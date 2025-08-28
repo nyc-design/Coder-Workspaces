@@ -65,8 +65,8 @@ jobs:
           # name-canonical=true ensures full ref IMG@sha256:...
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ env.IMG }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMG }}:buildcache,mode=max
+          cache-from: type=gha,ref=${{ env.IMG }}:buildcache
+          cache-to: type=gha,ref=${{ env.IMG }}:buildcache,mode=max
 
       - name: Export digest file
         run: |
@@ -77,7 +77,7 @@ jobs:
       - name: Upload digest artifact
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.platform }}
+          name: digests-${{ matrix.platform == 'linux/amd64' && 'linux-amd64' || 'linux-arm64' }}
           path: ${{ runner.temp }}/digests/*
           retention-days: 1
 
