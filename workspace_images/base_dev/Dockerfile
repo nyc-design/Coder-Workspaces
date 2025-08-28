@@ -1,11 +1,11 @@
 FROM codercom/enterprise-base:ubuntu
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
 
 # Core deps + Python + build tools
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    ca-certificates curl git openssh-client \
+    ca-certificates curl git \
     python3 python3-pip python3-venv build-essential \
  && rm -rf /var/lib/apt/lists/*
 
