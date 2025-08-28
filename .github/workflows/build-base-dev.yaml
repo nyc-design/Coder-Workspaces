@@ -63,6 +63,7 @@ jobs:
           file: workspace_images/base_dev/Dockerfile
           platforms: ${{ matrix.platform }}
           # name-canonical=true ensures full ref IMG@sha256:...
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.IMG }}:buildcache
           cache-to: type=registry,ref=${{ env.IMG }}:buildcache,mode=max
