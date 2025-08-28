@@ -1,0 +1,11 @@
+{
+  "name": "Pokelink Dev Env",
+  "image": "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "workbench.colorTheme": "Default Dark Modern"
+      }
+    }
+  }
+}
