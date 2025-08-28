@@ -48,3 +48,5 @@ jobs:
           docker build -t "${IMG}:latest" -t "${IMG}:${SHA_SHORT}" -f ubuntu-dev/Dockerfile ubuntu-dev
           docker push "${IMG}:latest"
           docker push "${IMG}:${SHA_SHORT}"
+
+#rebuild
