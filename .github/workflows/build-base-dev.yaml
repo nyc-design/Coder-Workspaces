@@ -3,7 +3,7 @@ name: Build & Push base_dev (latest)
 on:
   push:
     paths:
-      - "base_dev/**"
+      - "workspace_images/base_dev/**"
       - ".github/workflows/build-base-dev.yaml"
   workflow_dispatch:
 
