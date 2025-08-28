@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.env
+
+# Virtual environment
+.venv/
+env/
+
+# Logs
+*.log
+
+# Docker
+*.dockerignore
+docker-compose.override.yml
+
+# Nginx
+nginx/*.log
+
+# Git
+.DS_Store
+.idea/
+.vscode/
+
+# Node
+node_modules/
+.next/
+
+#Scrapyard
+scrapyard/

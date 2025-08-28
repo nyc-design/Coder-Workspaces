@@ -1,0 +1,50 @@
+name: Build & Push base_dev (latest)
+
+on:
+  push:
+    paths:
+      - "base_dev/**"
+      - ".github/workflows/build-base-dev.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: us-central1
+  GCP_PROJECT: coder-nt                  # <-- change if needed
+  REPO: workspace-images                  # Artifact Registry repo (Docker)
+  IMAGE_NAME: workspace-base-dev                   # final image name
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Auth to GCP using your service-account JSON secret
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      # Allow Docker to push to Artifact Registry
+      - name: Configure Docker for AR
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # Build & push (latest + short SHA)
+      - name: Build & Push
+        run: |
+          REG="${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}"
+          IMG="${REG}/${{ env.IMAGE_NAME }}"
+          SHA_SHORT=${GITHUB_SHA::7}
+
+          docker build -t "${IMG}:latest" -t "${IMG}:${SHA_SHORT}" -f ubuntu-dev/Dockerfile ubuntu-dev
+          docker push "${IMG}:latest"
+          docker push "${IMG}:${SHA_SHORT}"
