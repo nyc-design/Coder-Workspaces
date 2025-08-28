@@ -48,3 +48,5 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
 USER root
 COPY init_workspace.sh /usr/local/bin/init_workspace.sh
 RUN chmod +x /usr/local/bin/init_workspace.sh
+
+USER coder
