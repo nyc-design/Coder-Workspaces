@@ -15,7 +15,7 @@ env:
   REGION: us-central1
   GCP_PROJECT: coder-nt                  # <-- change if needed
   REPO: workspace-images                  # Artifact Registry repo (Docker)
-  IMAGE_NAME: workspace-base-dev                   # final image name
+  IMAGE_NAME: base-dev                   # final image name
 
 jobs:
   build-push:
