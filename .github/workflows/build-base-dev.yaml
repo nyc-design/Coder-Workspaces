@@ -45,7 +45,7 @@ jobs:
           IMG="${REG}/${{ env.IMAGE_NAME }}"
           SHA_SHORT=${GITHUB_SHA::7}
 
-          docker build -t "${IMG}:latest" -t "${IMG}:${SHA_SHORT}" -f base_dev/Dockerfile base_dev
+          docker build -t "${IMG}:latest" -t "${IMG}:${SHA_SHORT}" -f workspace_images/base_dev/Dockerfile workspace_images/base_dev
           docker push "${IMG}:latest"
           docker push "${IMG}:${SHA_SHORT}"
 
