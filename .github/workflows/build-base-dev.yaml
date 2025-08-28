@@ -117,13 +117,14 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
-      # Create and push the manifest list (latest + short SHA)
       - name: Create and push multi-arch manifest
         working-directory: ${{ runner.temp }}/digests
         run: |
           set -eux
-          # Build imagetools create command with all per-arch digests
-          refs=$(printf '%s@sha256:%s ' "${IMG}" *)
+          refs=""
+          for d in *; do
+            refs="$refs ${IMG}@sha256:${d}"
+          done
           docker buildx imagetools create \
             -t "${IMG}:latest" \
             -t "${IMG}:${SHA_SHORT}" \
