@@ -74,4 +74,4 @@ else
 fi
 
 # Hand off to CMD (e.g., coder agent)
-exec su -s /bin/bash coder -c 'exec "$@"'
+exit 0
