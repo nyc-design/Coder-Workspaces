@@ -1,4 +1,4 @@
-name: Build & Push base_dev (multi-arch native)
+name: Build & Push base_dev (latest)
 
 on:
   push:
@@ -13,25 +13,17 @@ permissions:
 
 env:
   REGION: us-central1
-  GCP_PROJECT: coder-nt
-  REPO: workspace-images
-  IMAGE_NAME: base-dev
+  GCP_PROJECT: coder-nt                  # <-- change if needed
+  REPO: workspace-images                 # Artifact Registry repo (Docker)
+  IMAGE_NAME: base-dev                   # final image name
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-latest
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm   # <-- native ARM64 GitHub runner
-    runs-on: ${{ matrix.runner }}
+  build-push:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Auth to GCP / configure AR
+      # ── Auth to Google Cloud ──────────────────────────────────────────
       - name: Auth to GCP
         uses: google-github-actions/auth@v2
         with:
@@ -42,75 +34,29 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT }}
 
+      # ── Docker pushes to Artifact Registry ────────────────────────────
       - name: Configure Docker for AR
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      # Buildx (no QEMU needed because each job is native to its arch)
-      - uses: docker/setup-buildx-action@v3
+      # ── Enable multi-arch build (QEMU + Buildx) ───────────────────────
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Compute image refs
-        id: refs
-        run: |
-          echo "REG=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}" >> $GITHUB_ENV
-          echo "IMG=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
-          echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Build & push by digest per-arch (faster, reproducible)
-      - name: Build & Push ${{ matrix.platform }}
-        id: build
+      # ── Compute short SHA for tag ─────────────────────────────────────
+      - name: Compute short SHA
+        run: echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      # ── Build & push multi-arch image ─────────────────────────────────
+      - name: Build & Push (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: workspace_images/base_dev
           file: workspace_images/base_dev/Dockerfile
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           push: true
-          provenance: false
-          sbom: false
-          outputs: type=registry
           tags: |
-            ${{ env.IMG }}:${{ env.SHA_SHORT }}-${{ matrix.platform##*/ }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  manifest:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Auth to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          project_id: ${{ env.GCP_PROJECT }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GCP_PROJECT }}
-
-      - name: Configure Docker for AR
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-
-      - name: Compute image refs
-        run: |
-          echo "IMG=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
-          echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-      # Create multi-arch manifests from the two arch-specific tags
-      - name: Create & Push manifests
-        run: |
-          docker manifest create "${IMG}:latest" \
-            --amend "${IMG}:${SHA_SHORT}-amd64" \
-            --amend "${IMG}:${SHA_SHORT}-arm64"
-
-          docker manifest create "${IMG}:${SHA_SHORT}" \
-            --amend "${IMG}:${SHA_SHORT}-amd64" \
-            --amend "${IMG}:${SHA_SHORT}-arm64"
-
-          docker manifest push "${IMG}:latest"
-          docker manifest push "${IMG}:${SHA_SHORT}"
-
-      - name: Show result
-        run: |
-          echo "Published:"
-          echo " - ${IMG}:latest"
-          echo " - ${IMG}:${SHA_SHORT}"
-          docker buildx imagetools inspect "${IMG}:latest"
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}:latest,
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}:${{ env.SHA_SHORT }}
