@@ -64,8 +64,8 @@ USER root
 # --------------------------------------------------
 # Init script to bootstrap dockerd, PAT persistence, etc.
 # --------------------------------------------------
-COPY init-workspace.sh /usr/local/bin/init-workspace.sh
-RUN chmod +x /usr/local/bin/init-workspace.sh
+COPY init-workspace.sh /usr/local/bin/init_workspace.sh
+RUN chmod +x /usr/local/bin/init_workspace.sh
 
 ENTRYPOINT ["/usr/local/bin/init-workspace.sh"]
 CMD ["bash"]
