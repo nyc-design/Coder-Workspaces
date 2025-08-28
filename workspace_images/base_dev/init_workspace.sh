@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
 
 log() { printf '[init] %s\n' "$*"; }
 
 # --- Fix /run perms ---
 log "fixing /run and /var/run perms"
 mkdir -p /run /var/run
-chmod 755 /run /var/run || true
+chmod 755 /run || true
+chmod 755 /var/run || true
 
 # --- Start dockerd ---
 log "starting dockerd"
 nohup dockerd --host=unix:///var/run/docker.sock --storage-driver=overlay2 > /tmp/dockerd.log 2>&1 &
 
-# Wait for socket
+# Wait for the socket to appear
 for i in $(seq 1 60); do
   if test -S /var/run/docker.sock; then
     break
@@ -27,9 +28,9 @@ if ! test -S /var/run/docker.sock; then
 fi
 
 # Set socket perms
-log "setting docker.sock ownership & perms"
+log "setting socket ownership & perms"
 chown coder:coder /var/run/docker.sock
-chmod 660 /var/run/docker.sock
+chmod 660         /var/run/docker.sock
 [ -S /run/docker.sock ] || ln -sf /var/run/docker.sock /run/docker.sock
 
 # Add coder to docker group
@@ -73,4 +74,4 @@ else
 fi
 
 # Hand off to CMD (e.g., coder agent)
-exec "$@"
+exec su -s /bin/bash coder -c 'exec "$@"'
