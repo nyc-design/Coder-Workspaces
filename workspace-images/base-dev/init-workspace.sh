@@ -55,23 +55,5 @@ PS1='$${debian_chroot:+($${debian_chroot})}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\0
 EOF
 fi
 
-# --- GitHub PAT persistence ---
-if [[ -n "${GITHUB_PAT:-}" ]]; then
-  log "persisting GitHub PAT"
-  su - coder -c 'umask 077; cat > /home/coder/.git-credentials <<EOF
-https://x-access-token:'"${GITHUB_PAT}"'@github.com
-https://x-access-token:'"${GITHUB_PAT}"'@api.github.com
-EOF
-chmod 600 /home/coder/.git-credentials'
-
-  if command -v gh >/dev/null 2>&1; then
-    log "authenticating gh CLI"
-    su - coder -c 'echo "'"${GITHUB_PAT}"'" | gh auth login --hostname github.com --with-token'
-    su - coder -c 'gh auth setup-git || true'
-  fi
-else
-  log "no GITHUB_PAT provided; skipping credential setup"
-fi
-
 # Hand off to CMD (e.g., coder agent)
 exit 0
