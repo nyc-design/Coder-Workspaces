@@ -49,4 +49,9 @@ USER root
 COPY init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh
 
+RUN install -d -m 0755 /usr/local/share/workspace-init.d
+
+COPY run-workspace-inits /usr/local/bin/run-workspace-inits
+RUN chmod +x /usr/local/bin/run-workspace-inits
+
 USER coder
