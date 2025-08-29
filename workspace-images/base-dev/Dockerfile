@@ -41,12 +41,12 @@ RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && chown coder:coder /home/coder/.ssh/known_hosts \
  && chmod 644 /home/coder/.ssh/known_hosts
 
-USER root
+USER coder
+RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
+ && gh config set git_protocol https || true
 
+USER root
 COPY init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh
-
-COPY run-workspace-inits /usr/local/bin/run-workspace-inits
-RUN chmod +x /usr/local/bin/run-workspace-inits
 
 USER coder
