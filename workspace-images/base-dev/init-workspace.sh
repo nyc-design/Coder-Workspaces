@@ -46,14 +46,20 @@ fi
 log "dockerd is ready"
 
 # --- Colored prompt ---
-if ! grep -q 'custom colored prompt' /home/coder/.bashrc 2>/dev/null; then
-  cat >> /home/coder/.bashrc <<'EOF'
+# Remove any previous prompt block we may have written
+sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
+
+# Append a clean, colored PS1 (no $$ anywhere)
+cat >> /home/coder/.bashrc <<'EOF'
 # --- custom colored prompt ---
-force_color_prompt=yes
-PS1='$${debian_chroot:+($${debian_chroot})}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+# Show (chroot) only if debian_chroot is set; then user@host:cwd with colors.
+# Use \[ \] around non-printing escapes so line editing works correctly.
+export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
 # -----------------------------
 EOF
-fi
+
+# Ensure the file is owned by coder (helpful if script ran via sudo)
+sudo chown coder:coder /home/coder/.bashrc || true
 
 # --- GitHub auth (runner executes as coder) ---
 if [[ -n "${GH_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
