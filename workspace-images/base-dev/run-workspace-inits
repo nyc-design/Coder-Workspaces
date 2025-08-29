@@ -1,15 +1,11 @@
 #!/bin/sh
 set -eu
-
 INIT_DIR="${INIT_DIR:-/usr/local/share/workspace-init.d}"
 
-# Run all *.sh in lexicographic order; no logs/once/locks.
-# Any script failing will stop the runner (good for surfacing errors).
 if [ -d "$INIT_DIR" ]; then
-  # shellcheck disable=SC2035
   for s in $(ls "$INIT_DIR"/*.sh 2>/dev/null | sort); do
     echo "[init-runner] RUN $(basename "$s")"
-    sh "$s"
+    "$s"
   done
 fi
 
