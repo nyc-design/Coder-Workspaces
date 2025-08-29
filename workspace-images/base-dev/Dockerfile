@@ -46,7 +46,11 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
  && gh config set git_protocol https || true
 
 USER root
-COPY init_workspace.sh /usr/local/bin/init_workspace.sh
-RUN chmod +x /usr/local/bin/init_workspace.sh
+RUN install -d -m 0755 /usr/local/share/workspace-init.d /var/lib/workspace-init.d /var/log/workspace-init.d
+COPY run-workspace-inits /usr/local/bin/run-workspace-inits
+RUN chmod +x /usr/local/bin/run-workspace-inits
+
+COPY init-workspace.sh /usr/local/share/workspace-init.d/10-base.every.sh
+RUN chmod +x /usr/local/share/workspace-init.d/10-base.every.sh
 
 USER coder

@@ -1,10 +1,10 @@
-name: Build & Push base-dev (multi-arch, native runners)
+name: Build & Push playwright-dev (multi-arch, native runners)
 
 on:
   push:
     paths:
-      - "workspace-images/base-dev/**"
-      - ".github/workflows/build-base-dev.yaml"
+      - "workspace-images/playwright-dev/**"
+      - ".github/workflows/build-playwright-dev.yaml"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ env:
   REGION: us-central1
   GCP_PROJECT: coder-nt
   REPO: workspace-images
-  IMAGE_NAME: base-dev
+  IMAGE_NAME: playwright-dev
 
 jobs:
   build:
@@ -59,8 +59,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: workspace-images/base-dev
-          file: workspace-images/base-dev/Dockerfile
+          context: workspace-images/playwright-dev
+          file: workspace-images/playwright-dev/Dockerfile
           platforms: ${{ matrix.platform }}
           # name-canonical=true ensures full ref IMG@sha256:...
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.REPO }}/${{ env.IMAGE_NAME }}
