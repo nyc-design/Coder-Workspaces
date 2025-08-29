@@ -43,8 +43,8 @@ RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
 
 USER root
 
-COPY init_workspace.sh /usr/local/bin/init_workspace.sh
-RUN chmod +x /usr/local/bin/init_workspace.sh
+COPY init-workspace.sh /usr/local/bin/init-workspace.sh
+RUN chmod +x /usr/local/bin/init-workspace.sh
 
 COPY run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
