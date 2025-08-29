@@ -45,32 +45,31 @@ if ! docker info >/dev/null 2>&1; then
 fi
 log "dockerd is ready"
 
-# --- Git-aware colored prompt ---
-# Clean out any previous block we may have added
+# --- Git-aware colored prompt (idempotent) ---
+# Remove any previous block we wrote
 sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
 
+# Append a clean PS1 that uses git-sh-prompt
 cat >> /home/coder/.bashrc <<'EOF'
 # --- custom colored prompt ---
-# Try common locations for the git prompt helper
-for _gp in \
-  /usr/lib/git-core/git-sh-prompt \
-  /usr/share/git/completion/git-prompt.sh \
-  /usr/share/doc/git/contrib/completion/git-prompt.sh \
-  ~/.git-prompt.sh
-do
-  [ -f "$_gp" ] && . "$_gp" && break
-done
+# Load Git's prompt helper (ships with git)
+[ -f /usr/lib/git-core/git-sh-prompt ] && . /usr/lib/git-core/git-sh-prompt
 
-# Show dirty state (*) and stash count ($), etc.
+# Show markers:
+#   * = dirty (unstaged or staged)
+#   $ = stash exists
+#   <, >, = upstream status (behind/ahead/equal) when a remote is set
 export GIT_PS1_SHOWDIRTYSTATE=1
 export GIT_PS1_SHOWSTASHSTATE=1
 export GIT_PS1_SHOWUPSTREAM=auto
 
-# Green user@host, blue path, yellow (branch[*])
+# Prompt: (chroot) user@host:cwd (branch markers) $
+# Colors use \[ \] so readline keeps alignment
 export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[33m\]$(__git_ps1 " (%s)")\[\033[00m\]\$ '
 # -----------------------------
 EOF
 
+# Ensure ownership if we appended as root
 sudo chown coder:coder /home/coder/.bashrc || true
 
 # --- GitHub auth (runner executes as coder) ---
