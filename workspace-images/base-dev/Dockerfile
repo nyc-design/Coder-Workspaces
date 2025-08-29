@@ -41,10 +41,6 @@ RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && chown coder:coder /home/coder/.ssh/known_hosts \
  && chmod 644 /home/coder/.ssh/known_hosts
 
-USER coder
-RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
- && gh config set git_protocol https || true
-
 USER root
 RUN install -d -m 0755 /usr/local/share/workspace-init.d /var/lib/workspace-init.d /var/log/workspace-init.d
 COPY run-workspace-inits /usr/local/bin/run-workspace-inits
