@@ -16,6 +16,8 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
       | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
  && apt-get update -y \
  && apt-get install -y --no-install-recommends google-cloud-cli \
+     google-cloud-cli-gke-gcloud-auth-plugin kubectl \
+     google-cloud-cli-skaffold google-cloud-cli-minikube \
  && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI
