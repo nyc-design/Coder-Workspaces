@@ -45,20 +45,32 @@ if ! docker info >/dev/null 2>&1; then
 fi
 log "dockerd is ready"
 
-# --- Colored prompt ---
-# Remove any previous prompt block we may have written
+# --- Git-aware colored prompt ---
+# Clean out any previous block we may have added
 sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
 
-# Append a clean, colored PS1 (no $$ anywhere)
 cat >> /home/coder/.bashrc <<'EOF'
 # --- custom colored prompt ---
-# Show (chroot) only if debian_chroot is set; then user@host:cwd with colors.
-# Use \[ \] around non-printing escapes so line editing works correctly.
-export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+# Try common locations for the git prompt helper
+for _gp in \
+  /usr/lib/git-core/git-sh-prompt \
+  /usr/share/git/completion/git-prompt.sh \
+  /usr/share/doc/git/contrib/completion/git-prompt.sh \
+  ~/.git-prompt.sh
+do
+  [ -f "$_gp" ] && . "$_gp" && break
+done
+
+# Show dirty state (*) and stash count ($), etc.
+export GIT_PS1_SHOWDIRTYSTATE=1
+export GIT_PS1_SHOWSTASHSTATE=1
+export GIT_PS1_SHOWUPSTREAM=auto
+
+# Green user@host, blue path, yellow (branch[*])
+export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[33m\]$(__git_ps1 " (%s)")\[\033[00m\]\$ '
 # -----------------------------
 EOF
 
-# Ensure the file is owned by coder (helpful if script ran via sudo)
 sudo chown coder:coder /home/coder/.bashrc || true
 
 # --- GitHub auth (runner executes as coder) ---
