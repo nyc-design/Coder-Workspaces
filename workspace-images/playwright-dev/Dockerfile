@@ -5,17 +5,26 @@ FROM ${BASE_IMAGE}
 USER root
 
 # --- Real Google Chrome (stable) + desktop stack ---
-RUN install -d -m 0755 -o root -g root /usr/share/keyrings && \
-    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-      | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-      > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update -y && apt-get install -y --no-install-recommends \
-      google-chrome-stable \
-      xvfb x11vnc novnc websockify fluxbox xterm dbus-x11 xdg-utils \
-      x11-utils procps \
-      fonts-liberation libnss3 libxss1 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libdrm2 libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+  install -d -m 0755 -o root -g root /usr/share/keyrings; \
+  curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+    | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg; \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+    > /etc/apt/sources.list.d/google-chrome.list; \
+  \
+  # Enable universe (novnc/websockify live here)
+  apt-get update -y; \
+  apt-get install -y --no-install-recommends software-properties-common; \
+  add-apt-repository -y universe; \
+  apt-get update -y; \
+  \
+  # Install chrome + VNC/desktop stack
+  apt-get install -y --no-install-recommends \
+    google-chrome-stable \
+    xvfb x11vnc novnc websockify fluxbox xterm dbus-x11 xdg-utils \
+    x11-utils procps \
+    fonts-liberation libnss3 libxss1 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libdrm2 libasound2; \
+  rm -rf /var/lib/apt/lists/*
 
 # --- Playwright (Node + Python), use system Chrome (no bundled downloads) ---
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \

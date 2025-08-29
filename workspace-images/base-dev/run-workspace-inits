@@ -1,55 +1,16 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 INIT_DIR="${INIT_DIR:-/usr/local/share/workspace-init.d}"
-STATE_DIR="${STATE_DIR:-/var/lib/workspace-init.d}"
-LOG_DIR="${LOG_DIR:-/var/log/workspace-init.d}"
-LOCK_FILE="/var/run/workspace-init.lock"
 
-mkdir -p "$INIT_DIR" "$STATE_DIR" "$LOG_DIR"
-
-# prevent double-runs
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-  echo "[init-runner] another init is already running; exiting"
-  exit 0
+# Run all *.sh in lexicographic order; no logs/once/locks.
+# Any script failing will stop the runner (good for surfacing errors).
+if [ -d "$INIT_DIR" ]; then
+  # shellcheck disable=SC2035
+  for s in $(ls "$INIT_DIR"/*.sh 2>/dev/null | sort); do
+    echo "[init-runner] RUN $(basename "$s")"
+    sh "$s"
+  done
 fi
 
-run_one() {
-  local script="$1"
-  local name; name="$(basename "$script")"
-  local stamp="$STATE_DIR/$name.done"
-  local log="$LOG_DIR/$name.log"
-
-  local once=0
-  [[ "$name" == *.once.sh ]] && once=1
-
-  if (( once )) && [[ -f "$stamp" ]]; then
-    echo "[init-runner] SKIP (once): $name"
-    return 0
-  fi
-
-  echo "[init-runner] RUN: $name"
-  chmod +x "$script" || true
-  if bash "$script" >"$log" 2>&1; then
-    echo "[init-runner] OK:  $name"
-    (( once )) && touch "$stamp"
-  else
-    echo "[init-runner] FAIL: $name (see $log)"
-    if [[ "${INIT_CONTINUE_ON_ERROR:-0}" == "1" ]]; then
-      return 0
-    else
-      # show last lines for convenience
-      tail -n 50 "$log" || true
-      exit 1
-    fi
-  fi
-}
-
-# Sorted execution (00-*, 10-*, … 99-*)
-mapfile -t scripts < <(find "$INIT_DIR" -maxdepth 1 -type f -name "*.sh" | sort)
-for s in "${scripts[@]}"; do
-  run_one "$s"
-done
-
-echo "[init-runner] all done."
+echo "[init-runner] done."
