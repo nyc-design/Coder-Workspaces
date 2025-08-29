@@ -45,7 +45,7 @@ USER root
 COPY run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
 
-COPY init-workspace.sh /usr/local/share/workspace-init.d/10-base.every.sh
-RUN chmod +x /usr/local/share/workspace-init.d/10-base.every.sh
+COPY init-workspace.sh /usr/local/bin/workspace-init.d/10-base.every.sh
+RUN chmod +x /usr/local/bin/workspace-init.d/10-base.every.sh
 
 USER coder
