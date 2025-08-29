@@ -42,10 +42,11 @@ RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && chmod 644 /home/coder/.ssh/known_hosts
 
 USER root
+
+COPY init_workspace.sh /usr/local/bin/init_workspace.sh
+RUN chmod +x /usr/local/bin/init_workspace.sh
+
 COPY run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
-
-COPY init-workspace.sh /usr/local/bin/workspace-init.d/10-base.every.sh
-RUN chmod +x /usr/local/bin/workspace-init.d/10-base.every.sh
 
 USER coder
