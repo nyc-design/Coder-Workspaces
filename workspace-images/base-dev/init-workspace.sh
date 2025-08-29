@@ -55,31 +55,29 @@ PS1='$${debian_chroot:+($${debian_chroot})}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\0
 EOF
 fi
 
-# --- GitHub PAT persistence (runner executes as coder) ---
-if [[ -n "${GITHUB_PAT:-}" ]]; then
-  log "configuring GitHub auth"
+# --- GitHub auth (runner executes as coder) ---
+if [[ -n "${GH_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+  log "configuring GitHub auth via gh + GH_TOKEN"
 
-  # 1) Plain HTTPS fallback store (works even without gh)
+  # Use gh CLI as the Git credential helper
+  git config --global --unset-all credential.helper || true
+  git config --global credential.helper '!gh auth git-credential'
+  git config --global core.askPass ''
+
+elif [[ -n "${GITHUB_PAT:-}" ]]; then
+  log "configuring GitHub auth via stored GITHUB_PAT"
+
   umask 077
   cat > /home/coder/.git-credentials <<EOF
 https://x-access-token:${GITHUB_PAT}@github.com
-https://x-access-token:${GITHUB_PAT}@api.github.com
 EOF
   chmod 600 /home/coder/.git-credentials
 
-  # 2) If gh is present, make it the primary credential helper
-  if command -v gh >/dev/null 2>&1; then
-    printf '%s' "$GITHUB_PAT" | gh auth login --hostname github.com --with-token
-    gh config set git_protocol https || true
-
-    git config --global --unset-all credential.helper || true
-    git config --global credential.helper "!gh auth git-credential"
-    # keep the store file as a secondary fallback
-    git config --global --add credential.helper "store --file=/home/coder/.git-credentials"
-    git config --global core.askPass "" || true
-  fi
+  git config --global --unset-all credential.helper || true
+  git config --global credential.helper 'store --file=/home/coder/.git-credentials'
+  git config --global core.askPass ''
 else
-  log "no GITHUB_PAT provided; skipping credential setup"
+  log "no GitHub token provided; skipping credential setup"
 fi
 
 # Hand off to CMD (e.g., coder agent)
