@@ -57,8 +57,43 @@ provider "github" {
   token = data.google_secret_manager_secret_version.github_pat.secret_data
 }
 
-locals{
+locals {
+  # Basic user info
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  
+  # Determine if this is a new project
+  is_new_project = !data.coder_parameter.is_existing_project.value
+  
+  # Project name logic
+  project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
+  
+  # Project type for workspace image selection
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type.value : "base"
+  
+  # Repository URL (only used for existing projects)  
+  repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
+  
+  # GCP project (optional)
+  gcp_project = data.coder_parameter.gcp_project_name.value != "" ? data.coder_parameter.gcp_project_name.value : "coder-nt"
+  
+  # Workspace image mapping
+  workspace_image_map = {
+    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
+    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
+    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
+    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
+    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
+  }
+  
+  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
+  
+  # Note: final_repo_url will be calculated later after github_repository resource
+    
+  # Container and builder configuration
+  container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+  devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
+  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  git_author_email           = data.coder_workspace_owner.me.email
 }
 
 data "github_repositories" "user_repositories" {
@@ -173,60 +208,7 @@ data "coder_parameter" "gcp_project_name" {
   }
 }
 
-locals {
-  # Determine if this is a new project
-  is_new_project = !data.coder_parameter.is_existing_project.value
-  
-  # Project name logic
-  project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
-  
-  # Repository URL (only used for existing projects)  
-  repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
-  
-  # Project type for workspace image selection
-  project_type = local.is_new_project ? data.coder_parameter.new_project_type.value : "base"
-  
-  # Workspace image mapping
-  workspace_image_map = {
-    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
-    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
-    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
-    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
-    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
-  }
-  
-  # GCP project (optional)
-  gcp_project = data.coder_parameter.gcp_project_name.value != "" ? data.coder_parameter.gcp_project_name.value : "coder-nt"
-  
-  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
-}
 
-locals {
-  container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
-  devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
-  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  git_author_email           = data.coder_workspace_owner.me.email
-  # The envbuilder provider requires a key-value map of environment variables.
-  envbuilder_env = merge({
-    "CODER_AGENT_TOKEN" : coder_agent.main.token,
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
-    "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
-    "ENVBUILDER_PUSH_IMAGE" : "true",
-    "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
-  }, local.is_new_project ? {
-    # New project environment variables
-    "CODER_NEW_PROJECT" : "true",
-    "CODER_PROJECT_NAME" : local.project_name,
-  } : {})
-  # Convert the above map to the format expected by the docker provider.
-  docker_env = [
-    for k, v in local.envbuilder_env : "${k}=${v}"
-  ]
-}
 
 # Create GitHub repository for new projects (if requested)
 resource "github_repository" "new_repo" {
@@ -270,11 +252,7 @@ resource "github_repository" "new_repo" {
 }
 
 # Output the created repository URL for reference
-locals {
-  # Update repo_url for new projects with GitHub repo creation
-  final_repo_url = local.is_new_project && data.coder_parameter.create_github_repo.value ? 
-    github_repository.new_repo[0].clone_url : local.repo_url
-}
+# final_repo_url is now defined in the main locals block to avoid forward references
 
 resource "docker_image" "devcontainer_builder_image" {
   name         = local.devcontainer_builder_image
@@ -383,6 +361,35 @@ resource "coder_agent" "main" {
     interval     = 10
     timeout      = 1
   }
+}
+
+# Additional locals that depend on coder_agent resource
+locals {
+  # Update repo_url for new projects with GitHub repo creation
+  final_repo_url = local.is_new_project && data.coder_parameter.create_github_repo.value ? 
+    github_repository.new_repo[0].clone_url : local.repo_url
+    
+  # The envbuilder provider requires a key-value map of environment variables.
+  envbuilder_env = merge({
+    "CODER_AGENT_TOKEN" : coder_agent.main.token,
+    # Use the docker gateway if the access URL is 127.0.0.1
+    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    # Use the docker gateway if the access URL is 127.0.0.1
+    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
+    "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
+    "ENVBUILDER_PUSH_IMAGE" : "true",
+    "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
+  }, local.is_new_project ? {
+    # New project environment variables
+    "CODER_NEW_PROJECT" : "true",
+    "CODER_PROJECT_NAME" : local.project_name,
+  } : {})
+  
+  # Convert the above map to the format expected by the docker provider.
+  docker_env = [
+    for k, v in local.envbuilder_env : "${k}=${v}"
+  ]
 }
 
 resource "docker_volume" "home_volume" {
