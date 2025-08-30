@@ -61,32 +61,12 @@ locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 }
 
-# Step 1: Existing vs New Project
-data "coder_parameter" "is_existing_project" {
-  name         = "is_existing_project"
-  display_name = "Project Type"
-  type         = "string"
-  default      = "existing"
-  description  = "Use an existing GitHub repository or create a new project?"
-  order = 0
-  
-  option {
-    name  = "Existing Repository"
-    value = "existing"
-  }
-  option {
-    name  = "New Project"
-    value = "new"
-  }
-}
-
 data "github_repositories" "user_repositories" {
   query = "user:nyc-design"
   include_repo_id = true
 }
 
 data "coder_parameter" "repo_name" {
-  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "repo_name"
   display_name = "GitHub Repository"
   type = "string"
@@ -102,20 +82,11 @@ data "coder_parameter" "repo_name" {
   }
 }
 
-# Step 4: Optional GCP Project Selection  
-data "coder_parameter" "gcp_project_name" {
-  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
-  name         = "gcp_project_name"
-  display_name = "GCP Project (Optional)"
+data "coder_parameter" "project_name" {
+  name         = "project_name"
+  display_name = "Select your GCP Project"
   type         = "string"
-  default      = ""
   form_type    = "dropdown"
-  description  = "Select a GCP project to automatically configure secrets and credentials"
-
-  option {
-    name  = "None (Skip GCP integration)"
-    value = ""
-  }
 
   dynamic "option" {
     for_each = { for p in data.google_projects.gcp_projects.projects : p.project_id => p }
@@ -126,147 +97,28 @@ data "coder_parameter" "gcp_project_name" {
   }
 }
 
-data "coder_parameter" "new_project_type" {
-  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
-  name         = "new_project_type"
-  display_name = "New Project Type"
-  type         = "string"
-  default      = "base"
-  
-  option {
-    name  = "Base Project"
-    value = "base"
-  }
-  option {
-    name  = "Python Project"
-    value = "python"
-  }
-  option {
-    name  = "Next.js Project"
-    value = "nextjs"
-  }
-  option {
-    name  = "C++ Project"
-    value = "cpp"
-  }
-  option {
-    name  = "Fullstack Project"
-    value = "fullstack"
-  }
-}
-
-data "coder_parameter" "new_project_name" {
-  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
-  name         = "project_name"
-  display_name = "Project Name"
-  type         = "string"
-  default      = "my-new-project"
-}
-
-data "coder_parameter" "create_github_repo" {
-  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
-  name         = "create_github_repo"
-  display_name = "Create GitHub Repository"
-  type         = "bool"
-  description  = "Create a new GitHub repository for this project?"
+locals {
+  repo_url = "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
+  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
 }
 
 locals {
-  # Determine if this is a new project
-  is_new_project = data.coder_parameter.is_existing_project.value == "new"
-  
-  # Project name logic
-  project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
-  
-  # Project type for workspace image selection
-  project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
-  
-  # GCP project (optional)
-  gcp_project = data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : "coder-nt"
-  
-  # Workspace image mapping
-  workspace_image_map = {
-    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
-    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
-    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
-    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
-    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
-  }
-  
-  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
-    
-  # Container and builder configuration
   container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
-}
-
-
-
-# Create GitHub repository for new projects (if requested)
-resource "github_repository" "new_repo" {
-  count       = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? 1 : 0
-  name        = local.project_name
-  description = "Created with Coder workspace template"
-  
-  visibility = "private"
-  
-  # Initialize with README
-  auto_init = true
-  
-  # Add .gitignore based on project type
-  gitignore_template = local.project_type == "python" ? "Python" : (
-    local.project_type == "nextjs" ? "Node" : (
-      local.project_type == "cpp" ? "C++" : "Global"
-    )
-  )
-  
-  
-  # Repository settings
-  has_issues    = true
-  has_projects  = true
-  has_wiki      = false
-  
-  # Security settings
-  vulnerability_alerts   = true
-  delete_branch_on_merge = true
-  
-  lifecycle {
-    ignore_changes = [
-      # Ignore changes to these after creation to allow manual management
-      description,
-      has_issues,
-      has_projects,
-      has_wiki,
-    ]
-  }
-}
-
-locals {
-  new_repo_url = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? github_repository.new_repo[0].git_clone_url : ""
-
-  existing_repo_url = "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
-   
-  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
-
   # The envbuilder provider requires a key-value map of environment variables.
-  envbuilder_env = merge({
+  envbuilder_env = {
     "CODER_AGENT_TOKEN" : coder_agent.main.token,
     # Use the docker gateway if the access URL is 127.0.0.1
     "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
     # Use the docker gateway if the access URL is 127.0.0.1
     "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
+    "ENVBUILDER_FALLBACK_IMAGE" : "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest",
     "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
     "ENVBUILDER_PUSH_IMAGE" : "true",
     "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
-  }, local.is_new_project ? {
-    # New project environment variables
-    "CODER_NEW_PROJECT" : "true",
-    "CODER_PROJECT_NAME" : local.project_name,
-  } : {})
-  
+  }
   # Convert the above map to the format expected by the docker provider.
   docker_env = [
     for k, v in local.envbuilder_env : "${k}=${v}"
@@ -304,7 +156,7 @@ resource "coder_agent" "main" {
     # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
   EOT
 
-  dir = "/workspaces/${local.project_name}"
+  dir = "/workspaces/${data.coder_parameter.repo_name.value}"
 
   env = {
     GIT_AUTHOR_NAME     = local.git_author_name
@@ -436,16 +288,7 @@ resource "docker_container" "workspace" {
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
-    ],
-    local.is_new_project ? [
-      "CODER_NEW_PROJECT=true",
-      "NEW_PROJECT_TYPE=${local.project_type}",
-      "CODER_PROJECT_NAME=${local.project_name}",
-      "CODER_GITHUB_REPO_URL=${local.repo_url}",
-    ] : [],
-    local.gcp_project != "" ? [
-      "CODER_GCP_PROJECT=${local.gcp_project}",
-    ] : []
+    ]
   )
 
   host {
@@ -535,14 +378,14 @@ module "cursor" {
   source   = "registry.coder.com/coder/cursor/coder"
   version  = "1.2.1"
   agent_id = coder_agent.main.id
-  folder = "/workspaces/${local.project_name}"
+  folder = "/workspaces/${data.coder_parameter.repo_name.value}"
 }
 
 # See https://registry.coder.com/modules/coder/code-server
 module "code-server" {
   count  = data.coder_workspace.me.start_count
   source = "registry.coder.com/coder/code-server/coder"
-  folder = "/workspaces/${local.project_name}"
+  folder = "/workspaces/${data.coder_parameter.repo_name.value}"
 
   agent_id = coder_agent.main.id
   order    = 1
