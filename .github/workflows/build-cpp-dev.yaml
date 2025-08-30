@@ -59,7 +59,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: workspace-images/cpp-dev
+          context: .
           file: workspace-images/cpp-dev/Dockerfile
           platforms: ${{ matrix.platform }}
           # name-canonical=true ensures full ref IMG@sha256:...
