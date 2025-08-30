@@ -32,7 +32,7 @@ provider "docker" {}
 provider "envbuilder" {}
 
 provider "google" {
-  project = local.gcp_project
+  project = "coder-nt"  # Default project, will be overridden by resources if needed
   region  = "us-central1"
   zone    = "us-central1-c"
 }
@@ -58,42 +58,8 @@ provider "github" {
 }
 
 locals {
-  # Basic user info
+  # Basic user info (only variables that don't reference parameters)
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  
-  # Determine if this is a new project
-  is_new_project = !data.coder_parameter.is_existing_project.value
-  
-  # Project name logic
-  project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
-  
-  # Project type for workspace image selection
-  project_type = local.is_new_project ? data.coder_parameter.new_project_type.value : "base"
-  
-  # Repository URL (only used for existing projects)  
-  repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
-  
-  # GCP project (optional)
-  gcp_project = data.coder_parameter.gcp_project_name.value != "" ? data.coder_parameter.gcp_project_name.value : "coder-nt"
-  
-  # Workspace image mapping
-  workspace_image_map = {
-    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
-    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
-    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
-    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
-    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
-  }
-  
-  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
-  
-  # Note: final_repo_url will be calculated later after github_repository resource
-    
-  # Container and builder configuration
-  container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
-  devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
-  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  git_author_email           = data.coder_workspace_owner.me.email
 }
 
 data "github_repositories" "user_repositories" {
@@ -208,7 +174,40 @@ data "coder_parameter" "gcp_project_name" {
   }
 }
 
-
+# Main locals block - defined after all parameters
+locals {
+  # Determine if this is a new project
+  is_new_project = !data.coder_parameter.is_existing_project.value
+  
+  # Project name logic
+  project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
+  
+  # Project type for workspace image selection
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type.value : "base"
+  
+  # Repository URL (only used for existing projects)  
+  repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
+  
+  # GCP project (optional)
+  gcp_project = data.coder_parameter.gcp_project_name.value != "" ? data.coder_parameter.gcp_project_name.value : "coder-nt"
+  
+  # Workspace image mapping
+  workspace_image_map = {
+    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
+    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
+    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
+    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
+    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
+  }
+  
+  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
+    
+  # Container and builder configuration
+  container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+  devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
+  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  git_author_email           = data.coder_workspace_owner.me.email
+}
 
 # Create GitHub repository for new projects (if requested)
 resource "github_repository" "new_repo" {
