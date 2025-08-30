@@ -15,7 +15,8 @@ RUN set -eux; \
   apt-get install -y --no-install-recommends \
     google-chrome-stable \
     xvfb x11vnc fluxbox xterm dbus-x11 xdg-utils x11-utils procps \
-    fonts-liberation libnss3 libxss1 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libdrm2 libasound2 \
+    fonts-liberation libnss3 libxss1 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libdrm2 \
+    'libasound2t64 | libasound2' \
     python3 python3-pip; \
   pip3 install --no-cache-dir websockify; \
   curl -fsSL https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.tar.gz \

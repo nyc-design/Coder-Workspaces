@@ -1,0 +1,50 @@
+name: Deploy Chrome+Xpra to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}          # e.g. us-central1
+      SERVICE: ${{ secrets.CLOUD_RUN_SERVICE }}  # e.g. chrome-xpra
+      REPO: ${{ secrets.GAR_REPO }}              # e.g. workspace-images
+      IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GAR_REPO }}/chrome-xpra:${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Auth to GCP (Workload Identity Federation recommended)
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth to Artifact Registry
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        run: |
+          docker build -t "${IMAGE}" .
+          docker push "${IMAGE}"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE}" \
+            --image "${IMAGE}" \
+            --region "${REGION}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --cpu 1 --memory 1Gi \
+            --port 8080 \
+            --max-instances 1 \
+            --set-env-vars BASIC_AUTH_USER='${{ secrets.BASIC_AUTH_USER }}' \
+            --set-env-vars BASIC_AUTH_HASH='${{ secrets.BASIC_AUTH_HASH }}'
