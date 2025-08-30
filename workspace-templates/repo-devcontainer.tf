@@ -71,17 +71,17 @@ data "github_repositories" "user_repositories" {
 data "coder_parameter" "is_existing_project" {
   name         = "is_existing_project"
   display_name = "Project Type"
-  type         = "bool"
-  default      = true
+  type         = "string"
+  default      = "existing"
   description  = "Use an existing GitHub repository or create a new project?"
   
   option {
     name  = "Existing Repository"
-    value = true
+    value = "existing"
   }
   option {
     name  = "New Project"
-    value = false
+    value = "new"
   }
 }
 
@@ -90,9 +90,14 @@ data "coder_parameter" "repo_name" {
   name         = "repo_name"
   display_name = "GitHub Repository"
   type         = "string"
-  condition    = data.coder_parameter.is_existing_project.value == true
+  default      = ""
 
   form_type = "dropdown"
+
+  option {
+    name  = "Select a repository..."
+    value = ""
+  }
 
   dynamic "option" {
     for_each = data.github_repositories.user_repositories.names
@@ -109,7 +114,6 @@ data "coder_parameter" "new_project_type" {
   display_name = "New Project Type"
   type         = "string"
   default      = "base"
-  condition    = data.coder_parameter.is_existing_project.value == false
   
   option {
     name  = "Base Project"
@@ -139,7 +143,6 @@ data "coder_parameter" "project_name" {
   display_name = "Project Name"
   type         = "string"
   default      = "my-new-project"
-  condition    = data.coder_parameter.is_existing_project.value == false
 }
 
 data "coder_parameter" "create_github_repo" {
@@ -147,7 +150,6 @@ data "coder_parameter" "create_github_repo" {
   display_name = "Create GitHub Repository"
   type         = "bool"
   default      = true
-  condition    = data.coder_parameter.is_existing_project.value == false
   description  = "Create a new GitHub repository for this project?"
 }
 
@@ -177,7 +179,7 @@ data "coder_parameter" "gcp_project_name" {
 # Main locals block - defined after all parameters
 locals {
   # Determine if this is a new project
-  is_new_project = !data.coder_parameter.is_existing_project.value
+  is_new_project = data.coder_parameter.is_existing_project.value == "new"
   
   # Project name logic
   project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
