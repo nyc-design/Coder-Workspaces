@@ -45,29 +45,64 @@ if ! docker info >/dev/null 2>&1; then
 fi
 log "dockerd is ready"
 
-# --- Git-aware colored prompt (idempotent) ---
-# Remove any previous block we wrote
+# --- Starship prompt (Lion theme) ---
+# Remove any previous prompt blocks we wrote
 sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
+sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
 
-# Append a clean PS1 that uses git-sh-prompt
-cat >> /home/coder/.bashrc <<'EOF'
-# --- custom colored prompt ---
-# Load Git's prompt helper (ships with git)
-[ -f /usr/lib/git-core/git-sh-prompt ] && . /usr/lib/git-core/git-sh-prompt
+# Install starship if not present
+if ! command -v starship &> /dev/null; then
+  curl -sS https://starship.rs/install.sh | sh -s -- -y
+fi
 
-# Show markers:
-#   * = dirty (unstaged or staged)
-#   $ = stash exists
-#   <, >, = upstream status (behind/ahead/equal) when a remote is set
-export GIT_PS1_SHOWDIRTYSTATE=1
-export GIT_PS1_SHOWSTASHSTATE=1
-export GIT_PS1_SHOWUPSTREAM=auto
+# Create starship config
+mkdir -p /home/coder/.config
+cat > /home/coder/.config/starship.toml <<'EOF'
+format = "$username$hostname$directory$git_branch$git_status$cmd_duration$line_break$character"
 
-# Prompt: (chroot) user@host:cwd (branch markers) $
-# Colors use \[ \] so readline keeps alignment
-export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[33m\]$(__git_ps1 " (%s)")\[\033[00m\]\$ '
-# -----------------------------
+[username]
+style_user = "bright-red bold"
+format = "🦁[$user]($style)"
+
+[hostname]
+ssh_only = false
+format = "@[$hostname](bright-green bold)"
+
+[directory]
+style = "bright-blue bold"
+truncation_length = 3
+format = ":[$path]($style)"
+
+[git_branch]
+format = " 🌿[$branch]($style)"
+style = "bright-yellow bold"
+
+[git_status]
+format = '[$all_status$ahead_behind]($style)'
+style = "bright-magenta bold"
+ahead = "🏃‍♂️${count}"
+behind = "🐌${count}"
+up_to_date = "🌈👑"
+conflicted = "⚔️"
+untracked = "🔍"
+stashed = "📦"
+modified = "🦁"
+staged = "🎯"
+renamed = "🔄"
+deleted = "💀"
+
+[cmd_duration]
+min_time = 500
+format = " ⏱️[$duration](bright-cyan bold)"
+
+[character]
+success_symbol = "[🦁🌈➤](bright-green bold)"
+error_symbol = "[😡🔥➤](bright-red bold)"
 EOF
+
+# Set starship as prompt
+echo 'eval "$(starship init bash)"' >> /home/coder/.bashrc
+# -----------------------------
 
 # Ensure ownership if we appended as root
 sudo chown coder:coder /home/coder/.bashrc || true
