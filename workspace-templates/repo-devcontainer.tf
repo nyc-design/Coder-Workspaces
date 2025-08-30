@@ -2,7 +2,7 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "~> 2.0"
+      version = ">=2.4.0"
     }
     docker = {
       source = "kreuzwerker/docker"
@@ -32,7 +32,7 @@ provider "docker" {}
 provider "envbuilder" {}
 
 provider "google" {
-  project = "coder-nt"  # Default project, will be overridden by resources if needed
+  project = "coder-nt"
   region  = "us-central1"
   zone    = "us-central1-c"
 }
@@ -57,14 +57,8 @@ provider "github" {
   token = data.google_secret_manager_secret_version.github_pat.secret_data
 }
 
-locals {
-  # Basic user info (only variables that don't reference parameters)
+locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-}
-
-data "github_repositories" "user_repositories" {
-  query = "user:nyc-design"
-  include_repo_id = true
 }
 
 # Step 1: Existing vs New Project
@@ -74,6 +68,7 @@ data "coder_parameter" "is_existing_project" {
   type         = "string"
   default      = "existing"
   description  = "Use an existing GitHub repository or create a new project?"
+  order = 0
   
   option {
     name  = "Existing Repository"
@@ -85,19 +80,18 @@ data "coder_parameter" "is_existing_project" {
   }
 }
 
-# Step 2a: For existing projects - select repository (required)
+data "github_repositories" "user_repositories" {
+  query = "user:nyc-design"
+  include_repo_id = true
+}
+
 data "coder_parameter" "repo_name" {
+  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "repo_name"
   display_name = "GitHub Repository"
-  type         = "string"
-  default      = ""
+  type = "string"
 
   form_type = "dropdown"
-
-  option {
-    name  = "Select a repository..."
-    value = ""
-  }
 
   dynamic "option" {
     for_each = data.github_repositories.user_repositories.names
@@ -108,8 +102,32 @@ data "coder_parameter" "repo_name" {
   }
 }
 
-# Step 2b: For new projects - select project type
+# Step 4: Optional GCP Project Selection  
+data "coder_parameter" "gcp_project_name" {
+  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "gcp_project_name"
+  display_name = "GCP Project (Optional)"
+  type         = "string"
+  default      = ""
+  form_type    = "dropdown"
+  description  = "Select a GCP project to automatically configure secrets and credentials"
+
+  option {
+    name  = "None (Skip GCP integration)"
+    value = ""
+  }
+
+  dynamic "option" {
+    for_each = { for p in data.google_projects.gcp_projects.projects : p.project_id => p }
+    content {
+      name  = coalesce(option.value.name, option.value.project_id)
+      value = option.value.project_id
+    }
+  }
+}
+
 data "coder_parameter" "new_project_type" {
+  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
   name         = "new_project_type"
   display_name = "New Project Type"
   type         = "string"
@@ -137,8 +155,8 @@ data "coder_parameter" "new_project_type" {
   }
 }
 
-# Step 3: For new projects - project name and GitHub repo creation
-data "coder_parameter" "project_name" {
+data "coder_parameter" "new_project_name" {
+  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
   name         = "project_name"
   display_name = "Project Name"
   type         = "string"
@@ -146,52 +164,25 @@ data "coder_parameter" "project_name" {
 }
 
 data "coder_parameter" "create_github_repo" {
+  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
   name         = "create_github_repo"
   display_name = "Create GitHub Repository"
   type         = "bool"
-  default      = true
   description  = "Create a new GitHub repository for this project?"
 }
 
-# Step 4: Optional GCP Project Selection  
-data "coder_parameter" "gcp_project_name" {
-  name         = "gcp_project_name"
-  display_name = "GCP Project (Optional)"
-  type         = "string"
-  default      = ""
-  form_type    = "dropdown"
-  description  = "Select a GCP project to automatically configure secrets and credentials"
-
-  option {
-    name  = "None (Skip GCP integration)"
-    value = ""
-  }
-
-  dynamic "option" {
-    for_each = { for p in data.google_projects.gcp_projects.projects : p.project_id => p }
-    content {
-      name  = coalesce(option.value.name, option.value.project_id)
-      value = option.value.project_id
-    }
-  }
-}
-
-# Main locals block - defined after all parameters
 locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
   
   # Project name logic
-  project_name = local.is_new_project ? data.coder_parameter.project_name.value : data.coder_parameter.repo_name.value
+  project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
   
   # Project type for workspace image selection
-  project_type = local.is_new_project ? data.coder_parameter.new_project_type.value : "base"
-  
-  # Repository URL (only used for existing projects)  
-  repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
   
   # GCP project (optional)
-  gcp_project = data.coder_parameter.gcp_project_name.value != "" ? data.coder_parameter.gcp_project_name.value : "coder-nt"
+  gcp_project = data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : "coder-nt"
   
   # Workspace image mapping
   workspace_image_map = {
@@ -211,9 +202,11 @@ locals {
   git_author_email           = data.coder_workspace_owner.me.email
 }
 
+
+
 # Create GitHub repository for new projects (if requested)
 resource "github_repository" "new_repo" {
-  count       = local.is_new_project && data.coder_parameter.create_github_repo.value ? 1 : 0
+  count       = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? 1 : 0
   name        = local.project_name
   description = "Created with Coder workspace template"
   
@@ -229,8 +222,6 @@ resource "github_repository" "new_repo" {
     )
   )
   
-  # Default branch
-  default_branch = "main"
   
   # Repository settings
   has_issues    = true
@@ -252,8 +243,35 @@ resource "github_repository" "new_repo" {
   }
 }
 
-# Output the created repository URL for reference
-# final_repo_url is now defined in the main locals block to avoid forward references
+locals {
+  new_repo_url = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? github_repository.new_repo[0].git_clone_url : ""
+
+  existing_repo_url = "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
+   
+  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
+
+  # The envbuilder provider requires a key-value map of environment variables.
+  envbuilder_env = merge({
+    "CODER_AGENT_TOKEN" : coder_agent.main.token,
+    # Use the docker gateway if the access URL is 127.0.0.1
+    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    # Use the docker gateway if the access URL is 127.0.0.1
+    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
+    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
+    "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
+    "ENVBUILDER_PUSH_IMAGE" : "true",
+    "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
+  }, local.is_new_project ? {
+    # New project environment variables
+    "CODER_NEW_PROJECT" : "true",
+    "CODER_PROJECT_NAME" : local.project_name,
+  } : {})
+  
+  # Convert the above map to the format expected by the docker provider.
+  docker_env = [
+    for k, v in local.envbuilder_env : "${k}=${v}"
+  ]
+}
 
 resource "docker_image" "devcontainer_builder_image" {
   name         = local.devcontainer_builder_image
@@ -261,18 +279,11 @@ resource "docker_image" "devcontainer_builder_image" {
 }
 
 resource "envbuilder_cached_image" "cached" {
-  count         = !local.is_new_project ? 1 : 0
+  count         = 1
   builder_image = local.devcontainer_builder_image
-  git_url       = local.final_repo_url
+  git_url       = local.repo_url
   cache_repo    = local.cache_repo
   extra_env     = local.envbuilder_env
-}
-
-# For new projects, use the workspace image directly
-resource "docker_image" "new_project_image" {
-  count        = local.is_new_project ? 1 : 0
-  name         = local.workspace_image_map[data.coder_parameter.project_type.value]
-  keep_locally = true
 }
 
 resource "coder_agent" "main" {
@@ -364,35 +375,6 @@ resource "coder_agent" "main" {
   }
 }
 
-# Additional locals that depend on coder_agent resource
-locals {
-  # Update repo_url for new projects with GitHub repo creation
-  final_repo_url = local.is_new_project && data.coder_parameter.create_github_repo.value ? 
-    github_repository.new_repo[0].clone_url : local.repo_url
-    
-  # The envbuilder provider requires a key-value map of environment variables.
-  envbuilder_env = merge({
-    "CODER_AGENT_TOKEN" : coder_agent.main.token,
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
-    "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
-    "ENVBUILDER_PUSH_IMAGE" : "true",
-    "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
-  }, local.is_new_project ? {
-    # New project environment variables
-    "CODER_NEW_PROJECT" : "true",
-    "CODER_PROJECT_NAME" : local.project_name,
-  } : {})
-  
-  # Convert the above map to the format expected by the docker provider.
-  docker_env = [
-    for k, v in local.envbuilder_env : "${k}=${v}"
-  ]
-}
-
 resource "docker_volume" "home_volume" {
   name = "coder-${data.coder_workspace.me.id}-home"
   # Protect the volume from being deleted due to changes in attributes.
@@ -440,7 +422,7 @@ resource "docker_volume" "dind_data" {
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = local.is_new_project ? local.workspace_image_map[local.project_type] : envbuilder_cached_image.cached.0.image
+  image = envbuilder_cached_image.cached.0.image
   # Uses lower() to avoid Docker restriction on container names.
   name = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   # Hostname makes the shell more user friendly: coder@my-workspace:~$
@@ -449,7 +431,7 @@ resource "docker_container" "workspace" {
   runtime = "sysbox-runc"
 
   env = concat(
-    local.is_new_project ? [] : envbuilder_cached_image.cached[0].env,
+    envbuilder_cached_image.cached[0].env,
     [
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
@@ -457,11 +439,12 @@ resource "docker_container" "workspace" {
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
+      "NEW_PROJECT_TYPE=${local.project_type}",
       "CODER_PROJECT_NAME=${local.project_name}",
-      "CODER_GITHUB_REPO_URL=${local.final_repo_url}",
+      "CODER_GITHUB_REPO_URL=${local.repo_url}",
     ] : [],
-    data.coder_parameter.gcp_project_name.value != "" ? [
-      "CODER_GCP_PROJECT=${data.coder_parameter.gcp_project_name.value}",
+    local.gcp_project != "" ? [
+      "CODER_GCP_PROJECT=${local.gcp_project}",
     ] : []
   )
 

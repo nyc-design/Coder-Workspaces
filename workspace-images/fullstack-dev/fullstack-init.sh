@@ -393,14 +393,14 @@ log "Setting up Poetry for Python development"
 mkdir -p /home/coder/.cache/pypoetry
 chown -R coder:coder /home/coder/.cache/pypoetry
 
-su -c "poetry config virtualenvs.in-project true" coder 2>/dev/null || true
-su -c "poetry config virtualenvs.prefer-active-python true" coder 2>/dev/null || true
+poetry config virtualenvs.in-project true 2>/dev/null || true
+poetry config virtualenvs.prefer-active-python true 2>/dev/null || true
 
 # Create default virtual environment for general use
 DEFAULT_VENV="/home/coder/.venv"
 if [[ ! -d "$DEFAULT_VENV" ]]; then
     log "Creating default virtual environment at $DEFAULT_VENV"
-    su -c "python3 -m venv $DEFAULT_VENV" coder
+    python3 -m venv $DEFAULT_VENV
 fi
 
 # Configure environment variables in bashrc (idempotent)
@@ -448,7 +448,7 @@ EOF
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.venv /home/coder/.prettierrc 2>/dev/null || true
 
 # --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-}" == "fullstack" ]]; then
     PROJECT_NAME="${CODER_PROJECT_NAME:-new-fullstack-project}"
     PROJECT_DIR="/workspaces/${PROJECT_NAME}"
     
@@ -466,14 +466,14 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            su -c "git init" coder
-            su -c "git add ." coder
-            su -c "git commit -m 'Initial commit with fullstack scaffold'" coder
+            git init
+            git add .
+            git commit -m 'Initial commit with fullstack scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
-                su -c "git branch -M main" coder
+                git remote add origin '${CODER_GITHUB_REPO_URL}'
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
@@ -483,9 +483,9 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Install dependencies
         cd "${PROJECT_DIR}"
         log "Installing fullstack project dependencies..."
-        su -c "npm install" coder
+        npm install
         if [[ -f "requirements.txt" ]]; then
-            su -c "pip install -r requirements.txt" coder
+            pip install -r requirements.txt
         fi
         log "Dependencies installed successfully"
     else

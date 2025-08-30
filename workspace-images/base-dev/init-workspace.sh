@@ -214,7 +214,7 @@ else
 fi
 
 # --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-base}" == "base" ]]; then
     PROJECT_NAME="${CODER_PROJECT_NAME:-new-base-project}"
     PROJECT_DIR="/workspaces/${PROJECT_NAME}"
     
@@ -232,14 +232,14 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            su -c "git init" coder
-            su -c "git add ." coder
-            su -c "git commit -m 'Initial commit with base scaffold'" coder
+            git init
+            git add .
+            git commit -m 'Initial commit with base scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
-                su -c "git branch -M main" coder
+                git remote add origin '${CODER_GITHUB_REPO_URL}'
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             

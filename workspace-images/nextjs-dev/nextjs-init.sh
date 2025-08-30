@@ -279,7 +279,7 @@ fi
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.npm-global 2>/dev/null || true
 
 # --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-}" == "nextjs" ]]; then
     PROJECT_NAME="${CODER_PROJECT_NAME:-new-nextjs-project}"
     PROJECT_DIR="/workspaces/${PROJECT_NAME}"
     
@@ -297,14 +297,14 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            su -c "git init" coder
-            su -c "git add ." coder
-            su -c "git commit -m 'Initial commit with Next.js scaffold'" coder
+            git init
+            git add .
+            git commit -m 'Initial commit with Next.js scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
-                su -c "git branch -M main" coder
+                git remote add origin '${CODER_GITHUB_REPO_URL}'
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
@@ -314,7 +314,7 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Install dependencies
         cd "${PROJECT_DIR}"
         log "Installing Next.js project dependencies..."
-        su -c "npm install" coder
+        npm install
         log "Dependencies installed successfully"
     else
         log "WARNING: No scaffold directory found at /opt/coder-scaffolds"

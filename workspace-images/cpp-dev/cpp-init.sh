@@ -378,7 +378,7 @@ fi
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.clang-format 2>/dev/null || true
 
 # --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-}" == "cpp" ]]; then
     PROJECT_NAME="${CODER_PROJECT_NAME:-new-cpp-project}"
     PROJECT_DIR="/workspaces/${PROJECT_NAME}"
     
@@ -396,14 +396,14 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            su -c "git init" coder
-            su -c "git add ." coder
-            su -c "git commit -m 'Initial commit with C++ scaffold'" coder
+            git init
+            git add .
+            git commit -m 'Initial commit with C++ scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
-                su -c "git branch -M main" coder
+                git remote add origin '${CODER_GITHUB_REPO_URL}'
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
@@ -415,8 +415,8 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; 
         log "Building C++ project..."
         mkdir -p build
         cd build
-        su -c "cmake .. -G Ninja" coder
-        su -c "ninja" coder
+        cmake .. -G Ninja
+        ninja
         log "Project built successfully"
     else
         log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
