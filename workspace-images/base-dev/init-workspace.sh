@@ -47,21 +47,20 @@ log "dockerd is ready"
 
 # --- Starship prompt (Lion theme) ---
 # Ensure .bashrc exists
-touch /home/coder/.bashrc
-chown coder:coder /home/coder/.bashrc
+touch ~/.bashrc
 
 # Remove any previous prompt blocks we wrote
-sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
-sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
+sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' ~/.bashrc || true
+sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' ~/.bashrc || true
 
 # Install starship if not present
 if ! command -v starship &> /dev/null; then
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
 
-# Create starship config
-mkdir -p /home/coder/.config
-cat > /home/coder/.config/starship.toml <<'EOF'
+# Create starship config directory
+mkdir -p ~/.config
+cat > ~/.config/starship.toml <<'EOF'
 format = "$username$hostname$directory$git_branch$git_status$cmd_duration$line_break$character"
 
 [username]
@@ -105,15 +104,12 @@ error_symbol = "[😡🔥➤](bright-red bold)"
 EOF
 
 # Set starship as prompt (only add if not already present)
-if ! grep -q "starship init bash" /home/coder/.bashrc; then
-  echo 'eval "$(starship init bash)"' >> /home/coder/.bashrc
+if ! grep -q "starship init bash" ~/.bashrc; then
+  echo 'eval "$(starship init bash)"' >> ~/.bashrc
 fi
 # -----------------------------
 
-# Ensure ownership of config and bashrc
-chown coder:coder /home/coder/.bashrc /home/coder/.config/starship.toml
-
-# --- GitHub auth (runner executes as coder) ---
+# --- GitHub auth ---
 if [[ -n "${GH_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
   log "configuring GitHub auth via gh + GH_TOKEN"
 
@@ -186,14 +182,13 @@ EOF
         # Save to file for persistence
         secret_file="/home/coder/.secrets/${secret_name}"
         echo -n "$secret_value" > "$secret_file"
-        chown coder:coder "$secret_file"
         chmod 600 "$secret_file"
         
         # Export for current session
         export "$env_var_name"="$secret_value"
         
         # Add to bashrc for future sessions
-        echo "export ${env_var_name}=\"\$(cat ~/.secrets/${secret_name} 2>/dev/null || echo '')\"" >> /home/coder/.bashrc
+        echo "export ${env_var_name}=\"\$(cat /home/coder/.secrets/${secret_name} 2>/dev/null || echo '')\"" >> /home/coder/.bashrc
         
         log "configured secret: ${secret_name} -> ${env_var_name}"
         secret_count=$((secret_count + 1))
@@ -209,11 +204,6 @@ EOF
   else
     log "no secrets found in GCP project ${CODER_GCP_PROJECT}"
   fi
-  
-  if [[ -d /home/coder/.secrets ]]; then
-    chown -R coder:coder /home/coder/.secrets
-  fi
-  chown coder:coder /home/coder/.bashrc
 else
   if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
     log "warning: CODER_GCP_PROJECT set but gcloud not available"
@@ -234,8 +224,7 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
     
     # Copy scaffold files
     if [[ -d "/opt/coder-scaffolds" ]] && [[ -n "$(ls -A /opt/coder-scaffolds 2>/dev/null)" ]]; then
-        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
-        chown -R coder:coder "${PROJECT_DIR}"
+        cp -r /opt/coder-scaffolds/. "${PROJECT_DIR}/"
         log "Base project scaffold deployed successfully"
         
         # Initialize git repository if not exists
@@ -247,7 +236,7 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                git remote add origin '${CODER_GITHUB_REPO_URL}'
+                git remote add origin "${CODER_GITHUB_REPO_URL}"
                 git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
@@ -259,7 +248,6 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
         # Create a minimal scaffold
         echo "# ${PROJECT_NAME}" > "${PROJECT_DIR}/README.md"
         echo "A base development project created with Coder." >> "${PROJECT_DIR}/README.md"
-        chown coder:coder "${PROJECT_DIR}/README.md"
         log "Created minimal README.md scaffold"
     fi
 fi

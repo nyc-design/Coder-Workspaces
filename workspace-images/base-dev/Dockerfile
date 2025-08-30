@@ -57,6 +57,6 @@ COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-
 RUN chmod +x /usr/local/bin/run-workspace-inits
 
 # Copy base project scaffolds
-COPY project-scaffolds/base /opt/coder-scaffolds/
+COPY project-scaffolds/base/ /opt/coder-scaffolds/
 
 USER coder
