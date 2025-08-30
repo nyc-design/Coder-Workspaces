@@ -46,6 +46,10 @@ fi
 log "dockerd is ready"
 
 # --- Starship prompt (Lion theme) ---
+# Ensure .bashrc exists
+touch /home/coder/.bashrc
+chown coder:coder /home/coder/.bashrc
+
 # Remove any previous prompt blocks we wrote
 sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
 sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
@@ -158,7 +162,7 @@ EOF
     fi
     
     secret_count=0
-    echo "$SECRET_LIST" | while IFS= read -r secret_name; do
+    while IFS= read -r secret_name; do
       [[ -z "$secret_name" ]] && continue
       
       log "fetching secret: ${secret_name}"
@@ -194,7 +198,7 @@ EOF
       else
         log "warning: could not fetch secret '${secret_name}' (no permissions or doesn't exist)"
       fi
-    done
+    done <<< "$SECRET_LIST"
     
     # Complete the bashrc section
     echo "# --- End GCP Secrets ---" >> /home/coder/.bashrc
@@ -204,7 +208,10 @@ EOF
     log "no secrets found in GCP project ${CODER_GCP_PROJECT}"
   fi
   
-  chown -R coder:coder /home/coder/.secrets /home/coder/.bashrc
+  if [[ -d /home/coder/.secrets ]]; then
+    chown -R coder:coder /home/coder/.secrets
+  fi
+  chown coder:coder /home/coder/.bashrc
 else
   if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
     log "warning: CODER_GCP_PROJECT set but gcloud not available"
@@ -224,7 +231,7 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
     mkdir -p "${PROJECT_DIR}"
     
     # Copy scaffold files
-    if [[ -d "/opt/coder-scaffolds" ]]; then
+    if [[ -d "/opt/coder-scaffolds" ]] && [[ -n "$(ls -A /opt/coder-scaffolds 2>/dev/null)" ]]; then
         cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
         chown -R coder:coder "${PROJECT_DIR}"
         log "Base project scaffold deployed successfully"
@@ -246,7 +253,12 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
             log "Git repository initialized with scaffold"
         fi
     else
-        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
+        log "WARNING: No scaffold directory found at /opt/coder-scaffolds or directory is empty"
+        # Create a minimal scaffold
+        echo "# ${PROJECT_NAME}" > "${PROJECT_DIR}/README.md"
+        echo "A base development project created with Coder." >> "${PROJECT_DIR}/README.md"
+        chown coder:coder "${PROJECT_DIR}/README.md"
+        log "Created minimal README.md scaffold"
     fi
 fi
 
