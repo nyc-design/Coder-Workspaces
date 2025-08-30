@@ -104,12 +104,14 @@ success_symbol = "[🦁🌈➤](bright-green bold)"
 error_symbol = "[😡🔥➤](bright-red bold)"
 EOF
 
-# Set starship as prompt
-echo 'eval "$(starship init bash)"' >> /home/coder/.bashrc
+# Set starship as prompt (only add if not already present)
+if ! grep -q "starship init bash" /home/coder/.bashrc; then
+  echo 'eval "$(starship init bash)"' >> /home/coder/.bashrc
+fi
 # -----------------------------
 
-# Ensure ownership if we appended as root
-sudo chown coder:coder /home/coder/.bashrc || true
+# Ensure ownership of config and bashrc
+chown coder:coder /home/coder/.bashrc /home/coder/.config/starship.toml
 
 # --- GitHub auth (runner executes as coder) ---
 if [[ -n "${GH_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
