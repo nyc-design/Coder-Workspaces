@@ -17,6 +17,5 @@
     }
   },
   "forwardPorts": [3000],
-  "postCreateCommand": "npm install",
-  "remoteUser": "coder"
+  "postCreateCommand": "npm install"
 }

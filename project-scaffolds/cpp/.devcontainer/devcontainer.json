@@ -17,6 +17,5 @@
     }
   },
   "forwardPorts": [],
-  "postCreateCommand": "mkdir -p build && cd build && cmake .. && make",
-  "remoteUser": "coder"
+  "postCreateCommand": "mkdir -p build && cd build && cmake .. && make"
 }
