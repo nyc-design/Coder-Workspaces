@@ -35,11 +35,11 @@ RUN npm install -g \
     husky lint-staged
 
 # Create Next.js-specific init script
-COPY nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
+COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-nextjs-init.sh
 
 # Copy Next.js project scaffolds
-COPY ../../project-scaffolds/nextjs /opt/coder-scaffolds/
+COPY project-scaffolds/nextjs /opt/coder-scaffolds/
 
 # Set Node.js environment variables
 ENV NODE_ENV=development

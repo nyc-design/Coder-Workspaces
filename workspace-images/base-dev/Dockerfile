@@ -48,15 +48,15 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
  && gh config set git_protocol https || true
 
 USER root
-COPY init-workspace.sh /usr/local/bin/init-workspace.sh
+COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh
 
 RUN install -d -m 0755 /usr/local/share/workspace-init.d
 
-COPY run-workspace-inits /usr/local/bin/run-workspace-inits
+COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
 
 # Copy base project scaffolds
-COPY ../../project-scaffolds/base /opt/coder-scaffolds/
+COPY project-scaffolds/base /opt/coder-scaffolds/
 
 USER coder

@@ -36,11 +36,11 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     twine build
 
 # Create Python-specific init script
-COPY python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
+COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
 
 # Copy Python project scaffolds
-COPY ../../project-scaffolds/python /opt/coder-scaffolds/
+COPY project-scaffolds/python /opt/coder-scaffolds/
 
 # Set Python environment variables
 ENV PYTHONUNBUFFERED=1
