@@ -228,17 +228,17 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
         chown -R coder:coder "${PROJECT_DIR}"
         log "Base project scaffold deployed successfully"
         
-        # Initialize git repository if not exists (as coder user)
+        # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            sudo -u coder git init
-            sudo -u coder git add .
-            sudo -u coder git commit -m 'Initial commit with base scaffold'
+            git init
+            git add .
+            git commit -m 'Initial commit with base scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                sudo -u coder git remote add origin "${CODER_GITHUB_REPO_URL}"
-                sudo -u coder git branch -M main
+                git remote add origin "${CODER_GITHUB_REPO_URL}"
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
