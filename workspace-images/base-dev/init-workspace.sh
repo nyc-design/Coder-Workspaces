@@ -107,6 +107,10 @@ EOF
 if ! grep -q "starship init bash" ~/.bashrc; then
   echo 'eval "$(starship init bash)"' >> ~/.bashrc
 fi
+
+# Apply the starship config to current shell
+eval "$(starship init bash)"
+
 # -----------------------------
 
 # --- GitHub auth ---
