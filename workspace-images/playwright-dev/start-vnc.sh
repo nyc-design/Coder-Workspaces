@@ -16,7 +16,8 @@ start_as_coder() {
   if command -v runuser >/dev/null 2>&1; then
     runuser -u coder -- env DISPLAY="${DISPLAY}" "$@"
   else
-    su -s /bin/bash - coder -c "DISPLAY='${DISPLAY}' $*"
+    # Fallback: assume running as coder user
+    env DISPLAY="${DISPLAY}" "$@"
   fi
 }
 if ! pgrep -u coder -x fluxbox >/dev/null 2>&1; then
