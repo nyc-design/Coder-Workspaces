@@ -225,19 +225,20 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
     # Copy scaffold files
     if [[ -d "/opt/coder-scaffolds" ]] && [[ -n "$(ls -A /opt/coder-scaffolds 2>/dev/null)" ]]; then
         cp -r /opt/coder-scaffolds/. "${PROJECT_DIR}/"
+        chown -R coder:coder "${PROJECT_DIR}"
         log "Base project scaffold deployed successfully"
         
-        # Initialize git repository if not exists
+        # Initialize git repository if not exists (as coder user)
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            git init
-            git add .
-            git commit -m 'Initial commit with base scaffold'
+            sudo -u coder git init
+            sudo -u coder git add .
+            sudo -u coder git commit -m 'Initial commit with base scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                git remote add origin "${CODER_GITHUB_REPO_URL}"
-                git branch -M main
+                sudo -u coder git remote add origin "${CODER_GITHUB_REPO_URL}"
+                sudo -u coder git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
@@ -248,6 +249,7 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
         # Create a minimal scaffold
         echo "# ${PROJECT_NAME}" > "${PROJECT_DIR}/README.md"
         echo "A base development project created with Coder." >> "${PROJECT_DIR}/README.md"
+        chown -R coder:coder "${PROJECT_DIR}"
         log "Created minimal README.md scaffold"
     fi
 fi
