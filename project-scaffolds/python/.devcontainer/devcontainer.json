@@ -1,0 +1,22 @@
+{
+  "name": "Python Development",
+  "image": "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest",
+  "features": {},
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "workbench.colorTheme": "Default Dark Modern",
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "GitHub.vscode-github-actions",
+        "Anthropic.claude-code"
+      ]
+    }
+  },
+  "forwardPorts": [8000],
+  "postCreateCommand": "pip install -r requirements.txt",
+  "remoteUser": "coder"
+}

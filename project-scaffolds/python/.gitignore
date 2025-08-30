@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.env
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Logs
+*.log
+
+# Docker
+*.dockerignore
+docker-compose.override.yml
+
+# Git
+.DS_Store
+.idea/
+.vscode/
+
+# Python specific
+*.egg-info/
+dist/
+build/

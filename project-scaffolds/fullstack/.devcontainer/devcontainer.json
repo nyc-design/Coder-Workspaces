@@ -1,0 +1,25 @@
+{
+  "name": "Fullstack Development",
+  "image": "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest",
+  "features": {},
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "workbench.colorTheme": "Default Dark Modern",
+        "typescript.preferences.quoteStyle": "double",
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json",
+        "GitHub.vscode-github-actions",
+        "Anthropic.claude-code"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 8000],
+  "postCreateCommand": "npm install && pip install -r requirements.txt",
+  "remoteUser": "coder"
+}

@@ -377,6 +377,52 @@ fi
 # Ensure ownership of all created files
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.clang-format 2>/dev/null || true
 
+# --- Project scaffold deployment ---
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+    PROJECT_NAME="${CODER_PROJECT_NAME:-new-cpp-project}"
+    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
+    
+    log "Deploying C++ project scaffold to ${PROJECT_DIR}"
+    
+    # Create project directory
+    mkdir -p "${PROJECT_DIR}"
+    
+    # Copy scaffold files
+    if [[ -d "/opt/coder-scaffolds" ]]; then
+        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
+        chown -R coder:coder "${PROJECT_DIR}"
+        log "C++ project scaffold deployed successfully"
+        
+        # Initialize git repository if not exists
+        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
+            cd "${PROJECT_DIR}"
+            su -c "git init" coder
+            su -c "git add ." coder
+            su -c "git commit -m 'Initial commit with C++ scaffold'" coder
+            
+            # Add remote origin if GitHub repo URL is provided
+            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
+                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
+                su -c "git branch -M main" coder
+                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
+            fi
+            
+            log "Git repository initialized with scaffold"
+        fi
+        
+        # Build the project
+        cd "${PROJECT_DIR}"
+        log "Building C++ project..."
+        mkdir -p build
+        cd build
+        su -c "cmake .. -G Ninja" coder
+        su -c "ninja" coder
+        log "Project built successfully"
+    else
+        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
+    fi
+fi
+
 log "C++ development environment setup complete"
 log "Use 'create-cpp [project-name]' to create a new C++ project"
 log "Use 'cpp-tasks' to see available development commands"

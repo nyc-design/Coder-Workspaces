@@ -56,4 +56,7 @@ RUN install -d -m 0755 /usr/local/share/workspace-init.d
 COPY run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
 
+# Copy base project scaffolds
+COPY ../../project-scaffolds/base /opt/coder-scaffolds/
+
 USER coder

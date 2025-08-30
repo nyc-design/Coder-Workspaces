@@ -39,6 +39,9 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
 COPY python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
 
+# Copy Python project scaffolds
+COPY ../../project-scaffolds/python /opt/coder-scaffolds/
+
 # Set Python environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

@@ -132,5 +132,123 @@ else
   log "no GitHub token provided; skipping credential setup"
 fi
 
+# --- GCP Secrets Integration ---
+if [[ -n "${CODER_GCP_PROJECT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
+  log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
+  
+  # Set the active GCP project
+  gcloud config set project "${CODER_GCP_PROJECT}"
+  
+  # Create secrets directory
+  mkdir -p /home/coder/.secrets
+  chmod 700 /home/coder/.secrets
+  
+  # Get list of all secrets in the project
+  log "discovering secrets in GCP project..."
+  SECRET_LIST=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || echo "")
+  
+  if [[ -n "$SECRET_LIST" ]]; then
+    # Prepare bashrc section for secrets
+    if ! grep -q "# --- GCP Secrets Auto-Generated ---" /home/coder/.bashrc; then
+      cat >> /home/coder/.bashrc <<'EOF'
+
+# --- GCP Secrets Auto-Generated ---
+# Dynamically loaded secrets from GCP Secret Manager
+EOF
+    fi
+    
+    secret_count=0
+    echo "$SECRET_LIST" | while IFS= read -r secret_name; do
+      [[ -z "$secret_name" ]] && continue
+      
+      log "fetching secret: ${secret_name}"
+      
+      # Fetch the secret value
+      if secret_value=$(gcloud secrets versions access latest --secret="${secret_name}" --quiet 2>/dev/null); then
+        # Convert secret name to environment variable name
+        # Smart conversion: handle various naming conventions
+        env_var_name="$secret_name"
+        
+        # If it's already in UPPER_CASE format, keep it as is
+        if [[ "$secret_name" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+          env_var_name="$secret_name"
+        else
+          # Convert kebab-case or lowercase to UPPER_CASE
+          env_var_name=$(echo "$secret_name" | sed 's/-/_/g' | tr '[:lower:]' '[:upper:]')
+        fi
+        
+        # Save to file for persistence
+        secret_file="/home/coder/.secrets/${secret_name}"
+        echo -n "$secret_value" > "$secret_file"
+        chown coder:coder "$secret_file"
+        chmod 600 "$secret_file"
+        
+        # Export for current session
+        export "$env_var_name"="$secret_value"
+        
+        # Add to bashrc for future sessions
+        echo "export ${env_var_name}=\"\$(cat ~/.secrets/${secret_name} 2>/dev/null || echo '')\"" >> /home/coder/.bashrc
+        
+        log "configured secret: ${secret_name} -> ${env_var_name}"
+        secret_count=$((secret_count + 1))
+      else
+        log "warning: could not fetch secret '${secret_name}' (no permissions or doesn't exist)"
+      fi
+    done
+    
+    # Complete the bashrc section
+    echo "# --- End GCP Secrets ---" >> /home/coder/.bashrc
+    
+    log "GCP secrets configuration complete (configured ${secret_count} secrets)"
+  else
+    log "no secrets found in GCP project ${CODER_GCP_PROJECT}"
+  fi
+  
+  chown -R coder:coder /home/coder/.secrets /home/coder/.bashrc
+else
+  if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
+    log "warning: CODER_GCP_PROJECT set but gcloud not available"
+  else
+    log "no GCP project specified; skipping secrets setup"
+  fi
+fi
+
+# --- Project scaffold deployment ---
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+    PROJECT_NAME="${CODER_PROJECT_NAME:-new-base-project}"
+    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
+    
+    log "Deploying base project scaffold to ${PROJECT_DIR}"
+    
+    # Create project directory
+    mkdir -p "${PROJECT_DIR}"
+    
+    # Copy scaffold files
+    if [[ -d "/opt/coder-scaffolds" ]]; then
+        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
+        chown -R coder:coder "${PROJECT_DIR}"
+        log "Base project scaffold deployed successfully"
+        
+        # Initialize git repository if not exists
+        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
+            cd "${PROJECT_DIR}"
+            su -c "git init" coder
+            su -c "git add ." coder
+            su -c "git commit -m 'Initial commit with base scaffold'" coder
+            
+            # Add remote origin if GitHub repo URL is provided
+            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
+                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
+                su -c "git branch -M main" coder
+                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
+            fi
+            
+            log "Git repository initialized with scaffold"
+        fi
+    else
+        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
+    fi
+fi
+
 # Hand off to CMD (e.g., coder agent)
 exit 0

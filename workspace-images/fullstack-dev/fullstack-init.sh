@@ -447,6 +447,52 @@ EOF
 # Ensure ownership of all created files
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.venv /home/coder/.prettierrc 2>/dev/null || true
 
+# --- Project scaffold deployment ---
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+    PROJECT_NAME="${CODER_PROJECT_NAME:-new-fullstack-project}"
+    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
+    
+    log "Deploying fullstack project scaffold to ${PROJECT_DIR}"
+    
+    # Create project directory
+    mkdir -p "${PROJECT_DIR}"
+    
+    # Copy scaffold files
+    if [[ -d "/opt/coder-scaffolds" ]]; then
+        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
+        chown -R coder:coder "${PROJECT_DIR}"
+        log "Fullstack project scaffold deployed successfully"
+        
+        # Initialize git repository if not exists
+        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
+            cd "${PROJECT_DIR}"
+            su -c "git init" coder
+            su -c "git add ." coder
+            su -c "git commit -m 'Initial commit with fullstack scaffold'" coder
+            
+            # Add remote origin if GitHub repo URL is provided
+            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
+                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
+                su -c "git branch -M main" coder
+                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
+            fi
+            
+            log "Git repository initialized with scaffold"
+        fi
+        
+        # Install dependencies
+        cd "${PROJECT_DIR}"
+        log "Installing fullstack project dependencies..."
+        su -c "npm install" coder
+        if [[ -f "requirements.txt" ]]; then
+            su -c "pip install -r requirements.txt" coder
+        fi
+        log "Dependencies installed successfully"
+    else
+        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
+    fi
+fi
+
 log "Full-stack development environment setup complete"
 log "Use 'create-monorepo [project-name]' to create a new full-stack project"
 log "Use 'fullstack-tasks' to see available development commands"

@@ -43,6 +43,9 @@ RUN git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg \
 COPY cpp-init.sh /usr/local/share/workspace-init.d/20-cpp-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-cpp-init.sh
 
+# Copy C++ project scaffolds
+COPY ../../project-scaffolds/cpp /opt/coder-scaffolds/
+
 # Set C++ environment variables
 ENV CC=gcc
 ENV CXX=g++

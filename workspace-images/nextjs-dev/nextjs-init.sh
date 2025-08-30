@@ -278,6 +278,49 @@ fi
 # Ensure ownership of all created files
 chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.npm-global 2>/dev/null || true
 
+# --- Project scaffold deployment ---
+if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]]; then
+    PROJECT_NAME="${CODER_PROJECT_NAME:-new-nextjs-project}"
+    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
+    
+    log "Deploying Next.js project scaffold to ${PROJECT_DIR}"
+    
+    # Create project directory
+    mkdir -p "${PROJECT_DIR}"
+    
+    # Copy scaffold files
+    if [[ -d "/opt/coder-scaffolds" ]]; then
+        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
+        chown -R coder:coder "${PROJECT_DIR}"
+        log "Next.js project scaffold deployed successfully"
+        
+        # Initialize git repository if not exists
+        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
+            cd "${PROJECT_DIR}"
+            su -c "git init" coder
+            su -c "git add ." coder
+            su -c "git commit -m 'Initial commit with Next.js scaffold'" coder
+            
+            # Add remote origin if GitHub repo URL is provided
+            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
+                su -c "git remote add origin '${CODER_GITHUB_REPO_URL}'" coder
+                su -c "git branch -M main" coder
+                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
+            fi
+            
+            log "Git repository initialized with scaffold"
+        fi
+        
+        # Install dependencies
+        cd "${PROJECT_DIR}"
+        log "Installing Next.js project dependencies..."
+        su -c "npm install" coder
+        log "Dependencies installed successfully"
+    else
+        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
+    fi
+fi
+
 log "Next.js development environment setup complete"
 log "Use 'create-nextjs [project-name]' to create a new Next.js project"
 log "Use 'dev-tasks' to see available development commands"

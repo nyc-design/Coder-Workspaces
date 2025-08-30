@@ -38,6 +38,9 @@ RUN npm install -g \
 COPY nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-nextjs-init.sh
 
+# Copy Next.js project scaffolds
+COPY ../../project-scaffolds/nextjs /opt/coder-scaffolds/
+
 # Set Node.js environment variables
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
