@@ -46,21 +46,21 @@ fi
 log "dockerd is ready"
 
 # --- Starship prompt (Lion theme) ---
-# Ensure .bashrc exists (as coder user)
-sudo -u coder touch /home/coder/.bashrc
+# Ensure .bashrc exists
+touch ~/.bashrc
 
-# Remove any previous prompt blocks we wrote (as coder user)
-sudo -u coder sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
-sudo -u coder sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' /home/coder/.bashrc || true
+# Remove any previous prompt blocks we wrote
+sed -i -e '/^# --- custom colored prompt ---$/,/^# -----------------------------$/d' ~/.bashrc || true
+sed -i -e '/^# --- Starship prompt ---$/,/^# -----------------------------$/d' ~/.bashrc || true
 
-# Install starship if not present (install system-wide as root)
+# Install starship if not present
 if ! command -v starship &> /dev/null; then
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
 
-# Create starship config directory (as coder user)
-sudo -u coder mkdir -p /home/coder/.config
-cat > /home/coder/.config/starship.toml <<'EOF'
+# Create starship config directory
+mkdir -p ~/.config
+cat > ~/.config/starship.toml <<'EOF'
 format = "$username$hostname$directory$git_branch$git_status$cmd_duration$line_break$character"
 
 [username]
@@ -103,37 +103,33 @@ success_symbol = "[🦁🌈➤](bright-green bold)"
 error_symbol = "[😡🔥➤](bright-red bold)"
 EOF
 
-# Set starship as prompt (only add if not already present) - as coder user
-if ! sudo -u coder grep -q "starship init bash" /home/coder/.bashrc; then
-  sudo -u coder bash -c 'echo '\''eval "$(starship init bash)"'\'' >> /home/coder/.bashrc'
+# Set starship as prompt (only add if not already present)
+if ! grep -q "starship init bash" ~/.bashrc; then
+  echo 'eval "$(starship init bash)"' >> ~/.bashrc
 fi
-# Ensure proper ownership
-chown coder:coder /home/coder/.config/starship.toml /home/coder/.bashrc
 # -----------------------------
 
-# --- GitHub auth (configure for coder user) ---
+# --- GitHub auth ---
 if [[ -n "${GH_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
   log "configuring GitHub auth via gh + GH_TOKEN"
 
-  # Use gh CLI as the Git credential helper for coder user
-  sudo -u coder git config --global --unset-all credential.helper || true
-  sudo -u coder git config --global credential.helper '!gh auth git-credential'
-  sudo -u coder git config --global core.askPass ''
+  # Use gh CLI as the Git credential helper
+  git config --global --unset-all credential.helper || true
+  git config --global credential.helper '!gh auth git-credential'
+  git config --global core.askPass ''
 
 elif [[ -n "${GITHUB_PAT:-}" ]]; then
   log "configuring GitHub auth via stored GITHUB_PAT"
 
-  # Create .git-credentials as root, then fix ownership
   umask 077
   cat > /home/coder/.git-credentials <<EOF
 https://x-access-token:${GITHUB_PAT}@github.com
 EOF
   chmod 600 /home/coder/.git-credentials
-  chown coder:coder /home/coder/.git-credentials
 
-  sudo -u coder git config --global --unset-all credential.helper || true
-  sudo -u coder git config --global credential.helper 'store --file=/home/coder/.git-credentials'
-  sudo -u coder git config --global core.askPass ''
+  git config --global --unset-all credential.helper || true
+  git config --global credential.helper 'store --file=/home/coder/.git-credentials'
+  git config --global core.askPass ''
 else
   log "no GitHub token provided; skipping credential setup"
 fi
@@ -231,17 +227,17 @@ if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] &
         cp -r /opt/coder-scaffolds/. "${PROJECT_DIR}/"
         log "Base project scaffold deployed successfully"
         
-        # Initialize git repository if not exists (as coder user)
+        # Initialize git repository if not exists
         if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
             cd "${PROJECT_DIR}"
-            sudo -u coder git init
-            sudo -u coder git add .
-            sudo -u coder git commit -m 'Initial commit with base scaffold'
+            git init
+            git add .
+            git commit -m 'Initial commit with base scaffold'
             
             # Add remote origin if GitHub repo URL is provided
             if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                sudo -u coder git remote add origin "${CODER_GITHUB_REPO_URL}"
-                sudo -u coder git branch -M main
+                git remote add origin "${CODER_GITHUB_REPO_URL}"
+                git branch -M main
                 log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
             fi
             
