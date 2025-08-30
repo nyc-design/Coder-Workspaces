@@ -47,6 +47,7 @@ USER coder
 RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
  && gh config set git_protocol https || true
 
+
 USER root
 COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh
@@ -60,3 +61,7 @@ RUN chmod +x /usr/local/bin/run-workspace-inits
 COPY project-scaffolds/base/ /opt/coder-scaffolds/
 
 USER coder
+
+# Set default shell and working directory
+WORKDIR /workspaces
+SHELL ["/bin/bash", "-c"]
