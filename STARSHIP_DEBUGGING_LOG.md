@@ -100,16 +100,26 @@ exec bash
 
 3. **For Documentation**: Update user guides to explain that shell customizations require a new session
 
-### Status: ✅ RESOLVED
-- Starship is properly configured
-- Config file is correct and themed
-- `.bashrc` now contains the init line
-- Issue was just missing integration in this specific workspace instance
-- Future workspace launches should work correctly
+### Status: ✅ RESOLVED (2025-09-01 20:15)
+
+**ROOT CAUSE IDENTIFIED**: The startup script order was incorrect in the Terraform template.
+
+**The Real Problem**:
+1. Init script ran and correctly added starship to `.bashrc`
+2. THEN the startup script ran `cp -rT /etc/skel ~` which **OVERWROTE** the modified `.bashrc`
+3. All starship configuration was lost due to this ordering bug
+
+**Fix Applied**: 
+- Modified `workspace-templates/repo-devcontainer/repo-devcontainer.tf` 
+- Moved skeleton copy to happen BEFORE init scripts (lines 243-247)
+- Now order is: skeleton copy → init scripts → starship works ✅
+
+**Files Changed**:
+- `repo-devcontainer.tf:240-253` - Fixed startup script execution order
 
 ### Next Claude Agent Notes
 If you're investigating starship issues:
-1. First check the verification steps above
-2. Remember this is normal timing behavior, not a bug
-3. The init script in `workspace-images/base-dev/init-workspace.sh` is working correctly
-4. Users just need to start a new shell session to see changes
+1. Check the startup script order in the Terraform template first
+2. Skeleton copy MUST happen before init scripts, not after
+3. The init script logic was always correct - it was a timing/ordering issue
+4. New workspaces created with the fixed template should work immediately

@@ -240,14 +240,14 @@ resource "coder_agent" "main" {
   startup_script = <<-EOT
     set -e
     
-    /usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
-    /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
-
-    # Prepare user home with default files on first start.
+    # Prepare user home with default files on first start (MUST happen before init scripts).
     if [ ! -f ~/.init_done ]; then
       cp -rT /etc/skel ~
       touch ~/.init_done
     fi
+
+    /usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
+    /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
 
     # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
   EOT
