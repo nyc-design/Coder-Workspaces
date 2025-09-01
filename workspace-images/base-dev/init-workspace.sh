@@ -216,47 +216,5 @@ else
   fi
 fi
 
-# --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-base}" == "base" ]]; then
-    PROJECT_NAME="${CODER_PROJECT_NAME:-new-base-project}"
-    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
-    
-    log "Deploying base project scaffold to ${PROJECT_DIR}"
-    
-    # Create project directory
-    mkdir -p "${PROJECT_DIR}"
-    
-    # Copy scaffold files
-    if [[ -d "/opt/coder-scaffolds" ]] && [[ -n "$(ls -A /opt/coder-scaffolds 2>/dev/null)" ]]; then
-        cp -r /opt/coder-scaffolds/. "${PROJECT_DIR}/"
-        chown -R coder:coder "${PROJECT_DIR}"
-        log "Base project scaffold deployed successfully"
-        
-        # Initialize git repository if not exists
-        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
-            cd "${PROJECT_DIR}"
-            git init
-            git add .
-            git commit -m 'Initial commit with base scaffold'
-            
-            # Add remote origin if GitHub repo URL is provided
-            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                git remote add origin "${CODER_GITHUB_REPO_URL}"
-                git branch -M main
-                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
-            fi
-            
-            log "Git repository initialized with scaffold"
-        fi
-    else
-        log "WARNING: No scaffold directory found at /opt/coder-scaffolds or directory is empty"
-        # Create a minimal scaffold
-        echo "# ${PROJECT_NAME}" > "${PROJECT_DIR}/README.md"
-        echo "A base development project created with Coder." >> "${PROJECT_DIR}/README.md"
-        chown -R coder:coder "${PROJECT_DIR}"
-        log "Created minimal README.md scaffold"
-    fi
-fi
-
 # Hand off to CMD (e.g., coder agent)
 exit 0

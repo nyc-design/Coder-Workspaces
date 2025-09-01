@@ -167,16 +167,6 @@ data "coder_parameter" "new_project_name" {
   order = 2
 }
 
-data "coder_parameter" "create_github_repo" {
-  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
-  name         = "create_github_repo"
-  display_name = "Create GitHub Repository"
-  type         = "bool"
-  default = false
-  description  = "Create a new GitHub repository for this project?"
-  order = 3
-}
-
 locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
@@ -188,16 +178,7 @@ locals {
   project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
   
   # GCP project (optional)
-  gcp_project = data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : "coder-nt"
-  
-  # Workspace image mapping
-  workspace_image_map = {
-    "base"        = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
-    "python"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest"
-    "nextjs"      = "us-central1-docker.pkg.dev/coder-nt/workspace-images/nextjs-dev:latest"
-    "cpp"         = "us-central1-docker.pkg.dev/coder-nt/workspace-images/cpp-dev:latest"
-    "fullstack"   = "us-central1-docker.pkg.dev/coder-nt/workspace-images/fullstack-dev:latest"
-  }
+  gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
   
   cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
     
@@ -209,50 +190,10 @@ locals {
 }
 
 
-
-# Create GitHub repository for new projects (if requested)
-resource "github_repository" "new_repo" {
-  count       = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? 1 : 0
-  name        = local.project_name
-  description = "Created with Coder workspace template"
-  
-  visibility = "private"
-  
-  # Initialize with README
-  auto_init = true
-  
-  # Add .gitignore based on project type
-  gitignore_template = local.project_type == "python" ? "Python" : (
-    local.project_type == "nextjs" ? "Node" : (
-      local.project_type == "cpp" ? "C++" : "Global"
-    )
-  )
-  
-  
-  # Repository settings
-  has_issues    = true
-  has_projects  = true
-  has_wiki      = false
-  
-  # Security settings
-  vulnerability_alerts   = true
-  delete_branch_on_merge = true
-  
-  lifecycle {
-    ignore_changes = [
-      # Ignore changes to these after creation to allow manual management
-      description,
-      has_issues,
-      has_projects,
-      has_wiki,
-    ]
-  }
-}
-
 locals {
-  new_repo_url = local.is_new_project && data.coder_parameter.create_github_repo[0].value ? github_repository.new_repo[0].git_clone_url : ""
+  new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
 
-  existing_repo_url = "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
+  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
    
   repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
 
@@ -263,10 +204,11 @@ locals {
     "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
     # Use the docker gateway if the access URL is 127.0.0.1
     "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : local.workspace_image_map[local.project_type],
+    "ENVBUILDER_FALLBACK_IMAGE" : "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest",
     "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
     "ENVBUILDER_PUSH_IMAGE" : "true",
     "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
+    "ENVBUILDER_WORKSPACE_FOLDER" : "/workspaces/${local.project_name}",
   }, local.is_new_project ? {
     # New project environment variables
     "CODER_NEW_PROJECT" : "true",
@@ -507,8 +449,8 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
-    container_path = "/home/coder/.local/share/code-server"
-    host_path      = "/home/ubuntu/secrets/code-server"
+    container_path = "/home/coder/.local/share/code-server/User"
+    host_path      = "/home/ubuntu/secrets/code-server/User"
     read_only      = false
   }
 

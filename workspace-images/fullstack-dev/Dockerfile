@@ -56,9 +56,6 @@ RUN npm install -g \
 COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/20-fullstack-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-fullstack-init.sh
 
-# Copy fullstack project scaffolds
-COPY project-scaffolds/fullstack /opt/coder-scaffolds/
-
 # Set environment variables for both Python and Node.js
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

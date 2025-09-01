@@ -142,41 +142,4 @@ fi
 # Ensure ownership of all created files
 chown -R coder:coder /home/coder/.bashrc /home/coder/.jupyter /home/coder/.local 2>/dev/null || true
 
-# --- Project scaffold deployment ---
-if [[ -n "${CODER_NEW_PROJECT:-}" ]] && [[ "${CODER_NEW_PROJECT}" == "true" ]] && [[ "${NEW_PROJECT_TYPE:-}" == "python" ]]; then
-    PROJECT_NAME="${CODER_PROJECT_NAME:-new-python-project}"
-    PROJECT_DIR="/workspaces/${PROJECT_NAME}"
-    
-    log "Deploying Python project scaffold to ${PROJECT_DIR}"
-    
-    # Create project directory
-    mkdir -p "${PROJECT_DIR}"
-    
-    # Copy scaffold files
-    if [[ -d "/opt/coder-scaffolds" ]]; then
-        cp -r /opt/coder-scaffolds/* "${PROJECT_DIR}/"
-        chown -R coder:coder "${PROJECT_DIR}"
-        log "Python project scaffold deployed successfully"
-        
-        # Initialize git repository if not exists
-        if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
-            cd "${PROJECT_DIR}"
-            git init
-            git add .
-            git commit -m 'Initial commit with Python scaffold'
-            
-            # Add remote origin if GitHub repo URL is provided
-            if [[ -n "${CODER_GITHUB_REPO_URL:-}" ]]; then
-                git remote add origin '${CODER_GITHUB_REPO_URL}'
-                git branch -M main
-                log "Git remote configured: ${CODER_GITHUB_REPO_URL}"
-            fi
-            
-            log "Git repository initialized with scaffold"
-        fi
-    else
-        log "WARNING: No scaffold directory found at /opt/coder-scaffolds"
-    fi
-fi
-
 log "Python development environment setup complete"
