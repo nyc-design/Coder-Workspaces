@@ -104,7 +104,19 @@ error_symbol = "[😡🔥➤](bright-red bold)"
 EOF
 
 # Set starship as prompt (only add if not already present)
-if ! grep -q "starship init bash" ~/.bashrc; then
+# Use a more robust check and add debugging
+if ! grep -q "starship.*init.*bash" ~/.bashrc; then
+  log "adding starship init to ~/.bashrc"
+  echo 'eval "$(starship init bash)"' >> ~/.bashrc
+else
+  log "starship init already present in ~/.bashrc"
+fi
+
+# Verify the addition worked
+if grep -q "starship.*init.*bash" ~/.bashrc; then
+  log "starship init confirmed in ~/.bashrc"
+else
+  log "ERROR: starship init missing from ~/.bashrc, force adding..."
   echo 'eval "$(starship init bash)"' >> ~/.bashrc
 fi
 
