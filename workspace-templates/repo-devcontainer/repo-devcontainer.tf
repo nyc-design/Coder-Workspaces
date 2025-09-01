@@ -239,8 +239,8 @@ resource "coder_agent" "main" {
   os             = "linux"
   startup_script = <<-EOT
     set -e
-    
-    # Prepare user home with default files on first start (MUST happen before init scripts).
+
+    # Prepare user home with default files on first start.
     if [ ! -f ~/.init_done ]; then
       cp -rT /etc/skel ~
       touch ~/.init_done
