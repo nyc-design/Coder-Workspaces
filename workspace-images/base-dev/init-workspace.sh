@@ -228,5 +228,62 @@ else
   fi
 fi
 
+# --- Git Helper Function ---
+log "adding gitquick helper function"
+
+# Remove any previous git helper functions we added
+sed -i -e '/^# --- GitHub Helper Function ---$/,/^# --- End GitHub Helper Function ---$/d' ~/.bashrc || true
+sed -i -e '/^# --- Git Helper Function ---$/,/^# --- End Git Helper Function ---$/d' ~/.bashrc || true
+
+# Add the gitquick helper function to .bashrc
+cat >> ~/.bashrc <<'EOF'
+
+# --- Git Helper Function ---
+gitquick() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: gitquick <command> [message]"
+    echo "Commands:"
+    echo "  push \"message\"  - git add ., git commit -m \"message\", git push"
+    echo "  status          - git status"
+    echo "  pull            - git pull"
+    return 1
+  fi
+  
+  local cmd="$1"
+  shift
+  
+  case "$cmd" in
+    "push")
+      if [[ $# -eq 0 ]]; then
+        echo "Error: commit message required"
+        echo "Usage: gitquick push \"Your commit message\""
+        return 1
+      fi
+      local message="$*"
+      echo "🔄 Adding all changes..."
+      git add .
+      echo "📝 Committing with message: $message"
+      git commit -m "$message"
+      echo "🚀 Pushing to remote..."
+      git push
+      ;;
+    "status")
+      git status
+      ;;
+    "pull")
+      git pull
+      ;;
+    *)
+      echo "Unknown command: $cmd"
+      echo "Available commands: push, status, pull"
+      return 1
+      ;;
+  esac
+}
+# --- End Git Helper Function ---
+EOF
+
+log "gitquick helper function added to ~/.bashrc"
+
 # Hand off to CMD (e.g., coder agent)
 exit 0
