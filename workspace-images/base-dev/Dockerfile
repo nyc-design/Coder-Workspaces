@@ -7,6 +7,7 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
+    tree \
  && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud CLI (modern method + single RUN per Google’s Docker tip)
