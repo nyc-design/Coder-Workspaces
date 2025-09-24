@@ -29,7 +29,9 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     # Documentation
     sphinx sphinx-rtd-theme \
     # Testing frameworks
-    pytest-xdist pytest-mock \
+    pytest-xdist pytest-mock pytest-asyncio \
+    # Modern testing tools
+    respx testcontainers pydantic-factories \
     # Development utilities
     ipython ipdb pdbpp \
     # Package management

@@ -65,25 +65,56 @@ cd() {
     builtin cd "$@" && activate_python_env
 }
 
-# Initialize Poetry in current directory
+# Initialize Poetry in current directory with proper dependency groups
 poetry-init() {
     if [[ ! -f "pyproject.toml" ]]; then
         poetry init --no-interaction
-        echo "Poetry project initialized. Run 'poetry add <package>' to add dependencies."
+
+        # Add common testing dependencies to test group
+        poetry add --group test pytest pytest-asyncio pytest-cov pytest-mock respx testcontainers pydantic-factories
+
+        # Add common dev dependencies to dev group
+        poetry add --group dev black isort flake8 mypy pre-commit ipython
+
+        echo "Poetry project initialized with test and dev dependency groups."
+        echo "Usage:"
+        echo "  poetry add <package>              # Production dependency"
+        echo "  poetry add --group dev <package>  # Development dependency"
+        echo "  poetry add --group test <package> # Testing dependency"
     else
         echo "pyproject.toml already exists in this directory."
     fi
 }
 
-# Install Poetry project and activate venv
+# Install Poetry project with all groups and activate venv
 poetry-setup() {
     if [[ -f "pyproject.toml" ]]; then
-        poetry install
+        poetry install --with dev,test
         activate_python_env
-        echo "Poetry project installed and environment activated."
+        echo "Poetry project installed with dev and test dependencies, environment activated."
     else
         echo "No pyproject.toml found. Run 'poetry-init' first."
     fi
+}
+
+# Install only production dependencies (for deployment)
+poetry-prod() {
+    if [[ -f "pyproject.toml" ]]; then
+        poetry install --only main
+        activate_python_env
+        echo "Production dependencies installed, environment activated."
+    else
+        echo "No pyproject.toml found. Run 'poetry-init' first."
+    fi
+}
+
+# Helper functions for adding dependencies to specific groups
+poetry-add-dev() {
+    poetry add --group dev "$@"
+}
+
+poetry-add-test() {
+    poetry add --group test "$@"
 }
 
 # Activate environment on shell start
