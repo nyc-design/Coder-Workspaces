@@ -12,6 +12,23 @@ mkdir -p /home/coder/.cache/node
 mkdir -p /home/coder/.local/share/pnpm/store
 chown -R coder:coder /home/coder/projects /home/coder/.cache /home/coder/.local
 
+# Install Playwright browsers globally for agents
+log "Installing Playwright browsers for Claude agents"
+if command -v npx >/dev/null 2>&1; then
+    # Install browsers in system location for reuse
+    export PLAYWRIGHT_BROWSERS_PATH="/usr/local/share/playwright-browsers"
+    sudo mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+    sudo chown coder:coder "$PLAYWRIGHT_BROWSERS_PATH"
+
+    # Install browsers
+    npx playwright install chromium firefox webkit || true
+
+    # Make browsers available to all users
+    sudo chown -R coder:coder "$PLAYWRIGHT_BROWSERS_PATH" || true
+
+    log "Playwright browsers installed for agent testing"
+fi
+
 # Add Next.js and React helper functions to bashrc (idempotent)
 if ! grep -q "# --- Next.js development helpers ---" /home/coder/.bashrc; then
     cat >> /home/coder/.bashrc <<'EOF'
@@ -85,7 +102,7 @@ setup-testing() {
             jest jest-environment-jsdom \
             @testing-library/react @testing-library/jest-dom \
             @testing-library/user-event
-        
+
         # Create basic Jest config
         cat > jest.config.js <<'JEST_EOF'
 const nextJest = require('next/jest')
@@ -101,13 +118,125 @@ const customJestConfig = {
 
 module.exports = createJestConfig(customJestConfig)
 JEST_EOF
-        
+
         # Create Jest setup file
         cat > jest.setup.js <<'SETUP_EOF'
 import '@testing-library/jest-dom'
 SETUP_EOF
-        
+
         echo "🧪 Testing setup complete! Create tests in __tests__ or *.test.js files."
+    else
+        echo "❌ No package.json found. Run this command from a Next.js project root."
+    fi
+}
+
+# Helper to set up Playwright for E2E testing
+setup-playwright() {
+    if [[ -f "package.json" ]]; then
+        echo "Setting up Playwright for E2E testing..."
+
+        # Install Playwright
+        npm install --save-dev @playwright/test
+
+        # Install browsers
+        echo "Installing Playwright browsers..."
+        npx playwright install
+
+        # Create basic Playwright config
+        cat > playwright.config.ts <<'PW_EOF'
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'Mobile Chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 12'] },
+    },
+  ],
+
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+});
+PW_EOF
+
+        # Create e2e directory and example test
+        mkdir -p e2e
+        cat > e2e/example.spec.ts <<'E2E_EOF'
+import { test, expect } from '@playwright/test';
+
+test('homepage loads correctly', async ({ page }) => {
+  await page.goto('/');
+
+  // Check that the page title contains expected text
+  await expect(page).toHaveTitle(/Next.js/);
+
+  // Check for main content
+  const main = page.locator('main');
+  await expect(main).toBeVisible();
+});
+
+test('navigation works', async ({ page }) => {
+  await page.goto('/');
+
+  // Example: Test navigation (adjust based on your app structure)
+  // const navLink = page.locator('nav a[href="/about"]');
+  // await navLink.click();
+  // await expect(page).toHaveURL(/.*about/);
+});
+E2E_EOF
+
+        # Add scripts to package.json
+        echo "Adding Playwright scripts to package.json..."
+
+        # Use Node.js to safely modify package.json
+        node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        pkg.scripts = pkg.scripts || {};
+        pkg.scripts['test:e2e'] = 'playwright test';
+        pkg.scripts['test:e2e:ui'] = 'playwright test --ui';
+        pkg.scripts['test:e2e:headed'] = 'playwright test --headed';
+        pkg.scripts['test:e2e:debug'] = 'playwright test --debug';
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        "
+
+        echo "🎭 Playwright setup complete!"
+        echo "Available commands:"
+        echo "  npm run test:e2e        - Run E2E tests"
+        echo "  npm run test:e2e:ui     - Run tests with UI mode"
+        echo "  npm run test:e2e:headed - Run tests in headed mode"
+        echo "  npm run test:e2e:debug  - Debug tests"
     else
         echo "❌ No package.json found. Run this command from a Next.js project root."
     fi
@@ -126,6 +255,7 @@ dev-tasks() {
     echo "  create-nextjs [name] [typescript] [tailwind] - Create new Next.js project"
     echo "  setup-storybook  - Add Storybook to current project"
     echo "  setup-testing    - Add Jest and Testing Library"
+    echo "  setup-playwright - Add Playwright E2E testing"
 }
 
 # Alias for quick project creation
@@ -217,6 +347,8 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
+# Playwright configuration for agents
+export PLAYWRIGHT_BROWSERS_PATH="/usr/local/share/playwright-browsers"
 # ---
 EOF
 fi
