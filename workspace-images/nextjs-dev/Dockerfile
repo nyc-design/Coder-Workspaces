@@ -10,15 +10,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     nodejs \
  && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright browser dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    # Browser dependencies for Playwright
-    libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-    libxrandr2 libgbm1 libxss1 libasound2 libatspi2.0-0 libgtk-3-0 \
-    # Additional tools for headless testing
-    xvfb \
- && rm -rf /var/lib/apt/lists/*
-
 # Install global Node.js development tools and package managers
 RUN npm install -g \
     # Package managers
@@ -41,9 +32,7 @@ RUN npm install -g \
     # Popular React ecosystem tools
     storybook @storybook/cli \
     # Code quality
-    husky lint-staged \
-    # Playwright MCP server for Claude agents
-    @modelcontextprotocol/server-playwright
+    husky lint-staged
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
