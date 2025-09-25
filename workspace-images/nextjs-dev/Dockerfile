@@ -35,7 +35,9 @@ RUN npm install -g \
     # Popular React ecosystem tools
     storybook @storybook/cli \
     # Code quality
-    husky lint-staged
+    husky lint-staged \
+    # MCP server for Claude agent browser automation
+    @modelcontextprotocol/server-playwright
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
@@ -50,6 +52,9 @@ ENV PNPM_HOME=/home/coder/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # Playwright browser path for MCP server
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+# MCP server configuration for Claude agents
+ENV MCP_SERVER_PLAYWRIGHT_PORT=3001
+ENV MCP_SERVER_PLAYWRIGHT_HOST=localhost
 
 USER coder
 

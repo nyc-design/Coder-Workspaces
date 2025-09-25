@@ -194,6 +194,48 @@ E2E_EOF
     fi
 }
 
+# Helper to start MCP Playwright server for Claude agent browser automation
+start-mcp-playwright() {
+    echo "Starting MCP Playwright server for Claude agent browser automation..."
+
+    # Check if browsers are installed
+    if [[ ! -d "$PLAYWRIGHT_BROWSERS_PATH" ]]; then
+        echo "Installing Playwright browsers..."
+        export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+        mkdir -p $PLAYWRIGHT_BROWSERS_PATH
+        npx playwright install chromium firefox webkit
+    fi
+
+    # Start MCP server in background
+    nohup mcp-server-playwright \
+        --port ${MCP_SERVER_PLAYWRIGHT_PORT:-3001} \
+        --host ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost} \
+        --browsers-path $PLAYWRIGHT_BROWSERS_PATH \
+        > /tmp/mcp-playwright.log 2>&1 &
+
+    echo "🤖 MCP Playwright server started!"
+    echo "  - Port: ${MCP_SERVER_PLAYWRIGHT_PORT:-3001}"
+    echo "  - Host: ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost}"
+    echo "  - Log: /tmp/mcp-playwright.log"
+    echo "  - Claude agents can now use browser automation"
+}
+
+# Helper to stop MCP Playwright server
+stop-mcp-playwright() {
+    pkill -f "mcp-server-playwright" && echo "🛑 MCP Playwright server stopped" || echo "❌ No MCP Playwright server found running"
+}
+
+# Helper to check MCP Playwright server status
+mcp-playwright-status() {
+    if pgrep -f "mcp-server-playwright" > /dev/null; then
+        echo "✅ MCP Playwright server is running"
+        echo "  - Port: ${MCP_SERVER_PLAYWRIGHT_PORT:-3001}"
+        echo "  - PID: $(pgrep -f 'mcp-server-playwright')"
+    else
+        echo "❌ MCP Playwright server is not running"
+    fi
+}
+
 # Helper to run common development tasks
 dev-tasks() {
     echo "Available development tasks:"
@@ -208,6 +250,11 @@ dev-tasks() {
     echo "  setup-storybook  - Add Storybook to current project"
     echo "  setup-testing    - Add Jest and Testing Library"
     echo "  setup-playwright - Add Playwright for E2E testing"
+    echo ""
+    echo "Claude Agent Browser Automation:"
+    echo "  start-mcp-playwright    - Start MCP server for Claude agents"
+    echo "  stop-mcp-playwright     - Stop MCP server"
+    echo "  mcp-playwright-status   - Check MCP server status"
 }
 
 # Alias for quick project creation
@@ -300,6 +347,8 @@ export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
 export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+export MCP_SERVER_PLAYWRIGHT_PORT=3001
+export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 # ---
 EOF
 fi
