@@ -4,10 +4,13 @@ FROM ${BASE_IMAGE}
 
 USER root
 
-# Install Node.js (using NodeSource repository for latest LTS)
+# Install Node.js and browser dependencies for Playwright
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
  && apt-get install -y --no-install-recommends \
     nodejs \
+    # Browser dependencies for Playwright
+    libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
+    libgbm1 libxss1 libasound2t64 libxshmfence1 xvfb \
  && rm -rf /var/lib/apt/lists/*
 
 # Install global Node.js development tools and package managers
@@ -32,7 +35,9 @@ RUN npm install -g \
     # Popular React ecosystem tools
     storybook @storybook/cli \
     # Code quality
-    husky lint-staged
+    husky lint-staged \
+    # MCP server for Claude agent browser automation
+    @playwright/mcp
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
@@ -45,6 +50,11 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_FUND=false
 ENV PNPM_HOME=/home/coder/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+# Playwright browser path for MCP server
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+# MCP server configuration for Claude agents
+ENV MCP_SERVER_PLAYWRIGHT_PORT=3001
+ENV MCP_SERVER_PLAYWRIGHT_HOST=localhost
 
 USER coder
 
