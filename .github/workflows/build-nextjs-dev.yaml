@@ -2,6 +2,8 @@ name: Build & Push nextjs-dev (multi-arch, native runners)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "workspace-images/nextjs-dev/**"
       - ".github/workflows/build-nextjs-dev.yaml"

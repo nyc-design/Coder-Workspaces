@@ -2,6 +2,8 @@ name: Build & Push fullstack-dev (multi-arch, native runners)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "workspace-images/fullstack-dev/**"
       - ".github/workflows/build-fullstack-dev.yaml"

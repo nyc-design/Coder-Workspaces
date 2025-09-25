@@ -2,6 +2,8 @@ name: Build & Push cpp-dev (multi-arch, native runners)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "workspace-images/cpp-dev/**"
       - ".github/workflows/build-cpp-dev.yaml"

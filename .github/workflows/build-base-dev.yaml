@@ -2,6 +2,8 @@ name: Build & Push base-dev (multi-arch, native runners)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "workspace-images/base-dev/**"
       - ".github/workflows/build-base-dev.yaml"

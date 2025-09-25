@@ -2,6 +2,8 @@ name: Build & Push python-dev (multi-arch, native runners)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "workspace-images/python-dev/**"
       - ".github/workflows/build-python-dev.yaml"
