@@ -85,7 +85,7 @@ setup-testing() {
             jest jest-environment-jsdom \
             @testing-library/react @testing-library/jest-dom \
             @testing-library/user-event
-        
+
         # Create basic Jest config
         cat > jest.config.js <<'JEST_EOF'
 const nextJest = require('next/jest')
@@ -101,13 +101,94 @@ const customJestConfig = {
 
 module.exports = createJestConfig(customJestConfig)
 JEST_EOF
-        
+
         # Create Jest setup file
         cat > jest.setup.js <<'SETUP_EOF'
 import '@testing-library/jest-dom'
 SETUP_EOF
-        
+
         echo "🧪 Testing setup complete! Create tests in __tests__ or *.test.js files."
+    else
+        echo "❌ No package.json found. Run this command from a Next.js project root."
+    fi
+}
+
+# Helper to set up Playwright for E2E testing
+setup-playwright() {
+    if [[ -f "package.json" ]]; then
+        echo "Setting up Playwright for E2E testing..."
+
+        # Install Playwright if not already installed
+        if ! npm list @playwright/test >/dev/null 2>&1; then
+            npm install --save-dev @playwright/test
+        fi
+
+        # Install browsers globally for workspace sharing
+        export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+        mkdir -p $PLAYWRIGHT_BROWSERS_PATH
+        npx playwright install chromium firefox webkit
+
+        # Create basic Playwright config
+        cat > playwright.config.ts <<'PW_EOF'
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+});
+PW_EOF
+
+        # Create E2E test directory and example test
+        mkdir -p e2e
+        cat > e2e/example.spec.ts <<'E2E_EOF'
+import { test, expect } from '@playwright/test';
+
+test('homepage has title and loads correctly', async ({ page }) => {
+  await page.goto('/');
+
+  // Expect a title "to contain" a substring.
+  await expect(page).toHaveTitle(/Next.js/);
+});
+
+test('navigation works', async ({ page }) => {
+  await page.goto('/');
+
+  // Click any link and verify navigation
+  // Add your specific navigation tests here
+});
+E2E_EOF
+
+        echo "🎭 Playwright setup complete!"
+        echo "  - Run 'npx playwright test' to run E2E tests"
+        echo "  - Run 'npx playwright test --ui' for interactive mode"
+        echo "  - Run 'npx playwright show-report' to view results"
     else
         echo "❌ No package.json found. Run this command from a Next.js project root."
     fi
@@ -126,6 +207,7 @@ dev-tasks() {
     echo "  create-nextjs [name] [typescript] [tailwind] - Create new Next.js project"
     echo "  setup-storybook  - Add Storybook to current project"
     echo "  setup-testing    - Add Jest and Testing Library"
+    echo "  setup-playwright - Add Playwright for E2E testing"
 }
 
 # Alias for quick project creation
@@ -217,6 +299,7 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
+export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
 # ---
 EOF
 fi
