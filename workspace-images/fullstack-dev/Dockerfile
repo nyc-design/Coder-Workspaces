@@ -16,19 +16,23 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-testresources \
  && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages and linters via pip
+# Install Python packages in smaller groups to avoid conflicts
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    # Core development tools
-    poetry pipenv virtualenv \
-    # Linters and formatters
-    black isort flake8 pylint mypy bandit \
-    # Code quality tools
+    pipenv virtualenv
+
+# Install Python linters and formatters
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    black isort flake8 pylint mypy bandit
+
+# Install Python testing tools and web frameworks
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
     pytest pytest-cov coverage pre-commit \
-    # Popular libraries for full-stack development
     fastapi uvicorn sqlalchemy alembic \
-    requests numpy pandas \
-    # Type checking
-    types-requests
+    requests numpy pandas types-requests
+
+# Install Poetry using official installer to avoid conflicts
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
 # Install global Node.js development tools
 RUN npm install -g \
@@ -73,7 +77,7 @@ ENV PATH=$PNPM_HOME:$PATH
 
 USER coder
 
-# Create development directories
+# Create development directories for fullstack projects
 RUN mkdir -p /home/coder/projects/fullstack \
  && mkdir -p /home/coder/.cache/pip \
  && mkdir -p /home/coder/.cache/pypoetry \
