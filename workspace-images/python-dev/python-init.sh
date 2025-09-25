@@ -75,12 +75,23 @@ poetry-init() {
     fi
 }
 
-# Install Poetry project and activate venv
+# Install Poetry project with dev and test dependencies
 poetry-setup() {
     if [[ -f "pyproject.toml" ]]; then
-        poetry install
+        poetry install --with dev,test
         activate_python_env
-        echo "Poetry project installed and environment activated."
+        echo "Poetry project installed (including dev and test dependencies) and environment activated."
+    else
+        echo "No pyproject.toml found. Run 'poetry-init' first."
+    fi
+}
+
+# Install only production dependencies
+poetry-prod() {
+    if [[ -f "pyproject.toml" ]]; then
+        poetry install --only main
+        activate_python_env
+        echo "Production dependencies installed and environment activated."
     else
         echo "No pyproject.toml found. Run 'poetry-init' first."
     fi
