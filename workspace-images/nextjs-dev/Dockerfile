@@ -37,7 +37,7 @@ RUN npm install -g \
     # Code quality
     husky lint-staged \
     # MCP server for Claude agent browser automation
-    @modelcontextprotocol/server-playwright
+    @playwright/mcp
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
