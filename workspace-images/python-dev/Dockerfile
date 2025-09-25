@@ -10,19 +10,29 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-testresources \
  && rm -rf /var/lib/apt/lists/*
 
-# Install common Python packages and linters via pip (break system packages for Docker)
+# Install essential development tools (avoiding Poetry temporarily due to platformdirs conflict)
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    # Core development tools (Poetry first for microservices)
-    poetry pipenv virtualenv \
-    # Linters and formatters
-    black isort flake8 pylint mypy bandit \
-    # Code quality tools
-    pytest pytest-cov coverage pre-commit \
-    # Popular libraries
-    requests numpy pandas matplotlib seaborn \
-    jupyter jupyterlab notebook \
-    # Type checking and stub packages
-    types-requests types-setuptools
+    pipenv virtualenv
+
+# Install linters and formatters
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    black isort flake8 pylint mypy bandit
+
+# Install testing tools
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    pytest pytest-cov coverage pre-commit
+
+# Install scientific libraries
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    requests numpy pandas matplotlib seaborn
+
+# Install Jupyter and type stubs
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    jupyter jupyterlab notebook types-requests types-setuptools
+
+# Install Poetry using the official installer to avoid package conflicts
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
 # Install additional development tools (avoid packages that conflict with system packages)
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
