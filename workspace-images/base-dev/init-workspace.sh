@@ -150,6 +150,11 @@ else
   log "no GitHub token provided; skipping credential setup"
 fi
 
+log "configuring git defaults (pull uses merge)"
+git config --global pull.rebase false || true
+# optional: keep history simple when fast-forward is possible
+git config --global pull.ff only || true
+
 # --- GCP Secrets Integration ---
 if [[ -n "${CODER_GCP_PROJECT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
   log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
@@ -272,6 +277,14 @@ gitquick() {
       ;;
     "pull")
       git pull
+      ;;
+    "update-from-main")
+      echo "🔄 Fetching origin/main and merging into current branch..."
+      git fetch origin && git pull --no-rebase origin main
+      ;;
+    "rebase-onto-main")
+      echo "🔄 Fetching origin/main and rebasing current branch..."
+      git fetch origin && git pull --rebase origin main
       ;;
     *)
       echo "Unknown command: $cmd"
