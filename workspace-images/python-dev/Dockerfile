@@ -39,13 +39,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     sphinx sphinx-rtd-theme \
     twine build
 
-# Install Poetry via pip with staged dependency resolution (as requested - not via official installer)
-# Handle platformdirs conflict by installing Poetry's dependencies first, then Poetry
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    setuptools wheel && \
-    python3 -m pip install --no-cache-dir --break-system-packages \
-    --ignore-installed platformdirs && \
-    python3 -m pip install --no-cache-dir --break-system-packages poetry
+# Install Poetry via pip (as requested - not via official installer)
+RUN python3 -m pip install --no-cache-dir --break-system-packages poetry
 
 # Create Python-specific init script
 COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
