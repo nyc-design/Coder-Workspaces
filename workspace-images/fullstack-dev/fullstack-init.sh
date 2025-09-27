@@ -5,15 +5,12 @@ log() { printf '[fullstack-init] %s\n' "$*"; }
 
 log "Setting up full-stack development environment"
 
-# Create necessary directories
-log "Creating development directories"
-mkdir -p /home/coder/projects/fullstack
-mkdir -p /home/coder/.cache/pip
-mkdir -p /home/coder/.cache/pypoetry
+# Create additional directories for fullstack development (Python dirs already created by python-init.sh)
+log "Creating Node.js and fullstack-specific directories"
+mkdir -p /home/coder/projects/fullstack  # Specific to fullstack projects
 mkdir -p /home/coder/.cache/node
 mkdir -p /home/coder/.local/share/pnpm/store
-mkdir -p /home/coder/.venv
-chown -R coder:coder /home/coder/projects /home/coder/.cache /home/coder/.local /home/coder/.venv
+chown -R coder:coder /home/coder/.cache/node /home/coder/.local/share/pnpm
 
 # Add full-stack development helper functions to bashrc (idempotent)
 if ! grep -q "# --- Full-stack development helpers ---" /home/coder/.bashrc; then
@@ -569,21 +566,7 @@ fullstack-tasks() {
     echo "    cd backend && poetry run black . && poetry run isort ."
 }
 
-# Python environment helpers (from python-dev)
-activate_python_env() {
-    if [[ -f "pyproject.toml" ]] && command -v poetry >/dev/null 2>&1; then
-        if poetry env info --path >/dev/null 2>&1; then
-            source "$(poetry env info --path)/bin/activate" 2>/dev/null || true
-        fi
-    elif [[ -f "$HOME/.venv/bin/activate" ]]; then
-        source "$HOME/.venv/bin/activate"
-    fi
-}
-
-# Auto-activate appropriate Python environment when changing directories
-cd() {
-    builtin cd "$@" && activate_python_env
-}
+# Note: Python environment helpers are already provided by python-init.sh
 
 # Package manager shortcuts
 alias ni='npm install'
@@ -637,32 +620,14 @@ alias tw-build='npx tailwindcss -o ./dist/output.css --watch'
 EOF
 fi
 
-# Set up Poetry configuration for Python projects
-log "Setting up Poetry for Python development"
-mkdir -p /home/coder/.cache/pypoetry
-chown -R coder:coder /home/coder/.cache/pypoetry
+# Note: Poetry configuration and virtual environment setup handled by python-init.sh
 
-poetry config virtualenvs.in-project true 2>/dev/null || true
-poetry config virtualenvs.prefer-active-python true 2>/dev/null || true
-
-# Create default virtual environment for general use
-DEFAULT_VENV="/home/coder/.venv"
-if [[ ! -d "$DEFAULT_VENV" ]]; then
-    log "Creating default virtual environment at $DEFAULT_VENV"
-    python3 -m venv $DEFAULT_VENV
-fi
-
-# Configure environment variables in bashrc (idempotent)
-if ! grep -q "# --- Full-stack environment ---" /home/coder/.bashrc; then
+# Configure Node.js and Playwright environment variables in bashrc (idempotent)
+# Note: Python environment variables are already set by python-init.sh
+if ! grep -q "# --- Fullstack Node.js environment ---" /home/coder/.bashrc; then
     cat >> /home/coder/.bashrc <<'EOF'
 
-# --- Full-stack environment ---
-# Python
-export PYTHONPATH="${PYTHONPATH:-}:/workspace"
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHONUNBUFFERED=1
-export PIP_USER=1
-
+# --- Fullstack Node.js environment ---
 # Node.js
 export NODE_ENV=development
 export NEXT_TELEMETRY_DISABLED=1
@@ -675,12 +640,8 @@ export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 
-# Paths
-export PATH="$HOME/.local/bin:$PATH"
+# Node.js paths
 export PATH="$HOME/.npm-global/bin:$PATH"
-
-# Auto-activate Python environment on shell start
-activate_python_env
 # ---
 EOF
 fi
@@ -754,8 +715,8 @@ cat > /home/coder/.prettierrc <<'EOF'
 }
 EOF
 
-# Ensure ownership of all created files
-chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.venv /home/coder/.prettierrc 2>/dev/null || true
+# Ensure ownership of fullstack-specific files (Python files already handled by python-init.sh)
+chown -R coder:coder /home/coder/.prettierrc /home/coder/.local/share/nextjs-templates 2>/dev/null || true
 
 log "Full-stack development environment setup complete"
 log "Use 'create-monorepo [project-name]' to create a new full-stack project"
