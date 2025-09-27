@@ -10,28 +10,37 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
   python3-testresources \
 && rm -rf /var/lib/apt/lists/*
 
-# Install Python development tools and linters
+# Install Python packages in smaller groups to avoid conflicts
+# Essential development tools (avoiding Poetry temporarily due to platformdirs conflict)
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
-  # Core development tools
-  poetry pipenv virtualenv \
-  # Linters and formatters
-  black isort flake8 pylint mypy bandit \
-  # Testing tools
-  pytest pytest-cov coverage pre-commit \
-  # Scientific libraries
-  requests numpy pandas matplotlib seaborn \
-  # Jupyter and notebooks
-  jupyter jupyterlab notebook \
-  # Type stubs
-  types-requests types-setuptools \
-  # Documentation
-  sphinx sphinx-rtd-theme \
-  # Additional testing frameworks
-  pytest-xdist pytest-mock \
-  # Development utilities
-  ipython ipdb pdbpp \
-  # Package management
-  twine build
+    pipenv virtualenv
+
+# Install linters and formatters
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    black isort flake8 pylint mypy bandit
+
+# Install Python testing tools and web frameworks
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    pytest pytest-cov coverage pre-commit \
+    pytest-xdist pytest-mock
+
+# Install scientific libraries and data tools
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    requests numpy pandas matplotlib seaborn \
+    types-requests types-setuptools
+
+# Install Jupyter and development utilities
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    jupyter jupyterlab notebook \
+    ipython ipdb pdbpp
+
+# Install documentation and packaging tools
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    sphinx sphinx-rtd-theme \
+    twine build
+
+# Install Poetry via pip (as requested - not via official installer)
+RUN python3 -m pip install --no-cache-dir --break-system-packages poetry
 
 # Create Python-specific init script
 COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
