@@ -40,7 +40,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     twine build
 
 # Install Poetry via pip (as requested - not via official installer)
-RUN python3 -m pip install --no-cache-dir --break-system-packages poetry
+RUN python3 -m pip install --no-cache-dir --break-system-packages --ignore-installed poetry
 
 # Create Python-specific init script
 COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
