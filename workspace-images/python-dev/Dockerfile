@@ -6,44 +6,32 @@ USER root
 
 # Python development tools and linters
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    python3-dev python3-setuptools python3-wheel \
-    python3-testresources \
- && rm -rf /var/lib/apt/lists/*
+  python3-dev python3-setuptools python3-wheel \
+  python3-testresources \
+&& rm -rf /var/lib/apt/lists/*
 
-# Install essential development tools (avoiding Poetry temporarily due to platformdirs conflict)
+# Install Python development tools and linters
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    pipenv virtualenv
-
-# Install linters and formatters
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    black isort flake8 pylint mypy bandit
-
-# Install testing tools
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    pytest pytest-cov coverage pre-commit
-
-# Install scientific libraries
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    requests numpy pandas matplotlib seaborn
-
-# Install Jupyter and type stubs
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    jupyter jupyterlab notebook types-requests types-setuptools
-
-# Install Poetry using the official installer to avoid package conflicts
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
-
-# Install additional development tools (avoid packages that conflict with system packages)
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-    # Documentation
-    sphinx sphinx-rtd-theme \
-    # Testing frameworks
-    pytest-xdist pytest-mock \
-    # Development utilities
-    ipython ipdb pdbpp \
-    # Package management
-    twine build
+  # Core development tools
+  poetry pipenv virtualenv \
+  # Linters and formatters
+  black isort flake8 pylint mypy bandit \
+  # Testing tools
+  pytest pytest-cov coverage pre-commit \
+  # Scientific libraries
+  requests numpy pandas matplotlib seaborn \
+  # Jupyter and notebooks
+  jupyter jupyterlab notebook \
+  # Type stubs
+  types-requests types-setuptools \
+  # Documentation
+  sphinx sphinx-rtd-theme \
+  # Additional testing frameworks
+  pytest-xdist pytest-mock \
+  # Development utilities
+  ipython ipdb pdbpp \
+  # Package management
+  twine build
 
 # Create Python-specific init script
 COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
@@ -62,8 +50,8 @@ USER coder
 
 # Configure Python user environment
 RUN python3 -m pip install --user --no-cache-dir --break-system-packages \
-    # User-level tools that might conflict with system packages
-    cookiecutter python-dotenv
+  # User-level tools that might conflict with system packages
+  cookiecutter python-dotenv
 
 # Create common Python directories
 RUN mkdir -p /home/coder/.cache/pip
