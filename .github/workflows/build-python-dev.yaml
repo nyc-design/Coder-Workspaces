@@ -147,10 +147,17 @@ jobs:
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
 
-      - name: Trigger cleanup policies
+      - name: Clean up old image versions
         run: |
-          echo "Triggering cleanup policies for ${{ env.REPO }} repository..."
-          gcloud artifacts repositories cleanup ${{ env.REPO }} \
-            --location=${{ env.REGION }} \
-            --dry-run=false \
-            --quiet || echo "Cleanup command failed, but continuing..."
+          echo "Cleaning up old image versions to reduce storage costs..."
+          # List all images for this specific image name, excluding latest and current sha
+          gcloud artifacts docker images list "${{ env.IMG }}" \
+            --include-tags \
+            --filter="NOT (tags:(latest OR sha-${{ env.SHA_SHORT }}))" \
+            --format="value(version)" \
+            --limit=50 | while read -r version; do
+              if [[ -n "$version" ]]; then
+                echo "Deleting old version: ${{ env.IMG }}:$version"
+                gcloud artifacts docker images delete "${{ env.IMG }}:$version" --quiet || echo "Failed to delete $version, continuing..."
+              fi
+            done || echo "Cleanup completed with some failures, continuing..."
