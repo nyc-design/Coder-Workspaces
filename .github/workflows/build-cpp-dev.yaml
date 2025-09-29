@@ -134,30 +134,18 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
-      - name: Clean up digest versions
-        working-directory: ${{ runner.temp }}/digests
-        run: |
-          echo "Cleaning up individual digest versions to reduce registry clutter..."
-          for d in *; do
-            digest="sha256:${d}"
-            echo "Deleting digest: ${IMG}@${digest}"
-            gcloud container images delete "${IMG}@${digest}" --quiet --force-delete-tags || echo "Failed to delete digest ${digest}, continuing..."
-          done
-
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
 
-      - name: Clean up old image versions
+      - name: Clean up old tagged versions
         run: |
-          echo "Cleaning up old image versions to reduce storage costs..."
-          # List all images for this specific image name, excluding latest and current sha
+          echo "Cleaning up old tagged versions to reduce storage costs..."
+          # List all tags for this image, excluding latest
           gcloud artifacts docker images list "${{ env.IMG }}" \
             --include-tags \
-            --filter="NOT (tags:(latest OR sha-${{ env.SHA_SHORT }}))" \
-            --format="value(version)" \
-            --limit=50 | while read -r version; do
-              if [[ -n "$version" ]]; then
-                echo "Deleting old version: ${{ env.IMG }}:$version"
-                gcloud artifacts docker images delete "${{ env.IMG }}:$version" --quiet || echo "Failed to delete $version, continuing..."
+            --format="value(tags[])" | grep -v "^latest$" | head -20 | while read -r tag; do
+              if [[ -n "$tag" && "$tag" != "latest" && "$tag" != "sha-${{ env.SHA_SHORT }}" ]]; then
+                echo "Deleting old tag: ${{ env.IMG }}:$tag"
+                gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
               fi
-            done || echo "Cleanup completed with some failures, continuing..."
+            done || echo "Cleanup completed, continuing..."
