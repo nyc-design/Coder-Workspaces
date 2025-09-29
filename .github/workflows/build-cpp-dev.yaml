@@ -134,17 +134,27 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
+      - name: Clean up individual digest versions
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          echo "Cleaning up individual digest versions to reduce registry clutter..."
+          for d in *; do
+            digest="sha256:${d}"
+            echo "Deleting digest: ${IMG}@${digest}"
+            gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || echo "Failed to delete digest ${digest}, continuing..."
+          done
+
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
 
       - name: Clean up old tagged versions
         run: |
           echo "Cleaning up old tagged versions to reduce storage costs..."
-          # List all tags for this image, excluding latest
+          # List all tags for this image, excluding latest and current sha
           gcloud artifacts docker images list "${{ env.IMG }}" \
             --include-tags \
-            --format="value(tags[])" | grep -v "^latest$" | head -20 | while read -r tag; do
-              if [[ -n "$tag" && "$tag" != "latest" && "$tag" != "sha-${{ env.SHA_SHORT }}" ]]; then
+            --format="value(tags[])" | grep -v "^latest$" | grep -v "^sha-${{ env.SHA_SHORT }}$" | head -10 | while read -r tag; do
+              if [[ -n "$tag" ]]; then
                 echo "Deleting old tag: ${{ env.IMG }}:$tag"
                 gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
               fi
