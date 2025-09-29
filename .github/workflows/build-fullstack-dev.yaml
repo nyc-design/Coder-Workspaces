@@ -146,3 +146,11 @@ jobs:
 
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
+
+      - name: Trigger cleanup policies
+        run: |
+          echo "Triggering cleanup policies for ${{ env.REPO }} repository..."
+          gcloud artifacts repositories cleanup ${{ env.REPO }} \
+            --location=${{ env.REGION }} \
+            --dry-run=false \
+            --quiet || echo "Cleanup command failed, but continuing..."
