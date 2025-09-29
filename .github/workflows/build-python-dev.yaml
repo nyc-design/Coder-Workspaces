@@ -134,15 +134,15 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
-      - name: Clean up individual digest versions
-        working-directory: ${{ runner.temp }}/digests
+      - name: Clean up untagged digest versions
         run: |
-          echo "Cleaning up individual digest versions to reduce registry clutter..."
-          for d in *; do
-            digest="sha256:${d}"
-            echo "Deleting digest: ${IMG}@${digest}"
-            gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || echo "Failed to delete digest ${digest}, continuing..."
-          done
+          echo "Cleaning up untagged digest versions..."
+          gcloud artifacts docker images list "${{ env.IMG }}" --include-tags --filter='-tags:*' --format='value(digest)' | head -10 | while read -r digest; do
+            if [[ -n "$digest" ]]; then
+              echo "Deleting untagged digest: ${{ env.IMG }}@${digest}"
+              gcloud artifacts docker images delete "${{ env.IMG }}@${digest}" --quiet --delete-tags || echo "Failed to delete digest ${digest}, continuing..."
+            fi
+          done || echo "Untagged digest cleanup completed"
 
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
