@@ -137,10 +137,10 @@ jobs:
       - name: Clean up untagged digest versions
         run: |
           echo "Cleaning up untagged digest versions..."
-          gcloud artifacts docker images list "${{ env.IMG }}" --include-tags --filter='-tags:*' --format='value(digest)' | head -10 | while read -r digest; do
+          gcloud artifacts docker images list "${{ env.IMG }}" --include-tags --format=json | jq -r '.[] | select(.tags == null or .tags == []) | .digest' | head -10 | while read -r digest; do
             if [[ -n "$digest" ]]; then
               echo "Deleting untagged digest: ${{ env.IMG }}@${digest}"
-              gcloud artifacts docker images delete "${{ env.IMG }}@${digest}" --quiet --delete-tags || echo "Failed to delete digest ${digest}, continuing..."
+              gcloud artifacts docker images delete "${{ env.IMG }}@${digest}" --quiet || echo "Failed to delete digest ${digest}, continuing..."
             fi
           done || echo "Untagged digest cleanup completed"
 
