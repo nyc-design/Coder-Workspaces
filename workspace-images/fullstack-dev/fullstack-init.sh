@@ -422,7 +422,7 @@ setup-playwright() {
         mkdir -p $PLAYWRIGHT_BROWSERS_PATH
 
         # Only install browsers if they're not already installed
-        if [[ ! -f "$PLAYWRIGHT_BROWSERS_PATH/chromium-*/chrome-linux/chrome" ]] 2>/dev/null; then
+        if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
             echo "Installing Playwright browsers..."
             npx playwright install chromium firefox webkit
         else
@@ -500,7 +500,7 @@ start-mcp-playwright() {
     echo "Starting MCP Playwright server for Claude agent browser automation..."
 
     # Check if browsers are installed
-    if [[ ! -f "$PLAYWRIGHT_BROWSERS_PATH/chromium-*/chrome-linux/chrome" ]] 2>/dev/null; then
+    if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright browsers..."
         export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
         mkdir -p $PLAYWRIGHT_BROWSERS_PATH
