@@ -126,7 +126,14 @@ setup-playwright() {
         # Install browsers globally for workspace sharing
         export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
         mkdir -p $PLAYWRIGHT_BROWSERS_PATH
-        npx playwright install chromium firefox webkit
+
+        # Only install browsers if they're not already installed
+        if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
+            echo "Installing Playwright browsers..."
+            npx playwright install chromium firefox webkit
+        else
+            echo "Playwright browsers already installed"
+        fi
 
         # Create basic Playwright config
         cat > playwright.config.ts <<'PW_EOF'
@@ -199,11 +206,13 @@ start-mcp-playwright() {
     echo "Starting MCP Playwright server for Claude agent browser automation..."
 
     # Check if browsers are installed
-    if [[ ! -d "$PLAYWRIGHT_BROWSERS_PATH" ]]; then
+    if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright browsers..."
         export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
         mkdir -p $PLAYWRIGHT_BROWSERS_PATH
         npx playwright install chromium firefox webkit
+    else
+        echo "Playwright browsers already installed"
     fi
 
     # Start MCP server in background
