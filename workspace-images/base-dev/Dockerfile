@@ -36,7 +36,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && rm -rf /var/lib/apt/lists/*
 
 # AI coding CLIs
-RUN npm install -g @openai/codex @anthropic-ai/claude-code
+RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli
 
 # Minimal user config
 RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
