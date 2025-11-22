@@ -8,6 +8,12 @@ on:
       - "workspace-images/cpp-dev/**"
       - ".github/workflows/build-cpp-dev.yaml"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build & Push base-dev (multi-arch, native runners)"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read

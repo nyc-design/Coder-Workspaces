@@ -8,6 +8,12 @@ on:
       - "workspace-images/nextjs-dev/**"
       - ".github/workflows/build-nextjs-dev.yaml"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build & Push base-dev (multi-arch, native runners)"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
