@@ -130,6 +130,8 @@ jobs:
         run: docker buildx imagetools inspect "${IMG}:latest"
 
       - name: Clean up old sha-* versions in GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
