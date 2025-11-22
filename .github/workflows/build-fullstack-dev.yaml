@@ -8,6 +8,12 @@ on:
       - "workspace-images/fullstack-dev/**"
       - ".github/workflows/build-fullstack-dev.yaml"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build & Push python-dev (multi-arch, native runners)"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
