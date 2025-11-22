@@ -1,5 +1,5 @@
 # Extends python-dev image to get all Python functionality
-ARG BASE_IMAGE=us-central1-docker.pkg.dev/coder-nt/workspace-images/python-dev:latest
+ARG BASE_IMAGE=ghcr.io/nyc-design/python-dev:latest
 FROM ${BASE_IMAGE}
 
 USER root

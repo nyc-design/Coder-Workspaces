@@ -123,4 +123,104 @@ jobs:
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
 
-      # No cleanup needed; GHCR retention rules handle old digests if configured
+      - name: Clean up old sha-* versions in GHCR
+        run: |
+          set -euo pipefail
+
+          API="https://api.github.com"
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          PACKAGE_PATH="${IMAGE_NAMESPACE}/${IMAGE_NAME}"
+          PACKAGE_NAME_ENCODED="$(printf '%s' "${PACKAGE_PATH}" | sed 's#/#%2F#g')"
+
+          echo "Package: ${OWNER}/${PACKAGE_PATH}"
+
+          # Fetch up to 100 versions
+          curl -sS \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${API}/users/${OWNER}/packages/container/${PACKAGE_NAME_ENCODED}/versions?per_page=100" \
+            > versions.json
+
+          if ! jq -e 'length > 0' versions.json >/dev/null 2>&1; then
+            echo "No versions found; skipping cleanup."
+            exit 0
+          fi
+
+          # Save id -> tags mapping
+          jq -r '
+            .[]
+            | {id, tags: (.metadata.container.tags // [])}
+            | "\(.id) \(.tags | join(","))"
+          ' versions.json > id_tags.txt
+
+          # Find *all* sha-* versions (newest first)
+          jq -r '
+            [ .[]
+              | {id, created_at, tags: (.metadata.container.tags // [])}
+              | select(any(.tags[]?; startswith("sha-")))
+            ]
+            | sort_by(.created_at) | reverse
+            | .[] | .id
+          ' versions.json > sha_ids_all.txt
+
+          if ! [ -s sha_ids_all.txt ]; then
+            echo "No sha-* versions found; nothing to delete."
+            exit 0
+          fi
+
+          echo "sha-* versions (newest first):"
+          nl -ba sha_ids_all.txt
+
+          # Keep only the FIRST (newest) one
+          NEWEST_SHA_ID="$(head -n 1 sha_ids_all.txt)"
+
+          CURRENT_SHA_TAG="sha-${SHA_SHORT}"
+
+          echo "Newest sha-* version ID: ${NEWEST_SHA_ID}"
+          echo "Current build sha tag: ${CURRENT_SHA_TAG}"
+
+          # Decide what to delete
+          : > delete_ids.txt
+          while read -r vid; do
+            # Skip the newest sha-* version
+            if [ "${vid}" = "${NEWEST_SHA_ID}" ]; then
+              echo "Keeping newest sha-* version: ${vid}"
+              continue
+            fi
+
+            # Get the tag list for vid
+            tags="$(grep "^${vid} " id_tags.txt | cut -d' ' -f2-)"
+
+            # Never delete 'latest'
+            if printf "%s" "${tags}" | grep -q "latest"; then
+              echo "Keeping version ${vid} (tag: latest)"
+              continue
+            fi
+
+            # Never delete the current build's sha tag
+            if printf "%s" "${tags}" | grep -q "${CURRENT_SHA_TAG}"; then
+              echo "Keeping version ${vid} (tag: ${CURRENT_SHA_TAG})"
+              continue
+            fi
+
+            # Otherwise, mark for deletion
+            echo "${vid}" >> delete_ids.txt
+          done < sha_ids_all.txt
+
+          if ! [ -s delete_ids.txt ]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+
+          echo "Deleting old sha-* versions:"
+          sed 's/^/  /' delete_ids.txt
+
+          # Perform deletion
+          while read -r id; do
+            echo "Deleting version id=${id}"
+            curl -sS -X DELETE \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${API}/users/${OWNER}/packages/container/${PACKAGE_NAME_ENCODED}/versions/${id}" \
+              || echo "Failed to delete version ${id}, continuing..."
+          done < delete_ids.txt

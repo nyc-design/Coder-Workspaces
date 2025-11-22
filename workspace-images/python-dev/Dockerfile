@@ -1,5 +1,5 @@
 # Extends YOUR base image
-ARG BASE_IMAGE=us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest
+ARG BASE_IMAGE=ghcr.io/nyc-design/base-dev:latest
 FROM ${BASE_IMAGE}
 
 USER root
