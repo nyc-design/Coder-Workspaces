@@ -1,6 +1,5 @@
 # Extends YOUR base image
-ARG BASE_IMAGE=ghcr.io/nyc-design/base-dev:latest
-FROM ${BASE_IMAGE}
+FROM ghcr.io/nyc-design/workspace-images/base-dev:latest
 
 USER root
 

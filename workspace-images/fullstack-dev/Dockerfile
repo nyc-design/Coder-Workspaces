@@ -1,6 +1,5 @@
 # Extends python-dev image to get all Python functionality
-ARG BASE_IMAGE=ghcr.io/nyc-design/python-dev:latest
-FROM ${BASE_IMAGE}
+FROM ghcr.io/nyc-design/workspace-images/python-dev:latest
 
 USER root
 
