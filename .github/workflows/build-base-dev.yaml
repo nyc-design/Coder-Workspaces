@@ -134,6 +134,22 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
+      - name: Inspect final image
+        run: docker buildx imagetools inspect "${IMG}:latest"
+
+      - name: Clean up old tagged versions
+        run: |
+          echo "Cleaning up old tagged versions to reduce storage costs..."
+          # List all tags for this image, split semicolon-separated tags, and exclude latest/current
+          gcloud artifacts docker images list "${{ env.IMG }}" \
+            --include-tags \
+            --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${{ env.SHA_SHORT }}$" | head -10 | while read -r tag; do
+              if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
+                echo "Deleting old tag: ${{ env.IMG }}:$tag"
+                gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
+              fi
+            done || echo "Cleanup completed, continuing..."
+            
       - name: Clean up old per-arch digests (untagged, not from this run)
         working-directory: ${{ runner.temp }}/digests
         run: |
@@ -148,18 +164,18 @@ jobs:
           echo "Digests to keep from this run:"
           cat "$KEEP_FILE"
 
-          # List all image versions as CSV: digest,tags
-          # Example lines:
-          #   sha256:abcd...,latest;sha-123
-          #   -,sha-oldtag
+          # List all image versions as CSV: version,tags
+          # version is the sha256 digest for that image version
           gcloud artifacts docker images list "${IMG}" \
             --include-tags \
-            --format='csv[no-heading](digest,tags)' \
-          | while IFS=, read -r digest tags; do
+            --format='csv[no-heading](version,tags)' \
+          | while IFS=, read -r version tags; do
+              digest="$version"
+
               # Skip empty lines
               [ -z "$digest" ] && continue
 
-              # Skip rows with no real digest (digest == "-"), those are tag-only views
+              # Skip rows with no real digest (version == "-"), those are tag-only rows
               if [ "$digest" = "-" ]; then
                 echo "Skipping tag-only row with tags: ${tags}"
                 continue
@@ -169,7 +185,7 @@ jobs:
               case "$digest" in
                 sha256:*) ;;
                 *)
-                  echo "Skipping non-sha256 digest row: digest='${digest}', tags='${tags}'"
+                  echo "Skipping non-sha256 version row: version='${digest}', tags='${tags}'"
                   continue
                   ;;
               esac
@@ -190,16 +206,3 @@ jobs:
               gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || \
                 echo "Failed to delete ${IMG}@${digest}, continuing..."
             done
-
-      - name: Inspect final image
-        run: docker buildx imagetools inspect "${IMG}:latest"
-
-      - name: Clean up old tagged versions
-        run: |
-          echo "Cleaning up old tagged versions to reduce storage costs..."
-          gcloud artifacts docker images list "${IMG}" --include-tags --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${SHA_SHORT}$" | head -10 | while read -r tag; do
-            if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
-              echo "Deleting old tag: ${IMG}:$tag"
-              gcloud artifacts docker images delete "${IMG}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
-            fi
-          done || echo "Cleanup completed, continuing..."
