@@ -138,25 +138,58 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           set -eux
+
+          # Build keep list (per-arch digests from this run)
           KEEP_FILE="$(mktemp)"
           for d in *; do
             echo "sha256:${d}" >> "$KEEP_FILE"
           done
+
           echo "Digests to keep from this run:"
           cat "$KEEP_FILE"
-          gcloud artifacts docker images list "${IMG}" --include-tags --format="value(digest,tags)" | while read -r digest tags; do
-            [ -z "$digest" ] && continue
-            if grep -qx "$digest" "$KEEP_FILE"; then
-              echo "Skipping current digest $digest"
-              continue
-            fi
-            if [ -n "$tags" ] && [ "$tags" != "-" ]; then
-              echo "Skipping tagged digest $digest with tags: $tags"
-              continue
-            fi
-            echo "Deleting old untagged digest: ${IMG}@${digest}"
-            gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || echo "Failed to delete ${IMG}@${digest}, continuing..."
-          done
+
+          # List all image versions as CSV: digest,tags
+          # Example lines:
+          #   sha256:abcd...,latest;sha-123
+          #   -,sha-oldtag
+          gcloud artifacts docker images list "${IMG}" \
+            --include-tags \
+            --format='csv[no-heading](digest,tags)' \
+          | while IFS=, read -r digest tags; do
+              # Skip empty lines
+              [ -z "$digest" ] && continue
+
+              # Skip rows with no real digest (digest == "-"), those are tag-only views
+              if [ "$digest" = "-" ]; then
+                echo "Skipping tag-only row with tags: ${tags}"
+                continue
+              fi
+
+              # Only care about real digests (sha256:...)
+              case "$digest" in
+                sha256:*) ;;
+                *)
+                  echo "Skipping non-sha256 digest row: digest='${digest}', tags='${tags}'"
+                  continue
+                  ;;
+              esac
+
+              # Skip digests from this run (keep them)
+              if grep -qx "$digest" "$KEEP_FILE"; then
+                echo "Skipping current digest $digest"
+                continue
+              fi
+
+              # Skip digests that still have tags (we only want old untagged per-arch digests)
+              if [ -n "$tags" ] && [ "$tags" != "-" ]; then
+                echo "Skipping tagged digest $digest with tags: $tags"
+                continue
+              fi
+
+              echo "Deleting old untagged digest: ${IMG}@${digest}"
+              gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || \
+                echo "Failed to delete ${IMG}@${digest}, continuing..."
+            done
 
       - name: Inspect final image
         run: docker buildx imagetools inspect "${IMG}:latest"
