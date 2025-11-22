@@ -1,4 +1,4 @@
-FROM codercom/enterprise-base:ubuntu
+FROM codercom/enterprise-base:ubuntu-20250929
 ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
