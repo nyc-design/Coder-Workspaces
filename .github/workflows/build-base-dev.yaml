@@ -134,14 +134,28 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
-      - name: Clean up individual digest versions
+      - name: Clean up old per-arch digests (untagged, not from this run)
         working-directory: ${{ runner.temp }}/digests
         run: |
-          echo "Cleaning up individual digest versions to reduce registry clutter..."
+          set -eux
+          KEEP_FILE="$(mktemp)"
           for d in *; do
-            digest="sha256:${d}"
-            echo "Deleting digest: ${IMG}@${digest}"
-            gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || echo "Failed to delete digest ${digest}, continuing..."
+            echo "sha256:${d}" >> "$KEEP_FILE"
+          done
+          echo "Digests to keep from this run:"
+          cat "$KEEP_FILE"
+          gcloud artifacts docker images list "${IMG}" --include-tags --format="value(digest,tags)" | while read -r digest tags; do
+            [ -z "$digest" ] && continue
+            if grep -qx "$digest" "$KEEP_FILE"; then
+              echo "Skipping current digest $digest"
+              continue
+            fi
+            if [ -n "$tags" ] && [ "$tags" != "-" ]; then
+              echo "Skipping tagged digest $digest with tags: $tags"
+              continue
+            fi
+            echo "Deleting old untagged digest: ${IMG}@${digest}"
+            gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || echo "Failed to delete ${IMG}@${digest}, continuing..."
           done
 
       - name: Inspect final image
@@ -150,12 +164,9 @@ jobs:
       - name: Clean up old tagged versions
         run: |
           echo "Cleaning up old tagged versions to reduce storage costs..."
-          # List all tags for this image, split semicolon-separated tags, and exclude latest/current
-          gcloud artifacts docker images list "${{ env.IMG }}" \
-            --include-tags \
-            --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${{ env.SHA_SHORT }}$" | head -10 | while read -r tag; do
-              if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
-                echo "Deleting old tag: ${{ env.IMG }}:$tag"
-                gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
-              fi
-            done || echo "Cleanup completed, continuing..."
+          gcloud artifacts docker images list "${IMG}" --include-tags --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${SHA_SHORT}$" | head -10 | while read -r tag; do
+            if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
+              echo "Deleting old tag: ${IMG}:$tag"
+              gcloud artifacts docker images delete "${IMG}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
+            fi
+          done || echo "Cleanup completed, continuing..."
