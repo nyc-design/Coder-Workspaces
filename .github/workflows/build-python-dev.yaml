@@ -147,7 +147,7 @@ jobs:
         uses: snok/container-retention-policy@v3.0.0
         with:
           # Personal account; if this is an org, use the org name instead
-          account: nyc-design
+          account: user
           # Ephemeral GITHUB_TOKEN with packages:write perms is enough
           token: ${{ secrets.GITHUB_TOKEN }}
           # This is the GHCR package name, e.g. "workspace-images/base-dev"
