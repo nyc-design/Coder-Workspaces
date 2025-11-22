@@ -140,6 +140,22 @@ jobs:
             -t "${IMG}:sha-${SHA_SHORT}" \
             $refs
 
+      - name: Inspect final image
+        run: docker buildx imagetools inspect "${IMG}:latest"
+
+      - name: Clean up old tagged versions
+        run: |
+          echo "Cleaning up old tagged versions to reduce storage costs..."
+          # List all tags for this image, split semicolon-separated tags, and exclude latest/current
+          gcloud artifacts docker images list "${{ env.IMG }}" \
+            --include-tags \
+            --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${{ env.SHA_SHORT }}$" | head -10 | while read -r tag; do
+              if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
+                echo "Deleting old tag: ${{ env.IMG }}:$tag"
+                gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
+              fi
+            done || echo "Cleanup completed, continuing..."
+            
       - name: Clean up old per-arch digests (untagged, not from this run)
         working-directory: ${{ runner.temp }}/digests
         run: |
@@ -196,19 +212,3 @@ jobs:
               gcloud artifacts docker images delete "${IMG}@${digest}" --quiet || \
                 echo "Failed to delete ${IMG}@${digest}, continuing..."
             done
-
-      - name: Inspect final image
-        run: docker buildx imagetools inspect "${IMG}:latest"
-
-      - name: Clean up old tagged versions
-        run: |
-          echo "Cleaning up old tagged versions to reduce storage costs..."
-          # List all tags for this image, split semicolon-separated tags, and exclude latest/current
-          gcloud artifacts docker images list "${{ env.IMG }}" \
-            --include-tags \
-            --format="value(tags[])" | tr ';' '\n' | grep -v "^latest$" | grep -v "^sha-${{ env.SHA_SHORT }}$" | head -10 | while read -r tag; do
-              if [[ -n "$tag" && "$tag" =~ ^sha- ]]; then
-                echo "Deleting old tag: ${{ env.IMG }}:$tag"
-                gcloud artifacts docker images delete "${{ env.IMG }}:$tag" --quiet || echo "Failed to delete $tag, continuing..."
-              fi
-            done || echo "Cleanup completed, continuing..."
