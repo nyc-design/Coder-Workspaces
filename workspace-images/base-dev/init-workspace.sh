@@ -57,13 +57,33 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
 
   # Start gnome-keyring-daemon (will read from mounted /home/coder/.local/share/keyrings)
   log "starting gnome-keyring-daemon"
-  eval $(gnome-keyring-daemon --start --daemonize --components=secrets,ssh,pkcs11 2>/dev/null)
+  KEYRING_OUTPUT=$(gnome-keyring-daemon --start --daemonize --components=secrets,ssh,pkcs11 2>&1)
 
-  # Export the variables for current session and all child processes
+  # Only eval if we got output
+  if [ -n "$KEYRING_OUTPUT" ]; then
+    eval "$KEYRING_OUTPUT"
+  fi
+
+  # Fallback: if GNOME_KEYRING_CONTROL isn't set, derive it from the running daemon
+  if [ -z "${GNOME_KEYRING_CONTROL:-}" ]; then
+    log "keyring variables not set by daemon, attempting fallback detection"
+    # Find the control socket from the running daemon
+    KEYRING_PID=$(pgrep -f gnome-keyring-daemon | head -1)
+    if [ -n "$KEYRING_PID" ]; then
+      # The control socket is usually in ~/.cache/keyring-*
+      GNOME_KEYRING_CONTROL=$(find /home/coder/.cache -name "keyring-*" -type d 2>/dev/null | head -1)
+      if [ -n "$GNOME_KEYRING_CONTROL" ]; then
+        SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
+        log "found keyring control socket via fallback: $GNOME_KEYRING_CONTROL"
+      fi
+    fi
+  fi
+
+  # Export the variables for current session and all child processes (only if set)
   export DBUS_SESSION_BUS_ADDRESS
-  export GNOME_KEYRING_CONTROL
-  export SSH_AUTH_SOCK
-  export GNOME_KEYRING_PID
+  [ -n "${GNOME_KEYRING_CONTROL:-}" ] && export GNOME_KEYRING_CONTROL
+  [ -n "${SSH_AUTH_SOCK:-}" ] && export SSH_AUTH_SOCK
+  [ -n "${GNOME_KEYRING_PID:-}" ] && export GNOME_KEYRING_PID
 
   # Save to .bashrc for interactive shell sessions (idempotent)
   if ! grep -q "# --- Keyring environment ---" /home/coder/.bashrc; then
@@ -84,7 +104,7 @@ EOF
   fi
 
   log "keyring daemon started (using mounted keyring at /home/coder/.local/share/keyrings)"
-  log "GNOME_KEYRING_CONTROL=${GNOME_KEYRING_CONTROL}"
+  log "GNOME_KEYRING_CONTROL=${GNOME_KEYRING_CONTROL:-not set}"
 else
   log "gnome-keyring-daemon not available, skipping keyring setup"
 fi
