@@ -64,7 +64,7 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
   export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 
   # Start gnome-keyring-daemon if not already running
-  if ! pgrep -u "$(id -u)" gnome-keyring-daemon >/dev/null 2>&1; then
+  if ! pgrep -u "$(id -u)" -f gnome-keyring-daemon >/dev/null 2>&1; then
     log "starting gnome-keyring-daemon"
     gnome-keyring-daemon --start --components=secrets,ssh,gpg,pkcs11 >/tmp/gnome-keyring.log 2>&1 &
     sleep 1  # Give it a moment to start and create sockets
@@ -93,7 +93,7 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
   fi
 
   # Get daemon PID
-  GNOME_KEYRING_PID=$(pgrep -u "$(id -u)" gnome-keyring-daemon)
+  GNOME_KEYRING_PID=$(pgrep -u "$(id -u)" -f gnome-keyring-daemon)
   export GNOME_KEYRING_PID
 
   # Export for current session and all child processes (following GCP secrets pattern)
