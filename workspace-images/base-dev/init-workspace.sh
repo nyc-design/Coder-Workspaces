@@ -56,21 +56,20 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
   fi
 
   # Start gnome-keyring-daemon (will read from mounted /home/coder/.local/share/keyrings)
+  # CRITICAL: Do NOT use --daemonize flag - it prevents the daemon from outputting environment variables
   log "starting gnome-keyring-daemon"
-  KEYRING_OUTPUT=$(gnome-keyring-daemon --start --daemonize --components=secrets,ssh,pkcs11 2>&1)
+  eval $(gnome-keyring-daemon --start --components=secrets,ssh,pkcs11 2>/dev/null)
 
-  # Only eval if we got output
-  if [ -n "$KEYRING_OUTPUT" ]; then
-    eval "$KEYRING_OUTPUT"
-  fi
-
-  # Fallback: if GNOME_KEYRING_CONTROL isn't set, derive it from the running daemon
+  # Fallback: if GNOME_KEYRING_CONTROL isn't set, try to find it
   if [ -z "${GNOME_KEYRING_CONTROL:-}" ]; then
     log "keyring variables not set by daemon, attempting fallback detection"
-    # Find the control socket from the running daemon
-    KEYRING_PID=$(pgrep -f gnome-keyring-daemon | head -1)
-    if [ -n "$KEYRING_PID" ]; then
-      # The control socket is usually in ~/.cache/keyring-*
+    # Check /tmp/runtime-coder/keyring/ first (XDG_RUNTIME_DIR based location)
+    if [ -d "/tmp/runtime-coder/keyring" ]; then
+      GNOME_KEYRING_CONTROL="/tmp/runtime-coder/keyring"
+      SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
+      log "found keyring control in /tmp/runtime-coder/keyring"
+    else
+      # Fallback to ~/.cache/keyring-*
       GNOME_KEYRING_CONTROL=$(find /home/coder/.cache -name "keyring-*" -type d 2>/dev/null | head -1)
       if [ -n "$GNOME_KEYRING_CONTROL" ]; then
         SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
@@ -79,25 +78,28 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
     fi
   fi
 
-  # Export the variables for current session and all child processes (only if set)
+  # Export the variables for current session and all child processes
   export DBUS_SESSION_BUS_ADDRESS
-  [ -n "${GNOME_KEYRING_CONTROL:-}" ] && export GNOME_KEYRING_CONTROL
-  [ -n "${SSH_AUTH_SOCK:-}" ] && export SSH_AUTH_SOCK
-  [ -n "${GNOME_KEYRING_PID:-}" ] && export GNOME_KEYRING_PID
+  export GNOME_KEYRING_CONTROL
+  export SSH_AUTH_SOCK
+  export GNOME_KEYRING_PID
 
-  # Save to .bashrc for interactive shell sessions (idempotent)
+  # Create .keyring-env file for other processes to source
+  cat > /home/coder/.keyring-env <<KEYRING_ENV
+export DBUS_SESSION_BUS_ADDRESS='$DBUS_SESSION_BUS_ADDRESS'
+export GNOME_KEYRING_CONTROL='$GNOME_KEYRING_CONTROL'
+export SSH_AUTH_SOCK='$SSH_AUTH_SOCK'
+export GNOME_KEYRING_PID='$GNOME_KEYRING_PID'
+KEYRING_ENV
+  chmod 600 /home/coder/.keyring-env
+
+  # Update .bashrc to source the env file (idempotent)
   if ! grep -q "# --- Keyring environment ---" /home/coder/.bashrc; then
     cat >> /home/coder/.bashrc <<'EOF'
 
 # --- Keyring environment ---
-if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-  export DBUS_SESSION_BUS_ADDRESS
-fi
-if [ -n "${GNOME_KEYRING_CONTROL:-}" ]; then
-  export GNOME_KEYRING_CONTROL
-fi
-if [ -n "${SSH_AUTH_SOCK:-}" ]; then
-  export SSH_AUTH_SOCK
+if [ -f ~/.keyring-env ]; then
+  source ~/.keyring-env
 fi
 # ---
 EOF
@@ -105,6 +107,7 @@ EOF
 
   log "keyring daemon started (using mounted keyring at /home/coder/.local/share/keyrings)"
   log "GNOME_KEYRING_CONTROL=${GNOME_KEYRING_CONTROL:-not set}"
+  log "SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-not set}"
 else
   log "gnome-keyring-daemon not available, skipping keyring setup"
 fi
