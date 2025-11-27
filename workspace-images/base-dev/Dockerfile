@@ -29,6 +29,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
  && apt-get update -y && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
 
+# Install keyring daemon support for VS Code credential persistence
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+      gnome-keyring \
+      dbus \
+      dbus-x11 \
+      libsecret-tools \
+      python3-secretstorage \
+ && rm -rf /var/lib/apt/lists/*
+
 # Node.js 20 + pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get update -y && apt-get install -y --no-install-recommends nodejs \
@@ -56,5 +65,9 @@ RUN install -d -m 0755 /usr/local/share/workspace-init.d
 
 COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
+
+# Copy keyring init script to workspace-init.d
+COPY workspace-images/base-dev/10-keyring-init.sh /usr/local/share/workspace-init.d/10-keyring-init.sh
+RUN chmod +x /usr/local/share/workspace-init.d/10-keyring-init.sh
 
 USER coder
