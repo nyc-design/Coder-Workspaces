@@ -45,14 +45,6 @@ if ! docker info >/dev/null 2>&1; then
 fi
 log "dockerd is ready"
 
-# --- Run modular init scripts ---
-log "running workspace-init.d scripts"
-if command -v run-workspace-inits >/dev/null 2>&1; then
-  run-workspace-inits
-else
-  log "run-workspace-inits not found, skipping modular scripts"
-fi
-
 # --- Starship prompt (Lion theme) ---
 # Ensure .bashrc exists
 touch ~/.bashrc
