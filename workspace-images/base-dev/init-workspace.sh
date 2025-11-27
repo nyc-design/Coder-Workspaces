@@ -49,42 +49,60 @@ log "dockerd is ready"
 if command -v gnome-keyring-daemon >/dev/null 2>&1; then
   log "initializing keyring for VS Code credential persistence"
 
-  # Start D-Bus if not running
-  if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-    log "starting D-Bus session"
-    eval $(dbus-launch --sh-syntax)
+  # Set up XDG_RUNTIME_DIR for consistent socket locations
+  if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    export XDG_RUNTIME_DIR="/tmp/runtime-coder"
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
   fi
 
-  # Start gnome-keyring-daemon (will read from mounted /home/coder/.local/share/keyrings)
-  # CRITICAL: Do NOT use --daemonize flag - it prevents the daemon from outputting environment variables
-  log "starting gnome-keyring-daemon"
-  eval $(gnome-keyring-daemon --start --components=secrets,ssh,pkcs11 2>/dev/null)
+  # Start D-Bus session if not running
+  if [ ! -S "$XDG_RUNTIME_DIR/bus" ]; then
+    log "starting D-Bus session at $XDG_RUNTIME_DIR/bus"
+    dbus-daemon --session --address="unix:path=$XDG_RUNTIME_DIR/bus" --fork --nopidfile
+  fi
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 
-  # Fallback: if GNOME_KEYRING_CONTROL isn't set, try to find it
-  if [ -z "${GNOME_KEYRING_CONTROL:-}" ]; then
-    log "keyring variables not set by daemon, attempting fallback detection"
-    # Check /tmp/runtime-coder/keyring/ first (XDG_RUNTIME_DIR based location)
-    if [ -d "/tmp/runtime-coder/keyring" ]; then
-      GNOME_KEYRING_CONTROL="/tmp/runtime-coder/keyring"
-      SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
-      log "found keyring control in /tmp/runtime-coder/keyring"
-    else
-      # Fallback to ~/.cache/keyring-*
+  # Start gnome-keyring-daemon if not already running
+  if ! pgrep -u "$(id -u)" gnome-keyring-daemon >/dev/null 2>&1; then
+    log "starting gnome-keyring-daemon"
+    gnome-keyring-daemon --start --components=secrets,ssh,gpg,pkcs11 >/tmp/gnome-keyring.log 2>&1 &
+    sleep 1  # Give it a moment to start and create sockets
+  else
+    log "gnome-keyring-daemon already running"
+  fi
+
+  # Find the keyring control socket
+  if [ -d "$XDG_RUNTIME_DIR/keyring" ]; then
+    export GNOME_KEYRING_CONTROL="$XDG_RUNTIME_DIR/keyring"
+    export SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
+    log "found keyring control at $GNOME_KEYRING_CONTROL"
+  else
+    # Search for the keyring directory
+    GNOME_KEYRING_CONTROL=$(find "$XDG_RUNTIME_DIR" -name "keyring" -type d 2>/dev/null | head -1)
+    if [ -z "$GNOME_KEYRING_CONTROL" ]; then
       GNOME_KEYRING_CONTROL=$(find /home/coder/.cache -name "keyring-*" -type d 2>/dev/null | head -1)
-      if [ -n "$GNOME_KEYRING_CONTROL" ]; then
-        SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
-        log "found keyring control socket via fallback: $GNOME_KEYRING_CONTROL"
-      fi
+    fi
+    if [ -n "$GNOME_KEYRING_CONTROL" ]; then
+      export GNOME_KEYRING_CONTROL
+      export SSH_AUTH_SOCK="$GNOME_KEYRING_CONTROL/ssh"
+      log "found keyring control at $GNOME_KEYRING_CONTROL"
+    else
+      log "warning: could not find keyring control socket"
     fi
   fi
 
-  # Export the variables for current session and all child processes
+  # Get daemon PID
+  GNOME_KEYRING_PID=$(pgrep -u "$(id -u)" gnome-keyring-daemon)
+  export GNOME_KEYRING_PID
+
+  # Export for current session and all child processes (following GCP secrets pattern)
   export DBUS_SESSION_BUS_ADDRESS
   export GNOME_KEYRING_CONTROL
   export SSH_AUTH_SOCK
   export GNOME_KEYRING_PID
 
-  # Create .keyring-env file for other processes to source
+  # Create .keyring-env file for shell sessions
   cat > /home/coder/.keyring-env <<KEYRING_ENV
 export DBUS_SESSION_BUS_ADDRESS='$DBUS_SESSION_BUS_ADDRESS'
 export GNOME_KEYRING_CONTROL='$GNOME_KEYRING_CONTROL'
@@ -93,7 +111,7 @@ export GNOME_KEYRING_PID='$GNOME_KEYRING_PID'
 KEYRING_ENV
   chmod 600 /home/coder/.keyring-env
 
-  # Update .bashrc to source the env file (idempotent)
+  # Add to .bashrc for shell sessions (idempotent)
   if ! grep -q "# --- Keyring environment ---" /home/coder/.bashrc; then
     cat >> /home/coder/.bashrc <<'EOF'
 
@@ -105,9 +123,11 @@ fi
 EOF
   fi
 
-  log "keyring daemon started (using mounted keyring at /home/coder/.local/share/keyrings)"
-  log "GNOME_KEYRING_CONTROL=${GNOME_KEYRING_CONTROL:-not set}"
-  log "SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-not set}"
+  log "keyring initialized successfully"
+  log "  DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
+  log "  GNOME_KEYRING_CONTROL=$GNOME_KEYRING_CONTROL"
+  log "  SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
+  log "  GNOME_KEYRING_PID=$GNOME_KEYRING_PID"
 else
   log "gnome-keyring-daemon not available, skipping keyring setup"
 fi
