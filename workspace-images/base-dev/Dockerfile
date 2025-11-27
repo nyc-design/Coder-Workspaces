@@ -66,8 +66,8 @@ RUN install -d -m 0755 /usr/local/share/workspace-init.d
 COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
 
-# Copy keyring init script to workspace-init.d
-COPY workspace-images/base-dev/10-keyring-init.sh /usr/local/share/workspace-init.d/10-keyring-init.sh
+# Copy keyring init script to workspace-init.d (renamed with numeric prefix for execution order)
+COPY workspace-images/base-dev/keyring-init.sh /usr/local/share/workspace-init.d/10-keyring-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/10-keyring-init.sh
 
 USER coder
