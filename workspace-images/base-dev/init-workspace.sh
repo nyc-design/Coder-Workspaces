@@ -52,9 +52,10 @@ if command -v gnome-keyring-daemon >/dev/null 2>&1; then
   # Set up XDG_RUNTIME_DIR for consistent socket locations
   if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
     export XDG_RUNTIME_DIR="/tmp/runtime-coder"
-    mkdir -p "$XDG_RUNTIME_DIR"
-    chmod 700 "$XDG_RUNTIME_DIR"
   fi
+  # Always ensure the directory exists with correct permissions
+  mkdir -p "$XDG_RUNTIME_DIR"
+  chmod 700 "$XDG_RUNTIME_DIR"
 
   # Start D-Bus session if not running
   if [ ! -S "$XDG_RUNTIME_DIR/bus" ]; then
