@@ -124,6 +124,18 @@ fi
 EOF
   fi
 
+  # Configure VS Code to use gnome-libsecret for credential storage
+  mkdir -p /home/coder/.vscode-server/data
+  if [ ! -f /home/coder/.vscode-server/data/argv.json ]; then
+    log "configuring VS Code to use gnome-libsecret"
+    cat > /home/coder/.vscode-server/data/argv.json <<'ARGV_JSON'
+{
+    "password-store": "gnome-libsecret"
+}
+ARGV_JSON
+    chmod 644 /home/coder/.vscode-server/data/argv.json
+  fi
+
   log "keyring initialized successfully"
   log "  DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
   log "  GNOME_KEYRING_CONTROL=$GNOME_KEYRING_CONTROL"
