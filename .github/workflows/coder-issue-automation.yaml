@@ -175,10 +175,8 @@ jobs:
             CMD_ARGS=(
               --template "repo-envbuilder-agent"
               --preset "Issue Automation"
-              --parameter "is_existing_project=existing"
               --parameter "repo_name=${REPO_NAME}"
               --parameter "coding_agent=${AGENT_TYPE}"
-              --parameter "ai_api_key="
             )
 
             if [ -n "$GCP_PROJECT_VALUE" ]; then
