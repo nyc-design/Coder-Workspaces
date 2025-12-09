@@ -27,6 +27,7 @@ provider "coder" {}
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
+data "coder_task" "me" {}
 
 provider "docker" {}
 
@@ -293,14 +294,6 @@ data "coder_parameter" "system_prompt" {
     EOT
 }
 
-data "coder_parameter" "ai_prompt" {
-  type        = "string"
-  name        = "AI Prompt"
-  default     = ""
-  description = "Write a prompt for Claude Code"
-  mutable     = true
-}
-
 # Claude Code module
 module "claude-code" {
   count               = local.coding_agent == "claude" ? 1 : 0
@@ -312,7 +305,7 @@ module "claude-code" {
   install_claude_code = false
   continue            = false
   order               = 999
-  ai_prompt           = data.coder_parameter.ai_prompt.value
+  ai_prompt           = data.coder_task.me.prompt
 }
 
 # Gemini CLI module
@@ -331,7 +324,7 @@ module "gemini" {
   agentapi_version     = "v0.10.0"
   gemini_system_prompt = data.coder_parameter.system_prompt.value
   enable_yolo_mode     = true
-  task_prompt          = data.coder_parameter.ai_prompt.value
+  task_prompt          = data.coder_task.me.prompt
 }
 
 # Codex module
@@ -350,7 +343,7 @@ module "codex" {
   agentapi_version     = "v0.10.0"
   report_tasks         = true
   codex_system_prompt  = data.coder_parameter.system_prompt.value
-  ai_prompt            = data.coder_parameter.ai_prompt.value
+  ai_prompt            = data.coder_task.me.prompt
   continue             = false
   base_config_toml     = <<-EOT
     sandbox_mode = "workspace-write"
@@ -361,22 +354,14 @@ module "codex" {
   EOT
 }
 
-resource "coder_env" "claude_task_prompt" {
-  agent_id   = coder_agent.main.id
-  name       = "CODER_MCP_CLAUDE_TASK_PROMPT"
-  value      = data.coder_parameter.ai_prompt.value
-}
-
-resource "coder_env" "app_status_slug" {
-  agent_id   = coder_agent.main.id
-  name       = "CODER_MCP_APP_STATUS_SLUG"
-  value      = "ccw"
-}
-
-resource "coder_env" "claude_system_prompt" {
-  agent_id   = coder_agent.main.id
-  name       = "CODER_MCP_CLAUDE_SYSTEM_PROMPT"
-  value      = data.coder_parameter.system_prompt.value
+# Coder AI Task - dynamically set app_id based on selected agent
+resource "coder_ai_task" "task" {
+  app_id = (
+    local.coding_agent == "claude" && length(module.claude-code) > 0 ? module.claude-code[0].task_app_id :
+    local.coding_agent == "gemini" && length(module.gemini) > 0 ? module.gemini[0].task_app_id :
+    local.coding_agent == "codex" && length(module.codex) > 0 ? module.codex[0].task_app_id :
+    ""
+  )
 }
 
 
