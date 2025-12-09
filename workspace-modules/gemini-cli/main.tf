@@ -179,7 +179,7 @@ EOT
 
 module "agentapi" {
   source  = "registry.coder.com/coder/agentapi/coder"
-  version = "1.2.0"
+  version = "2.0.0"
 
   agent_id             = var.agent_id
   folder               = local.folder
