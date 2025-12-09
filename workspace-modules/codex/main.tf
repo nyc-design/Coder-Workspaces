@@ -150,6 +150,7 @@ variable "codex_system_prompt" {
 }
 
 resource "coder_env" "openai_api_key" {
+  count    = var.openai_api_key != "" ? 1 : 0
   agent_id = var.agent_id
   name     = "OPENAI_API_KEY"
   value    = var.openai_api_key
@@ -190,7 +191,7 @@ module "agentapi" {
 
      echo -n '${base64encode(local.start_script)}' | base64 -d > /tmp/start.sh
      chmod +x /tmp/start.sh
-     ARG_OPENAI_API_KEY='${var.openai_api_key}' \
+     ${var.openai_api_key != "" ? "ARG_OPENAI_API_KEY='${var.openai_api_key}' \\" : ""}
      ARG_REPORT_TASKS='${var.report_tasks}' \
      ARG_CODEX_MODEL='${var.codex_model}' \
      ARG_CODEX_START_DIRECTORY='${local.workdir}' \
@@ -206,7 +207,7 @@ module "agentapi" {
 
     echo -n '${base64encode(local.install_script)}' | base64 -d > /tmp/install.sh
     chmod +x /tmp/install.sh
-    ARG_OPENAI_API_KEY='${var.openai_api_key}' \
+    ${var.openai_api_key != "" ? "ARG_OPENAI_API_KEY='${var.openai_api_key}' \\" : ""}
     ARG_REPORT_TASKS='${var.report_tasks}' \
     ARG_INSTALL='${var.install_codex}' \
     ARG_CODEX_VERSION='${var.codex_version}' \

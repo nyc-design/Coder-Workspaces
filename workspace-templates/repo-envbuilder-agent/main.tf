@@ -301,6 +301,7 @@ data "coder_parameter" "ai_prompt" {
   mutable     = true
 }
 
+# Claude Code module
 module "claude-code" {
   count               = local.coding_agent == "claude" ? 1 : 0
   source              = "registry.coder.com/coder/claude-code/coder"
@@ -312,6 +313,52 @@ module "claude-code" {
   continue            = false
   order               = 999
   ai_prompt           = data.coder_parameter.ai_prompt.value
+}
+
+# Gemini CLI module
+module "gemini" {
+  count   = local.coding_agent == "gemini" ? 1 : 0
+  source  = "github.com/nyc-design/Coder-Workspaces//workspace-modules/gemini-cli"
+
+  agent_id             = coder_agent.main.id
+  folder               = "/workspaces/${local.project_name}"
+  order                = 999
+  icon                 = "/icon/gemini.svg"
+  install_gemini       = false  # Already installed in base image
+  gemini_api_key       = local.ai_api_key
+  use_vertexai         = false
+  install_agentapi     = true
+  agentapi_version     = "v0.10.0"
+  gemini_system_prompt = data.coder_parameter.system_prompt.value
+  enable_yolo_mode     = true
+  task_prompt          = data.coder_parameter.ai_prompt.value
+}
+
+# Codex module
+module "codex" {
+  count   = local.coding_agent == "codex" ? 1 : 0
+  source  = "github.com/nyc-design/Coder-Workspaces//workspace-modules/codex"
+
+  agent_id             = coder_agent.main.id
+  workdir              = "/workspaces/${local.project_name}"
+  order                = 999
+  icon                 = "/icon/openai.svg"
+  web_app_display_name = "Codex"
+  install_codex        = false  # Already installed in base image
+  openai_api_key       = local.ai_api_key
+  install_agentapi     = true
+  agentapi_version     = "v0.10.0"
+  report_tasks         = true
+  codex_system_prompt  = data.coder_parameter.system_prompt.value
+  ai_prompt            = data.coder_parameter.ai_prompt.value
+  continue             = false
+  base_config_toml     = <<-EOT
+    sandbox_mode = "workspace-write"
+    approval_policy = "never"
+
+    [sandbox_workspace_write]
+    network_access = true
+  EOT
 }
 
 resource "coder_env" "claude_task_prompt" {
