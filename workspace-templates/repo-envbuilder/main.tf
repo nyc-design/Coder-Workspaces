@@ -20,6 +20,7 @@ terraform {
     }
   }
 }
+#rebuild
 
 provider "coder" {}
 
@@ -61,64 +62,139 @@ locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 }
 
+# Step 1: Existing vs New Project
+data "coder_parameter" "is_existing_project" {
+  name         = "is_existing_project"
+  display_name = "Project Type"
+  type         = "string"
+  default      = "existing"
+  description  = "Use an existing GitHub repository or create a new project?"
+  order = 0
+  
+  option {
+    name  = "Existing Repository"
+    value = "existing"
+  }
+  option {
+    name  = "New Project"
+    value = "new"
+  }
+}
+
 data "github_repositories" "user_repositories" {
   query = "user:nyc-design"
   include_repo_id = true
 }
 
 data "coder_parameter" "repo_name" {
+  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "repo_name"
   display_name = "GitHub Repository"
-  type = "string"
-
-  form_type = "dropdown"
-
-  dynamic "option" {
-    for_each = data.github_repositories.user_repositories.names
-    content {
-      name  = option.value
-      value = option.value
-    }
-  }
-}
-
-data "coder_parameter" "project_name" {
-  name         = "project_name"
-  display_name = "Select your GCP Project"
+  description  = "Enter just the repo name (e.g., shadowscout, stellarscout, etc)."
   type         = "string"
-  form_type    = "dropdown"
+  form_type    = "input"
+  order        = 1
+}
 
-  dynamic "option" {
-    for_each = { for p in data.google_projects.gcp_projects.projects : p.project_id => p }
-    content {
-      name  = coalesce(option.value.name, option.value.project_id)
-      value = option.value.project_id
-    }
+data "coder_parameter" "gcp_project_name" {
+  count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "gcp_project_name"
+  display_name = "GCP Project (Optional)"
+  default      = ""
+  description  = "Enter a GCP Project to automatically configure secrets and credentials"
+  type         = "string"
+  form_type    = "input"
+  order        = 2
+}
+
+data "coder_parameter" "new_project_type" {
+  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "new_project_type"
+  display_name = "New Project Type"
+  type         = "string"
+  default      = "base"
+  order = 1
+  
+  option {
+    name  = "Base Project"
+    value = "base"
+  }
+  option {
+    name  = "Python Project"
+    value = "python"
+  }
+  option {
+    name  = "Next.js Project"
+    value = "nextjs"
+  }
+  option {
+    name  = "C++ Project"
+    value = "cpp"
+  }
+  option {
+    name  = "Fullstack Project"
+    value = "fullstack"
   }
 }
 
-locals {
-  repo_url = "https://github.com/${local.github_username}/${data.coder_parameter.repo_name.value}.git"
-  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
+data "coder_parameter" "new_project_name" {
+  count = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "project_name"
+  display_name = "Project Name"
+  type         = "string"
+  default      = "my-new-project"
+  order = 2
 }
 
 locals {
+  # Determine if this is a new project
+  is_new_project = data.coder_parameter.is_existing_project.value == "new"
+  
+  # Project name logic
+  project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
+  
+  # Project type for workspace image selection
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
+  
+  # GCP project (optional)
+  gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
+  
+  cache_repo = "us-central1-docker.pkg.dev/coder-nt/envbuilder-cache/envbuilder"
+    
+  # Container and builder configuration
   container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
+}
+
+
+locals {
+  new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
+
+  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
+   
+  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
+
   # The envbuilder provider requires a key-value map of environment variables.
-  envbuilder_env = {
+  envbuilder_env = merge({
     "CODER_AGENT_TOKEN" : coder_agent.main.token,
     # Use the docker gateway if the access URL is 127.0.0.1
     "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
     # Use the docker gateway if the access URL is 127.0.0.1
     "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest",
+    "ENVBUILDER_FALLBACK_IMAGE" : "ghcr.io/nyc-design/workspace-images/base-dev:latest",
     "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
-    "ENVBUILDER_PUSH_IMAGE" : "true",
+    "ENVBUILDER_PUSH_IMAGE" : "false",
     "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
-  }
+    "ENVBUILDER_GIT_URL" : local.repo_url,
+    "ENVBUILDER_WORKSPACE_FOLDER" : "/workspaces/${local.project_name}",
+  }, local.is_new_project ? {
+    # New project environment variables
+    "CODER_NEW_PROJECT" : "true",
+    "CODER_PROJECT_NAME" : local.project_name,
+  } : {})
+  
   # Convert the above map to the format expected by the docker provider.
   docker_env = [
     for k, v in local.envbuilder_env : "${k}=${v}"
@@ -131,10 +207,10 @@ resource "docker_image" "devcontainer_builder_image" {
 }
 
 resource "envbuilder_cached_image" "cached" {
-  count         = 1
+  count         = 0
   builder_image = local.devcontainer_builder_image
   git_url       = local.repo_url
-  cache_repo    = local.cache_repo
+  cache_repo    = ""
   extra_env     = local.envbuilder_env
 }
 
@@ -144,19 +220,18 @@ resource "coder_agent" "main" {
   startup_script = <<-EOT
     set -e
     
-    /usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
-    /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
-
     # Prepare user home with default files on first start.
     if [ ! -f ~/.init_done ]; then
       cp -rT /etc/skel ~
       touch ~/.init_done
     fi
 
-    # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
+    /usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
+    /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
+
   EOT
 
-  dir = "/workspaces/${data.coder_parameter.repo_name.value}"
+  dir = "/workspaces/${local.project_name}"
 
   env = {
     GIT_AUTHOR_NAME     = local.git_author_name
@@ -274,7 +349,7 @@ resource "docker_volume" "dind_data" {
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = envbuilder_cached_image.cached.0.image
+  image = local.devcontainer_builder_image
   # Uses lower() to avoid Docker restriction on container names.
   name = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   # Hostname makes the shell more user friendly: coder@my-workspace:~$
@@ -283,12 +358,21 @@ resource "docker_container" "workspace" {
   runtime = "sysbox-runc"
 
   env = concat(
-    envbuilder_cached_image.cached[0].env,
+    local.docker_env,
     [
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
-    ]
+    ],
+    local.is_new_project ? [
+      "CODER_NEW_PROJECT=true",
+      "NEW_PROJECT_TYPE=${local.project_type}",
+      "CODER_PROJECT_NAME=${local.project_name}",
+      "CODER_GITHUB_REPO_URL=${local.repo_url}",
+    ] : [],
+    local.gcp_project != "" ? [
+      "CODER_GCP_PROJECT=${local.gcp_project}",
+    ] : []
   )
 
   host {
@@ -344,14 +428,20 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
-    container_path = "/home/coder/.local/share/code-server"
-    host_path      = "/home/ubuntu/secrets/code-server"
+    container_path = "/home/coder/.codex-module"
+    host_path      = "/home/ubuntu/secrets/.codex-module"
     read_only      = false
   }
 
   volumes {
-    container_path = "/home/coder/.cache/google-vscode-extension"
-    host_path      = "/home/ubuntu/secrets/google-vscode-extension"
+    container_path = "/home/coder/.supermaven"
+    host_path      = "/home/ubuntu/secrets/.supermaven"
+    read_only      = false
+  }
+
+  volumes {
+    container_path = "/home/coder/.local/share/code-server"
+    host_path      = "/home/ubuntu/secrets/code-server"
     read_only      = false
   }
 
@@ -378,14 +468,14 @@ module "cursor" {
   source   = "registry.coder.com/coder/cursor/coder"
   version  = "1.2.1"
   agent_id = coder_agent.main.id
-  folder = "/workspaces/${data.coder_parameter.repo_name.value}"
+  folder = "/workspaces/${local.project_name}"
 }
 
 # See https://registry.coder.com/modules/coder/code-server
 module "code-server" {
   count  = data.coder_workspace.me.start_count
   source = "registry.coder.com/coder/code-server/coder"
-  folder = "/workspaces/${data.coder_parameter.repo_name.value}"
+  folder = "/workspaces/${local.project_name}"
 
   agent_id = coder_agent.main.id
   order    = 1
@@ -397,7 +487,41 @@ module "code-server" {
 
   extensions = [
     "GitHub.vscode-github-actions",
+    "GitHub.vscode-pull-request-github",
     "Anthropic.claude-code",
-    "mongodb.mongodb-vscode"
+    "mongodb.mongodb-vscode",
+    "openai.chatgpt",
+    "ms-python.python",
+    "detachhead.basedpyright",
+    "Supermaven.supermaven",
+    "ms-azuretools.vscode-docker",
+    "Google.geminicodeassist"
+  ]
+}
+
+module "vscode-web" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/coder/vscode-web/coder"
+  folder = "/workspaces/${local.project_name}"
+
+  agent_id       = coder_agent.main.id
+  order          = 2
+  accept_license = true
+
+  settings = {
+    "workbench.colorTheme" = "Default Dark Modern",
+    "git.useIntegratedAskPass": "false"
+  }
+
+  extensions = [
+    "GitHub.vscode-github-actions",
+    "GitHub.vscode-pull-request-github",
+    "Github.copilot",
+    "Anthropic.claude-code",
+    "mongodb.mongodb-vscode",
+    "openai.chatgpt",
+    "ms-python.python",
+    "ms-azuretools.vscode-docker",
+    "Google.geminicodeassist"
   ]
 }

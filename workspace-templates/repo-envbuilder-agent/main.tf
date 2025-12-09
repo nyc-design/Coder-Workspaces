@@ -12,14 +12,15 @@ terraform {
     }
     google = {
       source = "hashicorp/google"
-      version = "7.0.1"
+      version = ">=7.0.1"
     }
     github = {
       source = "integrations/github"
-      version = "6.6.0"
+      version = ">=6.6.0"
     }
   }
 }
+#rebuild
 
 provider "coder" {}
 
@@ -61,7 +62,6 @@ locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 }
 
-# Step 1: Existing vs New Project
 data "coder_parameter" "is_existing_project" {
   name         = "is_existing_project"
   display_name = "Project Type"
@@ -80,6 +80,37 @@ data "coder_parameter" "is_existing_project" {
   }
 }
 
+data "coder_parameter" "coding_agent" {
+  name         = "coding_agent"
+  display_name = "Coding Agent"
+  type         = "string"
+  default      = "claude"
+  description  = "Which coding agent should be used?"
+  order = 0
+  
+  option {
+    name  = "Claude Code"
+    value = "claude"
+  }
+  option {
+    name  = "OpenAI Codex"
+    value = "codex"
+  }
+  option {
+    name  = "Google Gemini"
+    value = "gemini"
+  }  
+}
+
+data "coder_parameter" "ai_api_key" {
+  name         = "ai_api_key"
+  display_name = "API key for AI Agent"
+  type         = "string"
+  form_type    = "input"
+  default      = ""
+  description  = "If set, selected AI agent will use this API key. If left blank, agent will use workspace's added authorization."
+}
+
 data "github_repositories" "user_repositories" {
   query = "user:nyc-design"
   include_repo_id = true
@@ -89,43 +120,21 @@ data "coder_parameter" "repo_name" {
   count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "repo_name"
   display_name = "GitHub Repository"
-  type = "string"
-  order = 1
-
-  form_type = "dropdown"
-
-  dynamic "option" {
-    for_each = data.github_repositories.user_repositories.names
-    content {
-      name  = option.value
-      value = option.value
-    }
-  }
+  description  = "Enter just the repo name (e.g., shadowscout, stellarscout, etc)."
+  type         = "string"
+  form_type    = "input"
+  order        = 1
 }
 
-# Step 4: Optional GCP Project Selection  
 data "coder_parameter" "gcp_project_name" {
   count = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "gcp_project_name"
   display_name = "GCP Project (Optional)"
-  type         = "string"
   default      = ""
-  form_type    = "dropdown"
-  description  = "Select a GCP project to automatically configure secrets and credentials"
-  order = 2
-
-  option {
-    name  = "None (Skip GCP integration)"
-    value = ""
-  }
-
-  dynamic "option" {
-    for_each = { for p in data.google_projects.gcp_projects.projects : p.project_id => p }
-    content {
-      name  = coalesce(option.value.name, option.value.project_id)
-      value = option.value.project_id
-    }
-  }
+  description  = "Enter a GCP Project to automatically configure secrets and credentials"
+  type         = "string"
+  form_type    = "input"
+  order        = 2
 }
 
 data "coder_parameter" "new_project_type" {
@@ -170,6 +179,10 @@ data "coder_parameter" "new_project_name" {
 locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
+
+  coding_agent = data.coder_parameter.coding_agent.value
+
+  ai_api_key = data.coder_parameter.ai_api_key.value
   
   # Project name logic
   project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
@@ -206,8 +219,9 @@ locals {
     "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
     "ENVBUILDER_FALLBACK_IMAGE" : "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest",
     "ENVBUILDER_DOCKER_CONFIG_BASE64" : data.google_secret_manager_secret_version.docker_config.secret_data,
-    "ENVBUILDER_PUSH_IMAGE" : "true",
+    "ENVBUILDER_PUSH_IMAGE" : "false",
     "ENVBUILDER_GIT_USERNAME" : data.coder_external_auth.github.access_token,
+    "ENVBUILDER_GIT_URL" : local.repo_url,
     "ENVBUILDER_WORKSPACE_FOLDER" : "/workspaces/${local.project_name}",
   }, local.is_new_project ? {
     # New project environment variables
@@ -227,12 +241,97 @@ resource "docker_image" "devcontainer_builder_image" {
 }
 
 resource "envbuilder_cached_image" "cached" {
-  count         = 1
+  count         = 0
   builder_image = local.devcontainer_builder_image
   git_url       = local.repo_url
-  cache_repo    = local.cache_repo
+  cache_repo    = ""
   extra_env     = local.envbuilder_env
 }
+
+
+data "coder_parameter" "system_prompt" {
+  name         = "system_prompt"
+  display_name = "System Prompt"
+  type         = "string"
+  form_type    = "textarea"
+  description  = "System prompt for the agent with generalized instructions"
+  mutable      = false
+  default     = <<-EOT
+    -- Framing --                                                
+      You are a helpful assistant that can help with code. You     
+  are running inside a Coder Workspace (that is different from the workspace of the user, so make sure to git push/pull to stay synced with them) and provide status          
+  updates to the user via Coder MCP. Stay on track, feel free      
+  to debug, but when the original plan fails, do not choose a      
+  different route/architecture without checking the user first.    
+                                                                   
+      -- Tool Selection --                                         
+      - The following tools are available in every workspace,      
+  but look to CLAUDE.md for workspace-specific additional tools    
+   available:                                                      
+      - Global tools: file operations, git commands, builds &      
+  installs, one-off shell commands, GitHub CLI (gh), Google        
+  Cloud CLI (gcloud), Python, Node.js                              
+                                                                   
+      -- Context --                                                
+      Please read the CLAUDE.md, if present in workspace base      
+  directory, for project-specific context.                         
+                                                                   
+      -- Code Review Workflow --                                   
+      User has GitHub Pull Requests extension in VS Code. When     
+  implementing functions:                                          
+      1. Preserve implementation checklists in docstrings          
+      2. May check off items: [ ] → [x], but NEVER modify          
+  checklist text                                                   
+      3. Copy each checklist item as a comment and place           
+  relevant code directly below it                                  
+      4. Create individual PRs per function for granular           
+  review: `gh pr create`                                           
+      5. User reviews line-by-line in VS Code, you read            
+  feedback: `gh pr view [PR#] --comments`
+
+  Note: Always make sure to git pull when starting a new task and / or periodically, as the user will be working in a separate workspace on the same repo. Once an implementation checklist is completed, feel free to change the title of the checklist to 'Procedure'.
+    EOT
+}
+
+data "coder_parameter" "ai_prompt" {
+  type        = "string"
+  name        = "AI Prompt"
+  default     = ""
+  description = "Write a prompt for Claude Code"
+  mutable     = true
+}
+
+module "claude-code" {
+  count               = local.coding_agent == "claude" ? 1 : 0
+  source              = "registry.coder.com/coder/claude-code/coder"
+  version             = "4.2.0"
+  agent_id            = coder_agent.main.id
+  claude_code_oauth_token = "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"
+  workdir             = "/workspaces/${local.project_name}"
+  install_claude_code = false
+  continue            = false
+  order               = 999
+  ai_prompt           = data.coder_parameter.ai_prompt.value
+}
+
+resource "coder_env" "claude_task_prompt" {
+  agent_id   = coder_agent.main.id
+  name       = "CODER_MCP_CLAUDE_TASK_PROMPT"
+  value      = data.coder_parameter.ai_prompt.value
+}
+
+resource "coder_env" "app_status_slug" {
+  agent_id   = coder_agent.main.id
+  name       = "CODER_MCP_APP_STATUS_SLUG"
+  value      = "ccw"
+}
+
+resource "coder_env" "claude_system_prompt" {
+  agent_id   = coder_agent.main.id
+  name       = "CODER_MCP_CLAUDE_SYSTEM_PROMPT"
+  value      = data.coder_parameter.system_prompt.value
+}
+
 
 resource "coder_agent" "main" {
   arch           = data.coder_provisioner.me.arch
@@ -370,7 +469,7 @@ resource "docker_volume" "dind_data" {
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = envbuilder_cached_image.cached.0.image
+  image = local.devcontainer_builder_image
   # Uses lower() to avoid Docker restriction on container names.
   name = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   # Hostname makes the shell more user friendly: coder@my-workspace:~$
@@ -379,7 +478,7 @@ resource "docker_container" "workspace" {
   runtime = "sysbox-runc"
 
   env = concat(
-    envbuilder_cached_image.cached[0].env,
+    local.docker_env,
     [
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
@@ -393,6 +492,7 @@ resource "docker_container" "workspace" {
     ] : [],
     local.gcp_project != "" ? [
       "CODER_GCP_PROJECT=${local.gcp_project}",
+      "GOOGLE_CLOUD_PROJECT=${local.gcp_project}",
     ] : []
   )
 
@@ -431,14 +531,8 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
-    container_path = "/home/coder/.claude"
-    host_path      = "/home/ubuntu/secrets/.claude"
-    read_only      = false
-  }
-
-  volumes {
-    container_path = "/home/coder/.claude.json"
-    host_path      = "/home/ubuntu/secrets/.claude.json"
+    container_path = "/home/coder/.gemini"
+    host_path      = "/home/ubuntu/secrets/.gemini"
     read_only      = false
   }
 
@@ -447,16 +541,28 @@ resource "docker_container" "workspace" {
     host_path      = "/home/ubuntu/secrets/.codex"
     read_only      = false
   }
-
+  
   volumes {
-    container_path = "/home/coder/.local/share/code-server/User"
-    host_path      = "/home/ubuntu/secrets/code-server/User"
+    container_path = "/home/coder/.supermaven"
+    host_path      = "/home/ubuntu/secrets/.supermaven"
     read_only      = false
   }
 
   volumes {
-    container_path = "/home/coder/.cache/google-vscode-extension"
-    host_path      = "/home/ubuntu/secrets/google-vscode-extension"
+    container_path = "/home/coder/.local/share/code-server"
+    host_path      = "/home/ubuntu/secrets/code-server"
+    read_only      = false
+  }
+
+  volumes {
+    container_path = "/home/coder/.vscode-server"
+    host_path      = "/home/ubuntu/secrets/.vscode-server"
+    read_only      = false
+  }
+
+  volumes {
+    container_path = "/home/coder/.local/share/keyrings"
+    host_path      = "/home/ubuntu/secrets/keyrings"
     read_only      = false
   }
 
@@ -502,7 +608,41 @@ module "code-server" {
 
   extensions = [
     "GitHub.vscode-github-actions",
+    "GitHub.vscode-pull-request-github",
     "Anthropic.claude-code",
-    "mongodb.mongodb-vscode"
+    "mongodb.mongodb-vscode",
+    "openai.chatgpt",
+    "ms-python.python",
+    "detachhead.basedpyright",
+    "Supermaven.supermaven",
+    "ms-azuretools.vscode-docker",
+    "Google.geminicodeassist"
+  ]
+}
+
+module "vscode-web" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/coder/vscode-web/coder"
+  folder = "/workspaces/${local.project_name}"
+
+  agent_id       = coder_agent.main.id
+  order          = 2
+  accept_license = true
+
+  settings = {
+    "workbench.colorTheme" = "Default Dark Modern",
+    "git.useIntegratedAskPass": "false"
+  }
+
+  extensions = [
+    "GitHub.vscode-github-actions",
+    "GitHub.vscode-pull-request-github",
+    "Github.copilot",
+    "Anthropic.claude-code",
+    "mongodb.mongodb-vscode",
+    "openai.chatgpt",
+    "ms-python.python",
+    "ms-azuretools.vscode-docker",
+    "Google.geminicodeassist"
   ]
 }
