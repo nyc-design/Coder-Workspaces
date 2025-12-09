@@ -1,0 +1,22 @@
+name: Coder Tasks Automation
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  issue-automation:
+    if: github.event_name == 'issues'
+    uses: nyc-design/Coder-Workspaces/.github/workflows/coder-issue-automation.yaml@main
+    secrets:
+      CODER_URL: ${{ secrets.CODER_URL }}
+      CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
+
+  comment-forward:
+    if: github.event_name == 'issue_comment'
+    uses: nyc-design/Coder-Workspaces/.github/workflows/coder-task-comment.yaml@main
+    secrets:
+      CODER_URL: ${{ secrets.CODER_URL }}
+      CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}

@@ -1,0 +1,216 @@
+name: Forward Coder Issue Comments
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  forward-comment:
+    if: >
+      github.event.issue.pull_request == null &&
+      (
+        contains(github.event.issue.labels.*.name, 'coder-claude') ||
+        contains(github.event.issue.labels.*.name, 'coder-codex') ||
+        contains(github.event.issue.labels.*.name, 'coder-gemini')
+      ) &&
+      startsWith(github.event.comment.body, '/coder')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract agent type from labels
+        id: agent
+        env:
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels) }}
+        run: |
+          set -euo pipefail
+
+          AGENT_LABEL=$(echo "$ISSUE_LABELS" | jq -r '.[] | .name | select(startswith("coder-"))' | head -n 1)
+
+          if [ -z "$AGENT_LABEL" ]; then
+            echo "No coder label found; exiting."
+            exit 1
+          fi
+
+          AGENT_TYPE="${AGENT_LABEL#coder-}"
+          echo "type=$AGENT_TYPE" >> "$GITHUB_OUTPUT"
+          echo "label=$AGENT_LABEL" >> "$GITHUB_OUTPUT"
+          echo "Detected agent type: $AGENT_TYPE"
+
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: ${{ secrets.CODER_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || {
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+            && sudo mkdir -p -m 755 /etc/apt/keyrings \
+            && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+            && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+            && sudo apt update \
+            && sudo apt install gh -y
+          }
+          gh --version
+
+      - name: Resolve commenter Coder user
+        id: coder_user
+        env:
+          GITHUB_USER_ID: ${{ github.event.comment.user.id }}
+          GITHUB_USER_LOGIN: ${{ github.event.comment.user.login }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CODER_URL: ${{ secrets.CODER_URL }}
+          AGENT_LABEL: ${{ steps.agent.outputs.label }}
+        run: |
+          set -euo pipefail
+
+          USER_JSON=$(coder users list --github-user-id "$GITHUB_USER_ID" --output json || echo "[]")
+          COUNT=$(echo "$USER_JSON" | jq 'length')
+
+          if [ "$COUNT" -eq 0 ]; then
+            COMMENT=$(cat <<EOF
+**GitHub account not linked to Coder**
+
+Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
+
+Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then comment again with the \`${AGENT_LABEL}\` instructions so I can pass your update to the agent.
+EOF
+)
+            gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
+            echo "linked=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          USERNAME=$(echo "$USER_JSON" | jq -r '.[0].username')
+          DISPLAY=$(echo "$USER_JSON" | jq -r '.[0].name // .[0].username')
+
+          echo "linked=true" >> "$GITHUB_OUTPUT"
+          echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
+          echo "display_name=$DISPLAY" >> "$GITHUB_OUTPUT"
+
+      - name: Locate existing workspace
+        id: workspace
+        if: steps.coder_user.outputs.linked == 'true'
+        env:
+          AGENT_TYPE: ${{ steps.agent.outputs.type }}
+          CODER_USERNAME: ${{ steps.coder_user.outputs.username }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          WORKSPACE_DATA=$(coder ls --output json --search "owner:${CODER_USERNAME}" || echo "[]")
+          WORKSPACES=$(echo "$WORKSPACE_DATA" | jq -r '.[] | select(.template_name == "repo-envbuilder-agent") | .name')
+
+          MATCH=""
+          while IFS= read -r ws_name; do
+            [ -z "$ws_name" ] && continue
+
+            DETAILS=$(coder show "${CODER_USERNAME}/${ws_name}" --output json 2>/dev/null || echo "{}")
+            WS_REPO=$(echo "$DETAILS" | jq -r '.latest_build.template_variables[] | select(.name == "repo_name") | .value' 2>/dev/null || echo "")
+            WS_AGENT=$(echo "$DETAILS" | jq -r '.latest_build.template_variables[] | select(.name == "coding_agent") | .value' 2>/dev/null || echo "")
+
+            if [ "$WS_REPO" = "$REPO_NAME" ] && [ "$WS_AGENT" = "$AGENT_TYPE" ]; then
+              MATCH="$ws_name"
+              break
+            fi
+          done <<< "$WORKSPACES"
+
+          if [ -z "$MATCH" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "⚠️ I couldn't find an existing workspace for @${CODER_USERNAME} and agent \`${AGENT_TYPE}\`. Please re-apply the coder label to restart the agent, then resend your comment."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATUS=$(coder ls --output json --search "owner:${CODER_USERNAME}" | jq -r --arg name "$MATCH" '.[] | select(.name == $name) | .status')
+          REF="${CODER_USERNAME}/${MATCH}"
+
+          if [ "$STATUS" != "running" ]; then
+            coder start "$REF" --yes || true
+            sleep 10
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "name=$MATCH" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Find active task
+        id: task
+        if: steps.workspace.outputs.found == 'true'
+        env:
+          CODER_USERNAME: ${{ steps.coder_user.outputs.username }}
+          WORKSPACE_NAME: ${{ steps.workspace.outputs.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          TASK_DATA=$(coder task list --output json --user "$CODER_USERNAME" || echo "[]")
+          TASK=$(echo "$TASK_DATA" | jq -r --arg workspace "$WORKSPACE_NAME" \
+            '[.[] | select(.workspace_name == $workspace and (.status == "pending" or .status == "initializing" or .status == "active"))] | sort_by(.created_at) | last')
+
+          if [ "$TASK" = "null" ] || [ -z "$TASK" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "⚠️ I couldn't find a running task for workspace \`${WORKSPACE_NAME}\`. Please re-apply the coder label to start a new task, then resend your comment."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TASK_ID=$(echo "$TASK" | jq -r '.id')
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "id=$TASK_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Forward comment to task
+        if: steps.task.outputs.found == 'true'
+        env:
+          TASK_ID: ${{ steps.task.outputs.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          MESSAGE=$(python - <<'PY'
+import os, sys
+body = os.environ["COMMENT_BODY"]
+body = body.lstrip()
+if body.lower().startswith("/coder"):
+    payload = body[6:].lstrip(" :\t-")
+else:
+    payload = body
+payload = payload.strip()
+if not payload:
+    payload = "(no additional instructions provided)"
+print(payload)
+PY
+)
+
+          coder task send "$TASK_ID" "GitHub comment from @${COMMENT_AUTHOR} on issue #${ISSUE_NUMBER}: ${MESSAGE}"
+
+      - name: Confirm forwarding
+        if: steps.task.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODER_URL: ${{ secrets.CODER_URL }}
+          CODER_USERNAME: ${{ steps.coder_user.outputs.username }}
+          TASK_ID: ${{ steps.task.outputs.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+        run: |
+          TASK_LINK="${CODER_URL}/tasks/${CODER_USERNAME}/${TASK_ID}"
+          COMMENT=$(cat <<EOF
+📨 Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
+
+- ✅ Task: [View progress here](${TASK_LINK})
+
+The agent will incorporate the new instructions shortly.
+EOF
+)
+          gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
