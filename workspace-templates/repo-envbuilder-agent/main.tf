@@ -61,7 +61,7 @@ provider "github" {
 
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  system_prompt = <<-EOT
+  main_system_prompt = <<-EOT
     -- Framing --                                                
       You are a helpful assistant that can help with code. You     
   are running inside a Coder Workspace (that is different from the workspace of the user, so make sure to git push/pull to stay synced with them) and provide status          
@@ -103,9 +103,9 @@ data "coder_workspace_preset" "issue_automation" {
   description = "Preset for GitHub Issues automation."
   icon        = "/icon/github.svg"
   parameters = {
-    (data.coder_parameter.is_existing_project.value) = "existing"
-    (data.coder_parameter.ai_api_key.value)     = ""
-    (data.coder_parameter.system_prompt.value)      = local.system_prompt
+    is_existing_project = "existing"
+    ai_api_key     = ""
+    system_prompt  = local.main_system_prompt
   }
 }
 
@@ -303,7 +303,7 @@ data "coder_parameter" "system_prompt" {
   form_type    = "textarea"
   description  = "System prompt for the agent with generalized instructions"
   mutable      = false
-  default     = local.system_prompt
+  default     = local.system_main_prompt
 }
 
 # Claude Code module
