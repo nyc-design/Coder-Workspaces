@@ -223,5 +223,5 @@ module "agentapi" {
 # Output for Coder Tasks integration
 output "task_app_id" {
   description = "The app ID for the Codex AgentAPI web app, used by coder_ai_task resource"
-  value       = module.agentapi.web_app_id
+  value       = module.agentapi.task_app_id
 }
