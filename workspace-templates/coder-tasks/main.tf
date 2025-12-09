@@ -118,6 +118,7 @@ data "coder_workspace_preset" "issue_automation_claude" {
     is_existing_project = "existing"
     ai_api_key     = ""
     system_prompt  = local.main_system_prompt
+    repo_name      = "Coder-Workspaces"
     gcp_project_name = ""
     coding_agent = "claude"
   }
@@ -131,6 +132,7 @@ data "coder_workspace_preset" "issue_automation_gemini" {
     is_existing_project = "existing"
     ai_api_key     = ""
     system_prompt  = local.main_system_prompt
+    repo_name      = "Coder-Workspaces"
     gcp_project_name = ""
     coding_agent = "gemini"
   }
@@ -144,6 +146,7 @@ data "coder_workspace_preset" "issue_automation_codex" {
     is_existing_project = "existing"
     ai_api_key     = ""
     system_prompt  = local.main_system_prompt
+    repo_name      = "Coder-Workspaces"
     gcp_project_name = ""
     coding_agent = "codex"
   }
