@@ -1,0 +1,81 @@
+name: Update Coder Templates
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "workspace-templates/**"
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_templates: ${{ steps.detect.outputs.changed_templates }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed template folders
+        id: detect
+        run: |
+          # Get list of changed files in the last commit
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # For manual runs, update all templates
+            CHANGED_DIRS=$(find workspace-templates -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+          else
+            # Get changed files between HEAD and HEAD~1
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+
+            # Extract unique template directories from changed files
+            CHANGED_DIRS=$(echo "$CHANGED_FILES" | grep "^workspace-templates/" | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          fi
+
+          echo "changed_templates=$CHANGED_DIRS" >> $GITHUB_OUTPUT
+          echo "Changed template directories: $CHANGED_DIRS"
+
+  update-templates:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_templates != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        template: ${{ fromJson(needs.detect-changes.outputs.changed_templates) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get latest commit hash
+        id: latest_commit
+        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Get commit title
+        id: commit_title
+        run: echo "title=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+
+      - name: Check if template directory exists
+        id: check_dir
+        run: |
+          if [ -d "workspace-templates/${{ matrix.template }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Template directory workspace-templates/${{ matrix.template }} exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Template directory workspace-templates/${{ matrix.template }} does not exist (might be deleted)"
+          fi
+
+      - name: Update Coder Template
+        if: steps.check_dir.outputs.exists == 'true'
+        uses: matifali/update-coder-template@v3
+        with:
+          id: ${{ matrix.template }}
+          dir: workspace-templates/${{ matrix.template }}
+          url: ${{ secrets.CODER_URL }}
+          name: ${{ steps.latest_commit.outputs.hash }}
+          message: ${{ steps.commit_title.outputs.title }}
+          activate: true
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
