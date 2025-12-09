@@ -109,6 +109,32 @@ jobs:
           echo "Looking for workspace with repo: ${REPO_NAME} and agent: ${AGENT_TYPE}"
           GCP_PROJECT_VALUE="${GCP_PROJECT:-}"
 
+          wait_for_workspace_health() {
+            local attempts=60
+            local delay=10
+            for ((i=1; i<=attempts; i++)); do
+              STATUS_JSON=$(coder ls --output json --search "owner:${CODER_USERNAME}" | jq -c --arg name "$WORKSPACE_NAME" '.[] | select(.name == $name)')
+
+              if [ -n "$STATUS_JSON" ]; then
+                WS_STATUS=$(echo "$STATUS_JSON" | jq -r '.status // ""')
+                WS_HEALTH=$(echo "$STATUS_JSON" | jq -r '.healthy // ""')
+
+                if [ "$WS_STATUS" = "running" ] && { [ "$WS_HEALTH" = "true" ] || [ "$WS_HEALTH" = "healthy" ] || [ "$WS_HEALTH" = "1" ]; }; then
+                  echo "Workspace $WORKSPACE_NAME is healthy."
+                  return 0
+                fi
+
+                echo "Workspace $WORKSPACE_NAME not healthy yet (status: $WS_STATUS, healthy: $WS_HEALTH). Waiting..."
+              else
+                echo "Workspace $WORKSPACE_NAME not listed yet. Waiting..."
+              fi
+
+              sleep "$delay"
+            done
+            echo "Workspace $WORKSPACE_NAME did not become healthy within timeout."
+            exit 1
+          }
+
           WORKSPACE_DATA=$(coder ls --output json --search "owner:${CODER_USERNAME}" || echo "[]")
           WORKSPACES=$(echo "$WORKSPACE_DATA" | jq -r '.[] | select(.template_name == "repo-envbuilder-agent") | .name')
 
@@ -149,8 +175,8 @@ jobs:
             if [ "$WS_STATUS" != "running" ]; then
               echo "Starting workspace $WORKSPACE_NAME..."
               coder start "$WORKSPACE_REF" --yes || true
-              sleep 10
             fi
+            wait_for_workspace_health
           else
             echo "No existing workspace found. Creating new workspace..."
 
@@ -188,8 +214,8 @@ jobs:
                 exit 1
               }
 
-            echo "Waiting for workspace to start..."
-            sleep 20
+            echo "Waiting for workspace to become healthy..."
+            wait_for_workspace_health
           fi
 
           echo "name=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
@@ -239,8 +265,7 @@ jobs:
           echo "Task prompt:"
           echo "$TASK_PROMPT"
 
-          # Create task using Coder CLI
-          if ! TASK_ID=$(coder tasks create --quiet "$WORKSPACE_REF" "$TASK_PROMPT" | tr -d '\r\n'); then
+          if ! TASK_ID=$(echo "$TASK_PROMPT" | coder tasks create --quiet "$WORKSPACE_REF" --stdin | tr -d '\r\n'); then
             echo "Failed to create task"
             exit 1
           fi
