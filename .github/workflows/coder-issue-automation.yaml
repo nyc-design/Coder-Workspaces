@@ -41,7 +41,7 @@ jobs:
           echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
 
       - name: Start Coder Task
-        uses: coder/create-task-action@v0
+        uses: coder/create-task-action@v0.0.4
         with:
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_SESSION_TOKEN }}
