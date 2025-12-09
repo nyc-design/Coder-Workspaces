@@ -61,6 +61,19 @@ provider "github" {
 
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+
+  # Safely get the full task prompt (empty string if no task, e.g. manual workspace)
+  task_prompt = try(data.coder_task.me.prompt, "")
+
+  # Try to extract GH_REPO=owner/repo from the prompt.
+  gh_repo_match = can(regex("(?m)^GH_REPO=([^\\r\\n]+)", local.task_prompt)) ? regex("(?m)^GH_REPO=([^\\r\\n]+)", local.task_prompt) : []
+
+  # "" if not found, otherwise "owner/repo"
+  gh_repo = length(local.gh_repo_match) > 0 ? local.gh_repo_match[0] : ""
+
+  # If gh_repo is set, use repo name as project_name, e.g. "owner/repo" → "repo"
+  gh_project_name = local.gh_repo != "" ? element(split("/", local.gh_repo), 1) : ""
+  
   main_system_prompt = <<-EOT
     -- Framing --                                                
       You are a helpful assistant that can help with code. You     
@@ -98,8 +111,8 @@ locals{
     EOT
 }
 
-data "coder_workspace_preset" "issue_automation" {
-  name        = "Issue Automation"
+data "coder_workspace_preset" "issue_automation_claude" {
+  name        = "Issue Automation - Claude"
   description = "Preset for GitHub Issues automation."
   icon        = "/icon/github.svg"
   parameters = {
@@ -107,6 +120,33 @@ data "coder_workspace_preset" "issue_automation" {
     ai_api_key     = ""
     system_prompt  = local.main_system_prompt
     gcp_project_name = ""
+    coding_agent = "claude"
+  }
+}
+
+data "coder_workspace_preset" "issue_automation_gemini" {
+  name        = "Issue Automation - Gemini"
+  description = "Preset for GitHub Issues automation."
+  icon        = "/icon/github.svg"
+  parameters = {
+    is_existing_project = "existing"
+    ai_api_key     = ""
+    system_prompt  = local.main_system_prompt
+    gcp_project_name = ""
+    coding_agent = "gemini"
+  }
+}
+
+data "coder_workspace_preset" "issue_automation_codex" {
+  name        = "Issue Automation - Codex"
+  description = "Preset for GitHub Issues automation."
+  icon        = "/icon/github.svg"
+  parameters = {
+    is_existing_project = "existing"
+    ai_api_key     = ""
+    system_prompt  = local.main_system_prompt
+    gcp_project_name = ""
+    coding_agent = "codex"
   }
 }
 
@@ -233,7 +273,7 @@ locals {
   ai_api_key = data.coder_parameter.ai_api_key.value
   
   # Project name logic
-  project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
+  project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
   
   # Project type for workspace image selection
   project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
@@ -255,8 +295,10 @@ locals {
   new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
 
   existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
-   
-  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
+
+  task_repo_url = local.gh_repo != "" ? "https://github.com/${local.gh_repo}.git" : ""
+
+  repo_url = local.task_repo_url != "" ? local.task_repo_url : (local.is_new_project ? local.new_repo_url : local.existing_repo_url)
 
   # The envbuilder provider requires a key-value map of environment variables.
   envbuilder_env = merge({
