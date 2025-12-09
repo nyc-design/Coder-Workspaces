@@ -106,6 +106,7 @@ data "coder_workspace_preset" "issue_automation" {
     is_existing_project = "existing"
     ai_api_key     = ""
     system_prompt  = local.main_system_prompt
+    gcp_project_name = ""
   }
 }
 

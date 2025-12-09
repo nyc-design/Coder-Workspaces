@@ -7,6 +7,8 @@ on:
         required: true
       CODER_SESSION_TOKEN:
         required: true
+      GCP_PROJECT:
+        required: false
   issues:
     types: [labeled]
 
@@ -100,10 +102,12 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           CODER_USERNAME: ${{ steps.coder_user.outputs.username }}
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
         run: |
           set -euo pipefail
 
           echo "Looking for workspace with repo: ${REPO_NAME} and agent: ${AGENT_TYPE}"
+          GCP_PROJECT_VALUE="${GCP_PROJECT:-}"
 
           WORKSPACE_DATA=$(coder ls --output json --search "owner:${CODER_USERNAME}" || echo "[]")
           WORKSPACES=$(echo "$WORKSPACE_DATA" | jq -r '.[] | select(.template_name == "repo-envbuilder-agent") | .name')
@@ -168,12 +172,20 @@ jobs:
             echo "Creating workspace: $WORKSPACE_NAME"
 
             # Create workspace with parameters
-            coder create "$WORKSPACE_REF" \
-              --template "repo-envbuilder-agent" \
-              --preset "Issue Automation" \
-              --parameter "repo_name=${REPO_NAME}" \
-              --parameter "coding_agent=${AGENT_TYPE}" \
-              --yes || {
+            CMD_ARGS=(
+              --template "repo-envbuilder-agent"
+              --preset "issue_automation"
+              --parameter "is_existing_project=existing"
+              --parameter "repo_name=${REPO_NAME}"
+              --parameter "coding_agent=${AGENT_TYPE}"
+              --parameter "ai_api_key="
+            )
+
+            if [ -n "$GCP_PROJECT_VALUE" ]; then
+              CMD_ARGS+=(--parameter "gcp_project_name=${GCP_PROJECT_VALUE}")
+            fi
+
+            coder create "$WORKSPACE_REF" "${CMD_ARGS[@]}" --yes || {
                 echo "Failed to create workspace"
                 exit 1
               }
