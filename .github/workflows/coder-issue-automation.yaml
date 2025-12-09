@@ -170,7 +170,7 @@ jobs:
             # Create workspace with parameters
             coder create "$WORKSPACE_REF" \
               --template "repo-envbuilder-agent" \
-              --preset "issue_automation" \
+              --preset "Issue Automation" \
               --parameter "repo_name=${REPO_NAME}" \
               --parameter "coding_agent=${AGENT_TYPE}" \
               --yes || {
