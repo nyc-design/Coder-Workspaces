@@ -126,18 +126,22 @@ variable "enable_yolo_mode" {
   default     = false
 }
 
+locals {
+  gemini_api_key_value = trimspace(coalesce(var.gemini_api_key, ""))
+}
+
 resource "coder_env" "gemini_api_key" {
-  count    = var.gemini_api_key != "" ? 1 : 0
+  count    = local.gemini_api_key_value != "" ? 1 : 0
   agent_id = var.agent_id
   name     = "GEMINI_API_KEY"
-  value    = var.gemini_api_key
+  value    = local.gemini_api_key_value
 }
 
 resource "coder_env" "google_api_key" {
-  count    = var.gemini_api_key != "" ? 1 : 0
+  count    = local.gemini_api_key_value != "" ? 1 : 0
   agent_id = var.agent_id
   name     = "GOOGLE_API_KEY"
-  value    = var.gemini_api_key
+  value    = local.gemini_api_key_value
 }
 
 resource "coder_env" "gemini_use_vertex_ai" {
@@ -218,8 +222,8 @@ module "agentapi" {
 
      echo -n '${base64encode(local.start_script)}' | base64 -d > /tmp/start.sh
      chmod +x /tmp/start.sh
-     ${var.gemini_api_key != "" ? "GEMINI_API_KEY='${var.gemini_api_key}' \\" : ""}
-     ${var.gemini_api_key != "" ? "GOOGLE_API_KEY='${var.gemini_api_key}' \\" : ""}
+     ${local.gemini_api_key_value != "" ? "GEMINI_API_KEY='${local.gemini_api_key_value}' \\" : ""}
+     ${local.gemini_api_key_value != "" ? "GOOGLE_API_KEY='${local.gemini_api_key_value}' \\" : ""}
      GOOGLE_GENAI_USE_VERTEXAI='${var.use_vertexai}' \
      GEMINI_YOLO_MODE='${var.enable_yolo_mode}' \
      GEMINI_MODEL='${var.gemini_model}' \

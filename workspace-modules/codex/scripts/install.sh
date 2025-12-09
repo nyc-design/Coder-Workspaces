@@ -91,7 +91,6 @@ write_minimal_default_config() {
 # Minimal Default Codex Configuration
 sandbox_mode = "workspace-write"
 approval_policy = "never"
-preferred_auth_method = "apikey"
 
 [sandbox_workspace_write]
 network_access = true
@@ -169,6 +168,11 @@ function add_instruction_prompt_if_exists() {
 }
 
 function add_auth_json() {
+  if [ -z "${ARG_OPENAI_API_KEY:-}" ]; then
+    printf "No OpenAI API key provided, skipping auth.json creation.\n"
+    return
+  fi
+
   AUTH_JSON_PATH="$HOME/.codex/auth.json"
   mkdir -p "$(dirname "$AUTH_JSON_PATH")"
   AUTH_JSON=$(

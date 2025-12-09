@@ -149,19 +149,20 @@ variable "codex_system_prompt" {
   default     = "You are a helpful coding assistant. Start every response with `Codex says:`"
 }
 
-resource "coder_env" "openai_api_key" {
-  count    = var.openai_api_key != "" ? 1 : 0
-  agent_id = var.agent_id
-  name     = "OPENAI_API_KEY"
-  value    = var.openai_api_key
+locals {
+  openai_api_key_value = trimspace(coalesce(var.openai_api_key, ""))
+  workdir              = trimsuffix(var.workdir, "/")
+  app_slug             = "codex"
+  install_script       = file("${path.module}/scripts/install.sh")
+  start_script         = file("${path.module}/scripts/start.sh")
+  module_dir_name      = ".codex-module"
 }
 
-locals {
-  workdir         = trimsuffix(var.workdir, "/")
-  app_slug        = "codex"
-  install_script  = file("${path.module}/scripts/install.sh")
-  start_script    = file("${path.module}/scripts/start.sh")
-  module_dir_name = ".codex-module"
+resource "coder_env" "openai_api_key" {
+  count    = local.openai_api_key_value != "" ? 1 : 0
+  agent_id = var.agent_id
+  name     = "OPENAI_API_KEY"
+  value    = local.openai_api_key_value
 }
 
 module "agentapi" {
@@ -191,7 +192,7 @@ module "agentapi" {
 
      echo -n '${base64encode(local.start_script)}' | base64 -d > /tmp/start.sh
      chmod +x /tmp/start.sh
-     ${var.openai_api_key != "" ? "ARG_OPENAI_API_KEY='${var.openai_api_key}' \\" : ""}
+     ${local.openai_api_key_value != "" ? "ARG_OPENAI_API_KEY='${local.openai_api_key_value}' \\" : ""}
      ARG_REPORT_TASKS='${var.report_tasks}' \
      ARG_CODEX_MODEL='${var.codex_model}' \
      ARG_CODEX_START_DIRECTORY='${local.workdir}' \
@@ -207,7 +208,7 @@ module "agentapi" {
 
     echo -n '${base64encode(local.install_script)}' | base64 -d > /tmp/install.sh
     chmod +x /tmp/install.sh
-    ${var.openai_api_key != "" ? "ARG_OPENAI_API_KEY='${var.openai_api_key}' \\" : ""}
+    ${local.openai_api_key_value != "" ? "ARG_OPENAI_API_KEY='${local.openai_api_key_value}' \\" : ""}
     ARG_REPORT_TASKS='${var.report_tasks}' \
     ARG_INSTALL='${var.install_codex}' \
     ARG_CODEX_VERSION='${var.codex_version}' \
