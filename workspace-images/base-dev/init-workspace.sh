@@ -161,6 +161,12 @@ if [[ -n "${CODER_GCP_PROJECT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
   
   # Set the active GCP project
   gcloud config set project "${CODER_GCP_PROJECT}"
+
+  # Make it visible to Gemini CLI & other tools
+  export GOOGLE_CLOUD_PROJECT="${CODER_GCP_PROJECT}"
+  if ! grep -q "GOOGLE_CLOUD_PROJECT" /home/coder/.bashrc; then
+    echo "export GOOGLE_CLOUD_PROJECT=\"${CODER_GCP_PROJECT}\"" >> /home/coder/.bashrc
+  fi
   
   # Create secrets directory
   mkdir -p /home/coder/.secrets
