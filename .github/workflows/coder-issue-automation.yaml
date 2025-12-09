@@ -150,9 +150,19 @@ jobs:
           else
             echo "No existing workspace found. Creating new workspace..."
 
-            # Generate workspace name: repo-agent-timestamp
+            # Generate workspace name: repo-agent-timestamp with length <= 32
             TIMESTAMP=$(date +%s)
-            WORKSPACE_NAME="${REPO_NAME}-${AGENT_TYPE}-${TIMESTAMP}"
+            TIMESTAMP_SUFFIX=$(echo "$TIMESTAMP" | tail -c 6)
+            SANITIZED_REPO=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-' | cut -c1-16)
+            if [ -z "$SANITIZED_REPO" ]; then
+              SANITIZED_REPO="repo"
+            fi
+            SANITIZED_AGENT=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-' | cut -c1-6)
+            if [ -z "$SANITIZED_AGENT" ]; then
+              SANITIZED_AGENT="agent"
+            fi
+            WORKSPACE_NAME="${SANITIZED_REPO}-${SANITIZED_AGENT}-${TIMESTAMP_SUFFIX}"
+            WORKSPACE_NAME=$(echo "$WORKSPACE_NAME" | cut -c1-32)
             WORKSPACE_REF="${CODER_USERNAME}/${WORKSPACE_NAME}"
 
             echo "Creating workspace: $WORKSPACE_NAME"
