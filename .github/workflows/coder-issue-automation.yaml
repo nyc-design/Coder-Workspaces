@@ -1,0 +1,204 @@
+name: Coder Issue Automation
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  dispatch-to-coder:
+    # Only run if the label is one of our Coder agent labels
+    if: |
+      contains(github.event.label.name, 'coder-') &&
+      (github.event.label.name == 'coder-claude' ||
+       github.event.label.name == 'coder-codex' ||
+       github.event.label.name == 'coder-gemini')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract agent type from label
+        id: agent
+        run: |
+          LABEL="${{ github.event.label.name }}"
+          AGENT_TYPE="${LABEL#coder-}"
+          echo "type=$AGENT_TYPE" >> $GITHUB_OUTPUT
+          echo "Detected agent type: $AGENT_TYPE"
+
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: ${{ secrets.CODER_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || {
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+            && sudo mkdir -p -m 755 /etc/apt/keyrings \
+            && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+            && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+            && sudo apt update \
+            && sudo apt install gh -y
+          }
+          gh --version
+
+      - name: Find or create Coder workspace
+        id: workspace
+        env:
+          AGENT_TYPE: ${{ steps.agent.outputs.type }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_OWNER: ${{ github.event.repository.owner.login }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+
+          echo "Looking for workspace with repo: ${REPO_NAME} and agent: ${AGENT_TYPE}"
+
+          # List all workspaces using the repo-envbuilder-agent template
+          WORKSPACES=$(coder ls --output json | jq -r '.[] | select(.template_name == "repo-envbuilder-agent") | .name')
+
+          WORKSPACE_NAME=""
+
+          # Check each workspace's parameters to find a match
+          while IFS= read -r ws_name; do
+            [ -z "$ws_name" ] && continue
+
+            echo "Checking workspace: $ws_name"
+
+            # Get workspace details including parameters
+            WS_DETAILS=$(coder show "$ws_name" --output json 2>/dev/null || echo "{}")
+
+            # Extract parameters from the latest build
+            WS_REPO=$(echo "$WS_DETAILS" | jq -r '.latest_build.template_variables[] | select(.name == "repo_name") | .value' 2>/dev/null || echo "")
+            WS_AGENT=$(echo "$WS_DETAILS" | jq -r '.latest_build.template_variables[] | select(.name == "coding_agent") | .value' 2>/dev/null || echo "")
+
+            echo "  Workspace repo: ${WS_REPO}, agent: ${WS_AGENT}"
+
+            # Check if this workspace matches our repo and agent
+            if [ "$WS_REPO" = "$REPO_NAME" ] && [ "$WS_AGENT" = "$AGENT_TYPE" ]; then
+              echo "✓ Found matching workspace: $ws_name"
+              WORKSPACE_NAME="$ws_name"
+              break
+            fi
+          done <<< "$WORKSPACES"
+
+          if [ -n "$WORKSPACE_NAME" ]; then
+            echo "Using existing workspace: $WORKSPACE_NAME"
+
+            # Check if workspace is running
+            WS_STATUS=$(coder ls --output json | jq -r --arg name "$WORKSPACE_NAME" \
+              '.[] | select(.name == $name) | .status')
+
+            if [ "$WS_STATUS" != "running" ]; then
+              echo "Starting workspace $WORKSPACE_NAME..."
+              coder start "$WORKSPACE_NAME" --yes || true
+              sleep 10
+            fi
+          else
+            echo "No existing workspace found. Creating new workspace..."
+
+            # Generate workspace name: repo-agent-timestamp
+            TIMESTAMP=$(date +%s)
+            WORKSPACE_NAME="${REPO_NAME}-${AGENT_TYPE}-${TIMESTAMP}"
+
+            echo "Creating workspace: $WORKSPACE_NAME"
+
+            # Create workspace with parameters
+            coder create "$WORKSPACE_NAME" \
+              --template "repo-envbuilder-agent" \
+              --parameter "is_existing_project=existing" \
+              --parameter "repo_name=${REPO_NAME}" \
+              --parameter "coding_agent=${AGENT_TYPE}" \
+              --yes || {
+                echo "Failed to create workspace"
+                exit 1
+              }
+
+            echo "Waiting for workspace to start..."
+            sleep 20
+          fi
+
+          echo "name=$WORKSPACE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Coder task for issue
+        env:
+          WORKSPACE_NAME: ${{ steps.workspace.outputs.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Create task prompt
+          TASK_PROMPT=$(cat <<EOF
+          🤖 Automated Issue Assignment
+
+          You are working autonomously on GitHub issue #${ISSUE_NUMBER}: "${ISSUE_TITLE}"
+
+          Issue URL: ${ISSUE_URL}
+          Repository: ${REPO_FULL}
+
+          IMPORTANT INSTRUCTIONS:
+          1. You are working WITHOUT immediate user feedback - make your best decisions autonomously
+          2. Use 'gh issue view ${ISSUE_NUMBER}' to read the full issue details
+          3. Analyze the issue and understand what needs to be fixed
+          4. Create a new branch: git checkout -b fix/issue-${ISSUE_NUMBER}
+          5. Make the necessary code changes to fix the issue
+          6. Commit your changes with clear, descriptive commit messages
+          7. Push the branch: git push -u origin fix/issue-${ISSUE_NUMBER}
+          8. Create a pull request: gh pr create --title "Fix: ${ISSUE_TITLE} (fixes #${ISSUE_NUMBER})" --body "Fixes #${ISSUE_NUMBER}\n\n[Automated PR created by Coder AI Agent]" --head fix/issue-${ISSUE_NUMBER}
+          9. Get the PR URL and post it as a comment on the issue: gh issue comment ${ISSUE_NUMBER} --body "🤖 I've created a PR to address this issue: [PR_URL]"
+
+          Work carefully and thoroughly. If you encounter any blockers or need clarification, document them in the PR description.
+
+          Start by reviewing the issue now.
+          EOF
+          )
+
+          echo "Creating Coder task for workspace: $WORKSPACE_NAME"
+          echo "Task prompt:"
+          echo "$TASK_PROMPT"
+
+          # Create task using Coder CLI
+          coder tasks create "$WORKSPACE_NAME" "$TASK_PROMPT" || {
+            echo "Failed to create task"
+            exit 1
+          }
+
+          echo "✅ Task created successfully!"
+
+      - name: Post confirmation comment on issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKSPACE_NAME: ${{ steps.workspace.outputs.name }}
+          AGENT_TYPE: ${{ steps.agent.outputs.type }}
+          CODER_URL: ${{ secrets.CODER_URL }}
+        run: |
+          COMMENT=$(cat <<EOF
+          🤖 **Coder AI Agent Dispatched**
+
+          Your issue has been assigned to a Coder AI workspace for automated resolution.
+
+          **Details:**
+          - 🚀 Workspace: \`${WORKSPACE_NAME}\`
+          - 🧠 Agent: **${AGENT_TYPE}**
+          - 📍 Dashboard: [View Workspace](${CODER_URL}/workspaces)
+
+          The AI agent is now working on this issue autonomously. It will:
+          1. Review the issue details
+          2. Create a fix branch
+          3. Implement the solution
+          4. Open a pull request
+          5. Comment here with the PR link
+
+          Please allow a few minutes for the agent to complete its work.
+          EOF
+          )
+
+          gh issue comment ${{ github.event.issue.number }} --body "$COMMENT"

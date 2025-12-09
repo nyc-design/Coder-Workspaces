@@ -410,6 +410,12 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
+    container_path = "/home/coder/.gemini"
+    host_path      = "/home/ubuntu/secrets/.gemini"
+    read_only      = false
+  }
+
+  volumes {
     container_path = "/home/coder/.claude"
     host_path      = "/home/ubuntu/secrets/.claude"
     read_only      = false
@@ -428,8 +434,8 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
-    container_path = "/home/coder/.codex-module"
-    host_path      = "/home/ubuntu/secrets/.codex-module"
+    container_path = "/home/coder/.cache/google-vscode-extension"
+    host_path      = "/home/ubuntu/secrets/google-vscode-extension"
     read_only      = false
   }
 

@@ -21,7 +21,15 @@ workspace-images/          # Docker images for different development stacks
 └── python-dev/           # Python development environment
 
 workspace-templates/       # Coder workspace template definitions
-└── repo-devcontainer/    # Repository-based devcontainer template
+├── repo-devcontainer/    # Repository-based devcontainer template
+└── repo-envbuilder-agent/ # Repository template with AI agent selection
+
+workspace-modules/         # Reusable Terraform modules for workspace templates
+├── gemini-cli/           # Google Gemini CLI module
+└── codex/                # OpenAI Codex module
+
+scripts/                   # Utility scripts
+└── deploy-issue-automation.sh  # Deploy GitHub issue automation to repos
 ```
 
 ## Key Architecture Concepts
@@ -104,6 +112,37 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 ### Image Tagging Strategy
 - `:latest` - Always points to most recent build
 - `:sha-{7-char-commit}` - Specific commit-based tag for reproducibility
+
+## GitHub Issue Automation
+
+This repository includes an automated workflow for dispatching GitHub issues to AI coding agents running in Coder workspaces.
+
+### How It Works
+
+1. Create a GitHub issue describing a bug or feature
+2. Label it with `coder-claude`, `coder-codex`, or `coder-gemini`
+3. GitHub Actions automatically:
+   - Finds or creates a Coder workspace for the repository
+   - Dispatches a task to the selected AI agent
+   - AI agent reviews the issue, creates a fix branch, and opens a PR
+   - PR link is posted back to the issue
+
+### Quick Start
+
+```bash
+# Deploy to your repositories
+./scripts/deploy-issue-automation.sh my-repo-1 my-repo-2
+
+# Or use the workflow directly
+curl -o .github/workflows/coder-issue-automation.yaml \
+  https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/.github/workflows/coder-issue-automation.yaml
+```
+
+**Required Secrets:**
+- `CODER_URL`: Your Coder deployment URL
+- `CODER_SESSION_TOKEN`: From `coder token create --lifetime 8760h --name "GitHub Actions"`
+
+**Full Documentation:** [CODER_ISSUE_AUTOMATION.md](CODER_ISSUE_AUTOMATION.md)
 
 ## Common Tasks
 
