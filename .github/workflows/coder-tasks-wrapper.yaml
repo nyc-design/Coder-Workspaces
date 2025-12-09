@@ -17,7 +17,6 @@ jobs:
     secrets:
       CODER_URL: ${{ secrets.CODER_URL }}
       CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
-      GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
 
   comment-forward:
     if: github.event_name == 'issue_comment'
