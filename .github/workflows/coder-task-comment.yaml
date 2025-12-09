@@ -76,24 +76,24 @@ jobs:
 
           if [ "$COUNT" -eq 0 ]; then
             COMMENT=$(cat <<EOF
-**GitHub account not linked to Coder**
+          GitHub account not linked to Coder**
 
-Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
+          Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
 
-Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then comment again with the \`${AGENT_LABEL}\` instructions so I can pass your update to the agent.
-EOF
-)
-            gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
-            echo "linked=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then comment again with the \`${AGENT_LABEL}\` instructions so I can pass your update to the agent.
+          EOF
+          )
+                      gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
+                      echo "linked=false" >> "$GITHUB_OUTPUT"
+                      exit 0
+                    fi
 
-          USERNAME=$(echo "$USER_JSON" | jq -r '.[0].username')
-          DISPLAY=$(echo "$USER_JSON" | jq -r '.[0].name // .[0].username')
+                    USERNAME=$(echo "$USER_JSON" | jq -r '.[0].username')
+                    DISPLAY=$(echo "$USER_JSON" | jq -r '.[0].name // .[0].username')
 
-          echo "linked=true" >> "$GITHUB_OUTPUT"
-          echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
-          echo "display_name=$DISPLAY" >> "$GITHUB_OUTPUT"
+                    echo "linked=true" >> "$GITHUB_OUTPUT"
+                    echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
+                    echo "display_name=$DISPLAY" >> "$GITHUB_OUTPUT"
 
       - name: Locate existing workspace
         id: workspace
@@ -178,21 +178,21 @@ EOF
           set -euo pipefail
 
           MESSAGE=$(python - <<'PY'
-import os, sys
-body = os.environ["COMMENT_BODY"]
-body = body.lstrip()
-if body.lower().startswith("/coder"):
-    payload = body[6:].lstrip(" :\t-")
-else:
-    payload = body
-payload = payload.strip()
-if not payload:
-    payload = "(no additional instructions provided)"
-print(payload)
-PY
-)
+          import os, sys
+          body = os.environ["COMMENT_BODY"]
+          body = body.lstrip()
+          if body.lower().startswith("/coder"):
+              payload = body[6:].lstrip(" :\t-")
+          else:
+              payload = body
+          payload = payload.strip()
+          if not payload:
+              payload = "(no additional instructions provided)"
+          print(payload)
+          PY
+          )
 
-          coder task send "$TASK_ID" "GitHub comment from @${COMMENT_AUTHOR} on issue #${ISSUE_NUMBER}: ${MESSAGE}"
+                    coder task send "$TASK_ID" "GitHub comment from @${COMMENT_AUTHOR} on issue #${ISSUE_NUMBER}: ${MESSAGE}"
 
       - name: Confirm forwarding
         if: steps.task.outputs.found == 'true'
@@ -206,11 +206,11 @@ PY
         run: |
           TASK_LINK="${CODER_URL}/tasks/${CODER_USERNAME}/${TASK_ID}"
           COMMENT=$(cat <<EOF
-Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
+          Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
 
-- Task: [View progress here](${TASK_LINK})
+          - Task: [View progress here](${TASK_LINK})
 
-The agent will incorporate the new instructions shortly.
-EOF
-)
-          gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
+          The agent will incorporate the new instructions shortly.
+          EOF
+          )
+                    gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"

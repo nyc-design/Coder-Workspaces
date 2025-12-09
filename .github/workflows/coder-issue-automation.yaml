@@ -63,26 +63,26 @@ jobs:
 
           if [ "$COUNT" -eq 0 ]; then
             COMMENT=$(cat <<EOF
-**GitHub account not linked to Coder**
+          GitHub account not linked to Coder**
 
-Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
+          Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
 
-Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then re-apply the `${AGENT_LABEL}` label so I can dispatch an agent for this issue.
-EOF
-)
-            gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
-            echo "linked=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then re-apply the `${AGENT_LABEL}` label so I can dispatch an agent for this issue.
+          EOF
+          )
+                      gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
+                      echo "linked=false" >> $GITHUB_OUTPUT
+                      exit 0
+                    fi
 
-          USERNAME=$(echo "$USER_JSON" | jq -r '.[0].username')
-          EMAIL=$(echo "$USER_JSON" | jq -r '.[0].email // empty')
-          DISPLAY=$(echo "$USER_JSON" | jq -r '.[0].name // .[0].username')
+                    USERNAME=$(echo "$USER_JSON" | jq -r '.[0].username')
+                    EMAIL=$(echo "$USER_JSON" | jq -r '.[0].email // empty')
+                    DISPLAY=$(echo "$USER_JSON" | jq -r '.[0].name // .[0].username')
 
-          echo "linked=true" >> $GITHUB_OUTPUT
-          echo "username=$USERNAME" >> $GITHUB_OUTPUT
-          echo "email=$EMAIL" >> $GITHUB_OUTPUT
-          echo "display_name=$DISPLAY" >> $GITHUB_OUTPUT
+                    echo "linked=true" >> $GITHUB_OUTPUT
+                    echo "username=$USERNAME" >> $GITHUB_OUTPUT
+                    echo "email=$EMAIL" >> $GITHUB_OUTPUT
+                    echo "display_name=$DISPLAY" >> $GITHUB_OUTPUT
 
       - name: Find or create Coder workspace
         id: workspace
