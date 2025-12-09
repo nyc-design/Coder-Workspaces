@@ -43,7 +43,7 @@ jobs:
       - name: Setup Coder CLI
         uses: coder/setup-action@v1
         with:
-          access_url: ${{ secrets.CODER_URL }}
+          access_url: "https://coder.tapiavala.com"
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
       - name: Setup GitHub CLI
