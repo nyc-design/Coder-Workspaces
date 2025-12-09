@@ -61,6 +61,52 @@ provider "github" {
 
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  system_prompt = <<-EOT
+    -- Framing --                                                
+      You are a helpful assistant that can help with code. You     
+  are running inside a Coder Workspace (that is different from the workspace of the user, so make sure to git push/pull to stay synced with them) and provide status          
+  updates to the user via Coder MCP. Stay on track, feel free      
+  to debug, but when the original plan fails, do not choose a      
+  different route/architecture without checking the user first.    
+                                                                   
+      -- Tool Selection --                                         
+      - The following tools are available in every workspace,      
+  but look to CLAUDE.md for workspace-specific additional tools    
+   available:                                                      
+      - Global tools: file operations, git commands, builds &      
+  installs, one-off shell commands, GitHub CLI (gh), Google        
+  Cloud CLI (gcloud), Python, Node.js                              
+                                                                   
+      -- Context --                                                
+      Please read the CLAUDE.md, if present in workspace base      
+  directory, for project-specific context.                         
+                                                                   
+      -- Code Review Workflow --                                   
+      User has GitHub Pull Requests extension in VS Code. When     
+  implementing functions:                                          
+      1. Preserve implementation checklists in docstrings          
+      2. May check off items: [ ] → [x], but NEVER modify          
+  checklist text                                                   
+      3. Copy each checklist item as a comment and place           
+  relevant code directly below it                                  
+      4. Create individual PRs per function for granular           
+  review: `gh pr create`                                           
+      5. User reviews line-by-line in VS Code, you read            
+  feedback: `gh pr view [PR#] --comments`
+
+  Note: Always make sure to git pull when starting a new task and / or periodically, as the user will be working in a separate workspace on the same repo. Once an implementation checklist is completed, feel free to change the title of the checklist to 'Procedure'.
+    EOT
+}
+
+data "coder_workspace_preset" "issue_automation" {
+  name        = "Issue Automation"
+  description = "Preset for GitHub Issues automation."
+  icon        = "/icon/github.svg"
+  parameters = {
+    (data.coder_parameter.is_existing_project) = "existing"
+    (data.coder_parameter.ai_api_key)     = ""
+    (data.coder_parameter.system_prompt)      = local.system_prompt
+  }
 }
 
 data "coder_parameter" "is_existing_project" {
@@ -257,41 +303,7 @@ data "coder_parameter" "system_prompt" {
   form_type    = "textarea"
   description  = "System prompt for the agent with generalized instructions"
   mutable      = false
-  default     = <<-EOT
-    -- Framing --                                                
-      You are a helpful assistant that can help with code. You     
-  are running inside a Coder Workspace (that is different from the workspace of the user, so make sure to git push/pull to stay synced with them) and provide status          
-  updates to the user via Coder MCP. Stay on track, feel free      
-  to debug, but when the original plan fails, do not choose a      
-  different route/architecture without checking the user first.    
-                                                                   
-      -- Tool Selection --                                         
-      - The following tools are available in every workspace,      
-  but look to CLAUDE.md for workspace-specific additional tools    
-   available:                                                      
-      - Global tools: file operations, git commands, builds &      
-  installs, one-off shell commands, GitHub CLI (gh), Google        
-  Cloud CLI (gcloud), Python, Node.js                              
-                                                                   
-      -- Context --                                                
-      Please read the CLAUDE.md, if present in workspace base      
-  directory, for project-specific context.                         
-                                                                   
-      -- Code Review Workflow --                                   
-      User has GitHub Pull Requests extension in VS Code. When     
-  implementing functions:                                          
-      1. Preserve implementation checklists in docstrings          
-      2. May check off items: [ ] → [x], but NEVER modify          
-  checklist text                                                   
-      3. Copy each checklist item as a comment and place           
-  relevant code directly below it                                  
-      4. Create individual PRs per function for granular           
-  review: `gh pr create`                                           
-      5. User reviews line-by-line in VS Code, you read            
-  feedback: `gh pr view [PR#] --comments`
-
-  Note: Always make sure to git pull when starting a new task and / or periodically, as the user will be working in a separate workspace on the same repo. Once an implementation checklist is completed, feel free to change the title of the checklist to 'Procedure'.
-    EOT
+  default     = local.system_prompt
 }
 
 # Claude Code module
