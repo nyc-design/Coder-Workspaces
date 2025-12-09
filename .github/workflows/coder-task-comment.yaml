@@ -125,7 +125,7 @@ EOF
           done <<< "$WORKSPACES"
 
           if [ -z "$MATCH" ]; then
-            gh issue comment "$ISSUE_NUMBER" --body "⚠️ I couldn't find an existing workspace for @${CODER_USERNAME} and agent \`${AGENT_TYPE}\`. Please re-apply the coder label to restart the agent, then resend your comment."
+            gh issue comment "$ISSUE_NUMBER" --body "I couldn't find an existing workspace for @${CODER_USERNAME} and agent \`${AGENT_TYPE}\`. Please re-apply the coder label to restart the agent, then resend your comment."
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -158,7 +158,7 @@ EOF
             '[.[] | select(.workspace_name == $workspace and (.status == "pending" or .status == "initializing" or .status == "active"))] | sort_by(.created_at) | last')
 
           if [ "$TASK" = "null" ] || [ -z "$TASK" ]; then
-            gh issue comment "$ISSUE_NUMBER" --body "⚠️ I couldn't find a running task for workspace \`${WORKSPACE_NAME}\`. Please re-apply the coder label to start a new task, then resend your comment."
+            gh issue comment "$ISSUE_NUMBER" --body "I couldn't find a running task for workspace \`${WORKSPACE_NAME}\`. Please re-apply the coder label to start a new task, then resend your comment."
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -206,9 +206,9 @@ PY
         run: |
           TASK_LINK="${CODER_URL}/tasks/${CODER_USERNAME}/${TASK_ID}"
           COMMENT=$(cat <<EOF
-📨 Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
+Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
 
-- ✅ Task: [View progress here](${TASK_LINK})
+- Task: [View progress here](${TASK_LINK})
 
 The agent will incorporate the new instructions shortly.
 EOF

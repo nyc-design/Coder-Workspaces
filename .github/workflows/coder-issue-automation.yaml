@@ -67,7 +67,7 @@ jobs:
 
 Hi @${GITHUB_USER_LOGIN}! I couldn't find a Coder user linked to your GitHub account.
 
-Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then re-apply the \`${AGENT_LABEL}\` label so I can dispatch an agent for this issue.
+Please visit ${CODER_URL}/settings/external-auth to connect GitHub, then re-apply the `${AGENT_LABEL}` label so I can dispatch an agent for this issue.
 EOF
 )
             gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
@@ -122,7 +122,7 @@ EOF
 
             # Check if this workspace matches our repo and agent
             if [ "$WS_REPO" = "$REPO_NAME" ] && [ "$WS_AGENT" = "$AGENT_TYPE" ]; then
-              echo "✓ Found matching workspace: $ws_name"
+              echo "Found matching workspace: $ws_name"
               WORKSPACE_NAME="$ws_name"
               WORKSPACE_REF="${CODER_USERNAME}/${ws_name}"
               break
@@ -185,7 +185,7 @@ EOF
 
           # Create task prompt
           TASK_PROMPT=$(cat <<EOF
-          🤖 Automated Issue Assignment
+          Automated Issue Assignment
 
           You are working autonomously on GitHub issue #${ISSUE_NUMBER}: "${ISSUE_TITLE}"
 
@@ -201,7 +201,7 @@ EOF
           6. Commit your changes with clear, descriptive commit messages
           7. Push the branch: git push -u origin fix/issue-${ISSUE_NUMBER}
           8. Create a pull request: gh pr create --title "Fix: ${ISSUE_TITLE} (fixes #${ISSUE_NUMBER})" --body "Fixes #${ISSUE_NUMBER}\n\n[Automated PR created by Coder AI Agent]" --head fix/issue-${ISSUE_NUMBER}
-          9. Get the PR URL and post it as a comment on the issue: gh issue comment ${ISSUE_NUMBER} --body "🤖 I've created a PR to address this issue: [PR_URL]"
+          9. Get the PR URL and post it as a comment on the issue: gh issue comment ${ISSUE_NUMBER} --body "I've created a PR to address this issue: [PR_URL]"
 
           Work carefully and thoroughly. If you encounter any blockers or need clarification, document them in the PR description.
 
@@ -221,7 +221,7 @@ EOF
 
           echo "id=$TASK_ID" >> $GITHUB_OUTPUT
 
-          echo "✅ Task created successfully!"
+          echo "Task created successfully!"
 
       - name: Post confirmation comment on issue
         if: steps.coder_user.outputs.linked == 'true'
@@ -241,15 +241,15 @@ EOF
           fi
 
           COMMENT=$(cat <<EOF
-          🤖 **Coder AI Agent Dispatched**
+          **Coder AI Agent Dispatched**
 
           Your issue has been assigned to a Coder AI workspace for automated resolution.
 
           **Details:**
-          - 🚀 Workspace: \`${WORKSPACE_NAME}\`
-          - 🧠 Agent: **${AGENT_TYPE}**
-          - 📍 Workspace Dashboard: [View Workspace](${CODER_URL}/workspaces/${WORKSPACE_REF})
-          - ✅ Task: [Follow progress here](${TASK_LINK})
+          - Workspace: \`${WORKSPACE_NAME}\`
+          - Agent: **${AGENT_TYPE}**
+          - Workspace Dashboard: [View Workspace](${CODER_URL}/workspaces/${WORKSPACE_REF})
+          - Task: [Follow progress here](${TASK_LINK})
 
           The AI agent is now working on this issue autonomously. It will:
           1. Review the issue details
