@@ -1,6 +1,12 @@
 name: Coder Issue Automation
 
 on:
+  workflow_call:
+    secrets:
+      CODER_URL:
+        required: true
+      CODER_SESSION_TOKEN:
+        required: true
   issues:
     types: [labeled]
 
