@@ -155,6 +155,23 @@ git config --global pull.rebase false || true
 # optional: keep history simple when fast-forward is possible
 git config --global pull.ff only || true
 
+# --- Default GCP project when none provided (no secrets) ---
+if command -v gcloud >/dev/null 2>&1; then
+  if [[ -z "${CODER_GCP_PROJECT:-}" ]]; then
+    DEFAULT_GCP_PROJECT="coder-nt"
+    log "no CODER_GCP_PROJECT specified; using default GCP project ${DEFAULT_GCP_PROJECT}"
+
+    # Set gcloud project
+    gcloud config set project "${DEFAULT_GCP_PROJECT}"
+
+    # Make it visible to tools (Gemini, SDKs, etc.)
+    export GOOGLE_CLOUD_PROJECT="${DEFAULT_GCP_PROJECT}"
+    if ! grep -q "GOOGLE_CLOUD_PROJECT" /home/coder/.bashrc; then
+      echo "export GOOGLE_CLOUD_PROJECT=\"${DEFAULT_GCP_PROJECT}\"" >> /home/coder/.bashrc
+    fi
+  fi
+fi
+
 # --- GCP Secrets Integration ---
 if [[ -n "${CODER_GCP_PROJECT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
   log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
