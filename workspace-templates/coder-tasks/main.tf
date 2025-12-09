@@ -71,7 +71,7 @@ locals{
   # "" if not found, otherwise "owner/repo"
   gh_repo = length(local.gh_repo_match) > 0 ? local.gh_repo_match[0] : ""
 
-  gh_project_name = local.gh_repo != "" ? (length(split("/", local.gh_repo)) > 1 ? element(split("/", local.gh_repo), 1) -> repo: local.gh_repo) : ""
+  gh_project_name = local.gh_repo != "" ? (length(split("/", local.gh_repo)) > 1 ? element(split("/", local.gh_repo), 1) : local.gh_repo) : ""
   
   main_system_prompt = <<-EOT
     -- Framing --                                                
