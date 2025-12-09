@@ -303,7 +303,7 @@ data "coder_parameter" "system_prompt" {
   form_type    = "textarea"
   description  = "System prompt for the agent with generalized instructions"
   mutable      = false
-  default     = local.system_main_prompt
+  default     = local.main_system_prompt
 }
 
 # Claude Code module
