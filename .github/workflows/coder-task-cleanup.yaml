@@ -1,4 +1,4 @@
-name: Forward Coder Issue Comments
+name: Cleanup Coder Tasks
 
 on:
   workflow_call:
@@ -7,23 +7,22 @@ on:
         required: true
       CODER_SESSION_TOKEN:
         required: true
-  issue_comment:
-    types: [created]
+  issues:
+    types: [closed]
 
 permissions:
   issues: write
   contents: read
 
 jobs:
-  forward-comment:
+  delete-task:
     if: >
       github.event.issue.pull_request == null &&
       (
         contains(github.event.issue.labels.*.name, 'coder-claude') ||
         contains(github.event.issue.labels.*.name, 'coder-codex') ||
         contains(github.event.issue.labels.*.name, 'coder-gemini')
-      ) &&
-      startsWith(github.event.comment.body, '/coder')
+      )
     runs-on: ubuntu-latest
 
     steps:
@@ -46,8 +45,8 @@ jobs:
           }
           gh --version
 
-      - name: Locate Coder task for this issue
-        id: task
+      - name: Delete Coder task for this issue
+        id: cleanup
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
@@ -59,13 +58,12 @@ jobs:
           TASK_DATA=$(coder task list --all --output json || echo "[]")
 
           MATCH=$(echo "$TASK_DATA" | jq -r --arg NAME "$TASK_NAME" '
-            map(select(.name == $NAME and (.status == "pending" or .status == "initializing" or .status == "active")))
+            map(select(.name == $NAME))
             | sort_by(.created_at // .UpdatedAt // .updated_at // 0)
             | last
           ')
 
           if [ -z "$MATCH" ] || [ "$MATCH" = "null" ]; then
-            gh issue comment "$ISSUE_NUMBER" --body "I couldn't find an active Coder task named \`$TASK_NAME\`. Please re-apply the coder label to restart the agent, then resend your comment."
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -73,65 +71,22 @@ jobs:
           TASK_ID=$(echo "$MATCH" | jq -r '.id // .ID')
           OWNER_NAME=$(echo "$MATCH" | jq -r '.owner_name // .owner // ""')
 
-          if [ -z "$OWNER_NAME" ] || [ "$OWNER_NAME" = "null" ]; then
-            OWNER_NAME=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --paginate --jq '
-              [.[] | select(.body | startswith("Task created:"))] | last | .body // ""
-            ' | sed -n 's#.*tasks/\([^/]*\)/[^/ )]*.*#\1#p' | head -n 1 || true)
-          fi
-
           if [ -n "$OWNER_NAME" ] && [ "$OWNER_NAME" != "null" ]; then
             TASK_URL="${CODER_URL%/}/tasks/${OWNER_NAME}/${TASK_ID}"
           else
             TASK_URL="${CODER_URL%/}/tasks/${TASK_ID}"
           fi
 
+          coder task delete "$TASK_ID" --yes
+
           echo "found=true" >> "$GITHUB_OUTPUT"
-          echo "id=$TASK_ID" >> "$GITHUB_OUTPUT"
-          echo "name=$TASK_NAME" >> "$GITHUB_OUTPUT"
-          echo "owner=$OWNER_NAME" >> "$GITHUB_OUTPUT"
           echo "url=$TASK_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Forward comment to task
-        if: steps.task.outputs.found == 'true'
-        env:
-          TASK_ID: ${{ steps.task.outputs.id }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
-          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          set -euo pipefail
-
-          MESSAGE=$(python3 - <<'PY'
-          import os
-          body = os.environ["COMMENT_BODY"]
-          body = body.lstrip()
-          if body.lower().startswith("/coder"):
-              payload = body[6:].lstrip(" :\t-")
-          else:
-              payload = body
-          payload = payload.strip()
-          if not payload:
-              payload = "(no additional instructions provided)"
-          print(payload)
-          PY
-          )
-
-          coder task send "$TASK_ID" "GitHub comment from @${COMMENT_AUTHOR} on issue #${ISSUE_NUMBER}: ${MESSAGE}"
-
-      - name: Confirm forwarding
-        if: steps.task.outputs.found == 'true'
+      - name: Confirm cleanup
+        if: steps.cleanup.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
-          TASK_URL: ${{ steps.task.outputs.url }}
+          TASK_URL: ${{ steps.cleanup.outputs.url }}
         run: |
-          COMMENT=$(cat <<EOF
-          Forwarded @${COMMENT_AUTHOR}'s update to the running Coder task.
-
-          - Task: [View progress here](${TASK_URL})
-
-          The agent will incorporate the new instructions shortly.
-          EOF
-          )
-          gh issue comment "$ISSUE_NUMBER" --body "$COMMENT"
+          gh issue comment "$ISSUE_NUMBER" --body "Issue closed. Cleaned up the corresponding Coder task: ${TASK_URL}"
