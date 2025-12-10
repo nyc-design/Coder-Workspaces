@@ -141,32 +141,25 @@ function add_system_prompt_if_exists() {
 }
 
 configure_mcp() {
-  export CODER_MCP_APP_STATUS_SLUG="gemini"
-  export CODER_MCP_AI_AGENTAPI_URL="http://localhost:3284"
+  SETTINGS_PATH="$HOME/.gemini/settings.json"
+  mkdir -p "$(dirname "$SETTINGS_PATH")"
 
-  if ! command_exists gemini; then
-    printf "Error: Gemini CLI not found; skipping MCP configuration.\n"
+  if [ -z "${BASE_EXTENSIONS:-}" ]; then
+    printf "BASE_EXTENSIONS not provided; skipping MCP configuration.\n"
     return
   fi
 
-  TARGET_DIR="${GEMINI_START_DIRECTORY:-$PWD}"
-  mkdir -p "$TARGET_DIR"
+  if [ ! -f "$SETTINGS_PATH" ]; then
+    printf "%s does not exist. Creating default settings file for MCP configuration.\n" "$SETTINGS_PATH"
+    echo '{"mcpServers":{}}' > "$SETTINGS_PATH"
+  fi
 
-  (
-    cd "$TARGET_DIR" || exit 1
-    printf "Configuring Gemini MCP server for Coder reporting in %s\n" "$TARGET_DIR"
+  TMP_SETTINGS=$(mktemp)
+  jq --argjson base "$BASE_EXTENSIONS" \
+    '.mcpServers = (.mcpServers // {} + $base)' \
+    "$SETTINGS_PATH" > "$TMP_SETTINGS" && mv "$TMP_SETTINGS" "$SETTINGS_PATH"
 
-    MCP_CMD=(
-      gemini configure-mcp
-      --name "coder"
-      --command "coder exp mcp server"
-    )
-
-    if ! "${MCP_CMD[@]}"; then
-      printf "Primary MCP configure command failed, falling back to legacy 'gemini mcp add'.\n"
-      gemini mcp add coder "coder exp mcp server"
-    fi
-  )
+  printf "Configured Coder MCP server entry in %s\n" "$SETTINGS_PATH"
 }
 
 install_gemini
