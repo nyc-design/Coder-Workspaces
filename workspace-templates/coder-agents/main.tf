@@ -113,7 +113,7 @@ locals{
 data "coder_workspace_preset" "issue_automation_claude" {
   name        = "Issue Automation - Claude"
   description = "Preset for GitHub Issues automation."
-  icon        = "/icon/github.svg"
+  icon        = "/icon/claude.svg"
   parameters = {
     is_existing_project = "existing"
     ai_api_key     = ""
@@ -127,7 +127,7 @@ data "coder_workspace_preset" "issue_automation_claude" {
 data "coder_workspace_preset" "issue_automation_gemini" {
   name        = "Issue Automation - Gemini"
   description = "Preset for GitHub Issues automation."
-  icon        = "/icon/github.svg"
+  icon        = "/icon/gemini.svg"
   parameters = {
     is_existing_project = "existing"
     ai_api_key     = ""
@@ -141,7 +141,7 @@ data "coder_workspace_preset" "issue_automation_gemini" {
 data "coder_workspace_preset" "issue_automation_codex" {
   name        = "Issue Automation - Codex"
   description = "Preset for GitHub Issues automation."
-  icon        = "/icon/github.svg"
+  icon        = "/icon/openai.svg"
   parameters = {
     is_existing_project = "existing"
     ai_api_key     = ""
@@ -149,6 +149,17 @@ data "coder_workspace_preset" "issue_automation_codex" {
     repo_name      = "Coder-Workspaces"
     gcp_project_name = ""
     coding_agent = "codex"
+  }
+}
+
+data "coder_workspace_preset" "agent-workspace" {
+  name        = "Agent Workspace"
+  description = "Preset for launching a workspace with an AI agent."
+  icon        = "/icon/github.svg"
+  parameters = {
+    is_existing_project = "existing"
+    ai_api_key     = ""
+    system_prompt  = local.main_system_prompt
   }
 }
 

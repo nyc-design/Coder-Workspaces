@@ -71,7 +71,8 @@ jobs:
             agent_cap="${agent^}"
             workspace_name="${REPO_NAME}-${agent_cap}"
             template="coder-agents"
-            params+=(--parameter coding_agent="$agent" --parameter ai_api_key="")
+            preset="Agent Workspace"
+            params+=(--parameter coding_agent="$agent")
           fi
 
           existing_json=$(coder ls --output json || echo "[]")
@@ -82,7 +83,11 @@ jobs:
             coder start "$workspace_name" --yes || true
           else
             echo "Creating workspace '$workspace_name' with template '$template'..."
-            coder create "$workspace_name" --template "$template" --preset none "${params[@]}" --yes
+            if [ -n "$preset" ]; then
+              coder create "$workspace_name" --template "$template" --preset "$preset" "${params[@]}" --yes
+            else
+              coder create "$workspace_name" --template "$template" --preset none "${params[@]}" --yes
+            fi
           fi
 
           status=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].status')
