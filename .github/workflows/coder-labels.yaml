@@ -1,0 +1,93 @@
+name: Ensure Coder Labels
+
+on:
+  workflow_dispatch:
+    inputs:
+      target-repo:
+        description: "owner/repo to apply labels to (defaults to current repo)"
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      target-repo:
+        description: "owner/repo to apply labels to (defaults to current repo)"
+        required: false
+        type: string
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  apply-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine target repo
+        id: repo
+        env:
+          INPUT_REPO: ${{ inputs.target-repo }}
+          DEFAULT_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TARGET_REPO="${INPUT_REPO:-}"
+          if [ -z "$TARGET_REPO" ] || [ "$TARGET_REPO" = "null" ]; then
+            TARGET_REPO="$DEFAULT_REPO"
+          fi
+          echo "target=$TARGET_REPO" >> "$GITHUB_OUTPUT"
+          echo "Target repository: $TARGET_REPO"
+
+      - name: Setup GitHub CLI
+        run: |
+          type -p gh >/dev/null || {
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+            && sudo mkdir -p -m 755 /etc/apt/keyrings \
+            && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+            && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+            && sudo apt update \
+            && sudo apt install gh -y
+          }
+          gh --version
+
+      - name: Create or update labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPO: ${{ steps.repo.outputs.target }}
+        run: |
+          set -euo pipefail
+
+          LABELS=$(cat <<'EOF'
+          [
+            {"name": "coder-claude", "color": "7B5AFF", "description": "Dispatch to Claude Code agent"},
+            {"name": "coder-codex",  "color": "10A37F", "description": "Dispatch to OpenAI Codex agent"},
+            {"name": "coder-gemini", "color": "4285F4", "description": "Dispatch to Google Gemini agent"}
+          ]
+          EOF
+          )
+
+          echo "$LABELS" | jq -c '.[]' | while read -r label; do
+            NAME=$(echo "$label" | jq -r '.name')
+            COLOR=$(echo "$label" | jq -r '.color')
+            DESC=$(echo "$label" | jq -r '.description')
+
+            echo "Ensuring label '$NAME' on $TARGET_REPO"
+
+            gh api \
+              --method POST \
+              "repos/${TARGET_REPO}/labels" \
+              -f name="$NAME" \
+              -f color="$COLOR" \
+              -f description="$DESC" \
+              >/dev/null 2>&1 \
+              || gh api \
+                --method PATCH \
+                "repos/${TARGET_REPO}/labels/$(printf '%s' "$NAME" | sed 's/ /%20/g')" \
+                -f new_name="$NAME" \
+                -f color="$COLOR" \
+                -f description="$DESC" \
+                >/dev/null
+          done
+
+      - name: Summary
+        run: |
+          echo "Coder labels are present on ${{ steps.repo.outputs.target }}."

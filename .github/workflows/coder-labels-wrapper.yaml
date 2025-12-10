@@ -1,0 +1,19 @@
+name: Setup Coder Issue Labels
+
+on:
+  workflow_dispatch:
+    inputs:
+      target-repo:
+        description: "owner/repo to apply labels to (defaults to this repo)"
+        required: false
+        default: ""
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  ensure-labels:
+    uses: nyc-design/Coder-Workspaces/.github/workflows/coder-labels.yaml@main
+    with:
+      target-repo: ${{ inputs.target-repo || github.repository }}
