@@ -46,7 +46,7 @@ jobs:
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_SESSION_TOKEN }}
           coder-organization: "default"
-          coder-template-name: "coder-tasks"
+          coder-template-name: "coder-agents"
           coder-template-preset: ${{ steps.preset.outputs.preset }}
           coder-task-name-prefix: "gh-task"
           coder-task-prompt: |
