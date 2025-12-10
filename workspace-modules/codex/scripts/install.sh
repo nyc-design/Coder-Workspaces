@@ -89,11 +89,8 @@ write_minimal_default_config() {
   local config_path="$1"
   cat << EOF > "$config_path"
 # Minimal Default Codex Configuration
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 approval_policy = "never"
-
-[sandbox_workspace_write]
-network_access = true
 
 EOF
 }
