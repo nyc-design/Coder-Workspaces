@@ -394,7 +394,7 @@ module "codex" {
   order                = 999
   icon                 = "/icon/openai.svg"
   web_app_display_name = "Codex"
-  install_codex        = false  # Already installed in base image
+  install_codex        = false
   openai_api_key       = local.ai_api_key
   install_agentapi     = true
   agentapi_version     = "v0.10.0"
@@ -402,13 +402,6 @@ module "codex" {
   codex_system_prompt  = data.coder_parameter.system_prompt.value
   ai_prompt            = data.coder_task.me.prompt
   continue             = false
-  base_config_toml     = <<-EOT
-    sandbox_mode = "workspace-write"
-    approval_policy = "never"
-
-    [sandbox_workspace_write]
-    network_access = true
-  EOT
 }
 
 # Coder AI Task - dynamically set app_id based on selected agent
