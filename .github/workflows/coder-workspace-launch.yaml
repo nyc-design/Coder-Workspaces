@@ -13,6 +13,25 @@ on:
         type: choice
         options: [claude, codex, gemini]
         default: claude
+  workflow_call:
+    inputs:
+      mode:
+        description: "Who is the workspace for?"
+        required: false
+        type: string
+        default: "agent"
+      agent-type:
+        description: "Agent type (used when mode=agent)"
+        required: false
+        type: string
+        default: "claude"
+    secrets:
+      CODER_URL:
+        required: true
+      CODER_SESSION_TOKEN:
+        required: true
+      GCP_PROJECT:
+        required: false
 
 permissions:
   contents: read
