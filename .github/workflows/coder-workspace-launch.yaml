@@ -82,7 +82,7 @@ jobs:
             coder start "$workspace_name" --yes || true
           else
             echo "Creating workspace '$workspace_name' with template '$template'..."
-            coder create "$workspace_name" --template "$template" "${params[@]}" --yes
+            coder create "$workspace_name" --template "$template" --preset none "${params[@]}" --yes
           fi
 
           status=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].status')
