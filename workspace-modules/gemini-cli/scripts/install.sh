@@ -6,6 +6,9 @@ command_exists() {
   command -v "$1" > /dev/null 2>&1
 }
 
+# Ensure any helper binaries we create are available to later steps.
+export PATH="$HOME/.gemini-module/bin:$PATH"
+
 set -o nounset
 
 ARG_GEMINI_CONFIG=$(echo -n "$ARG_GEMINI_CONFIG" | base64 -d)
@@ -141,25 +144,24 @@ function add_system_prompt_if_exists() {
 }
 
 configure_mcp() {
-  SETTINGS_PATH="$HOME/.gemini/settings.json"
-  mkdir -p "$(dirname "$SETTINGS_PATH")"
+  export CODER_MCP_APP_STATUS_SLUG="gemini"
+  export CODER_MCP_AI_AGENTAPI_URL="http://localhost:3284"
 
-  if [ -z "${BASE_EXTENSIONS:-}" ]; then
-    printf "BASE_EXTENSIONS not provided; skipping MCP configuration.\n"
+  if ! command_exists gemini; then
+    printf "Gemini CLI command not found; skipping configure-mcp flow.\n"
     return
   fi
 
-  if [ ! -f "$SETTINGS_PATH" ]; then
-    printf "%s does not exist. Creating default settings file for MCP configuration.\n" "$SETTINGS_PATH"
-    echo '{"mcpServers":{}}' > "$SETTINGS_PATH"
-  fi
+  TARGET_DIR="${GEMINI_START_DIRECTORY:-$PWD}"
+  mkdir -p "$TARGET_DIR"
 
-  TMP_SETTINGS=$(mktemp)
-  jq --argjson base "$BASE_EXTENSIONS" \
-    '.mcpServers = (.mcpServers // {} + $base)' \
-    "$SETTINGS_PATH" > "$TMP_SETTINGS" && mv "$TMP_SETTINGS" "$SETTINGS_PATH"
-
-  printf "Configured Coder MCP server entry in %s\n" "$SETTINGS_PATH"
+  (
+    cd "$TARGET_DIR" || exit 1
+    printf "Configuring Gemini MCP server for Coder reporting in %s\n" "$TARGET_DIR"
+    if ! gemini mcp add coder coder exp mcp server; then
+      printf "Error: Failed to register MCP server with Gemini CLI.\n"
+    fi
+  )
 }
 
 install_gemini
