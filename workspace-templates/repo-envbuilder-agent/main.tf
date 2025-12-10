@@ -539,7 +539,6 @@ resource "docker_container" "workspace" {
       "CODER_GCP_PROJECT=${local.gcp_project}",
       "GOOGLE_CLOUD_PROJECT=${local.gcp_project}",
     ] : [
-      "CODER_GCP_PROJECT=coder-nt",
       "GOOGLE_CLOUD_PROJECT=coder-nt",
     ]
   )
