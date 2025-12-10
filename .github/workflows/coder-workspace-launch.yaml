@@ -1,0 +1,93 @@
+name: Create Coder Workspace
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Who is the workspace for?"
+        type: choice
+        options: [self, agent]
+        default: agent
+      agent-type:
+        description: "Agent type (used when mode=agent)"
+        type: choice
+        options: [claude, codex, gemini]
+        default: claude
+
+permissions:
+  contents: read
+
+jobs:
+  create-workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: ${{ secrets.CODER_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Create or start workspace
+        env:
+          MODE: ${{ inputs.mode }}
+          AGENT_TYPE: ${{ inputs.agent-type }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          CODER_URL: ${{ secrets.CODER_URL }}
+          GCP_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: |
+          set -euo pipefail
+
+          mode=$(echo "${MODE:-self}" | tr '[:upper:]' '[:lower:]')
+          agent=$(echo "${AGENT_TYPE:-claude}" | tr '[:upper:]' '[:lower:]')
+
+          workspace_name="$REPO_NAME"
+          template="repo-envbuilder"
+          params=(--parameter is_existing_project=existing --parameter repo_name="$REPO_NAME")
+
+          if [ -n "${GCP_PROJECT:-}" ]; then
+            params+=(--parameter gcp_project_name="$GCP_PROJECT")
+          fi
+
+          if [ "$mode" = "agent" ]; then
+            agent_cap="${agent^}"
+            workspace_name="${REPO_NAME}-${agent_cap}"
+            template="coder-agents"
+            params+=(--parameter coding_agent="$agent")
+          fi
+
+          existing_json=$(coder ls --output json || echo "[]")
+          exists=$(echo "$existing_json" | jq -e --arg NAME "$workspace_name" 'map(.name == $NAME) | any' || echo "false")
+
+          if [ "$exists" = "true" ]; then
+            echo "Workspace '$workspace_name' already exists. Starting (if stopped)..."
+            coder start "$workspace_name" --yes || true
+          else
+            echo "Creating workspace '$workspace_name' with template '$template'..."
+            coder create "$workspace_name" --template "$template" "${params[@]}" --yes
+          fi
+
+          status=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].status')
+          owner=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].owner_name // ""')
+          if [ -n "$owner" ] && [ "$owner" != "null" ]; then
+            url="${CODER_URL%/}/@${owner}/${workspace_name}"
+          else
+            url="${CODER_URL%/}/workspaces/${workspace_name}"
+          fi
+
+          {
+            echo "WORKSPACE_NAME=$workspace_name"
+            echo "WORKSPACE_STATUS=$status"
+            echo "WORKSPACE_URL=$url"
+            echo "MODE=$mode"
+          } >> "$GITHUB_ENV"
+
+      - name: Summary
+        env:
+          MODE: ${{ env.MODE }}
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          Workspace: $WORKSPACE_NAME  
+          Template: $([[ "$MODE" == "agent" ]] && echo "coder-agents" || echo "repo-envbuilder")  
+          Status: $WORKSPACE_STATUS  
+          Link: $WORKSPACE_URL
+          EOF
