@@ -94,6 +94,7 @@ approval_policy = "never"
 
 [shell_environment_policy]
 inherit = "all"
+ignore_default_excludes = true
 
 EOF
 }
