@@ -33,7 +33,7 @@ jobs:
           AGENT_TYPE: ${{ inputs.agent-type }}
           REPO_NAME: ${{ github.event.repository.name }}
           CODER_URL: ${{ secrets.CODER_URL }}
-          GCP_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
         run: |
           set -euo pipefail
 
