@@ -150,11 +150,7 @@ locals {
   base_extensions = <<-EOT
 {
   "coder": {
-    "args": [
-      "exp",
-      "mcp",
-      "server"
-    ],
+    "args": ["exp", "mcp","server"],
     "command": "coder",
     "description": "Report ALL tasks and statuses (in progress, done, failed) you are working on.",
     "enabled": true,
