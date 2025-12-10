@@ -26,13 +26,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Extract agent type from labels
+        id: agent
+        env:
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels) }}
+        run: |
+          set -euo pipefail
+
+          AGENT_LABEL=$(echo "$ISSUE_LABELS" | jq -r '.[] | .name | select(startswith("coder-"))' | head -n 1)
+
+          if [ -z "$AGENT_LABEL" ]; then
+            echo "No coder label found; exiting."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          AGENT_TYPE="${AGENT_LABEL#coder-}"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "type=$AGENT_TYPE" >> "$GITHUB_OUTPUT"
+          echo "label=$AGENT_LABEL" >> "$GITHUB_OUTPUT"
+          echo "Detected agent type: $AGENT_TYPE"
+
       - name: Setup Coder CLI
+        if: steps.agent.outputs.found == 'true'
         uses: coder/setup-action@v1
         with:
           access_url: ${{ secrets.CODER_URL }}
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
       - name: Setup GitHub CLI
+        if: steps.agent.outputs.found == 'true'
         run: |
           type -p gh >/dev/null || {
             (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
@@ -47,14 +70,17 @@ jobs:
 
       - name: Delete Coder task for this issue
         id: cleanup
+        if: steps.agent.outputs.found == 'true'
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
           CODER_URL: ${{ secrets.CODER_URL }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          AGENT_TYPE: ${{ steps.agent.outputs.type }}
         run: |
           set -euo pipefail
 
-          TASK_NAME="gh-task-${ISSUE_NUMBER}"
+          TASK_NAME="${REPO_NAME}-${AGENT_TYPE}-Issue-${ISSUE_NUMBER}"
           TASK_DATA=$(coder task list --all --output json || echo "[]")
 
           MATCH=$(echo "$TASK_DATA" | jq -r --arg NAME "$TASK_NAME" '

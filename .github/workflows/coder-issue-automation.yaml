@@ -39,6 +39,7 @@ jobs:
               ;;
           esac
           echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+          echo "agent=$AGENT" >> "$GITHUB_OUTPUT"
 
       - name: Start Coder Task
         uses: coder/create-task-action@v0.0.4
@@ -48,7 +49,7 @@ jobs:
           coder-organization: "default"
           coder-template-name: "coder-agents"
           coder-template-preset: ${{ steps.preset.outputs.preset }}
-          coder-task-name-prefix: "gh-task"
+          coder-task-name-prefix: ${{ format('{0}-{1}-Issue-', github.event.repository.name, steps.preset.outputs.agent) }}
           coder-task-prompt: |
             GH_REPO=${{ github.repository }}
             GH_ISSUE_URL=${{ github.event.issue.html_url }}
