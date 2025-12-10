@@ -92,6 +92,9 @@ write_minimal_default_config() {
 sandbox_mode = "danger-full-access"
 approval_policy = "never"
 
+[shell_environment_policy]
+inherit = "all"
+
 EOF
 }
 
