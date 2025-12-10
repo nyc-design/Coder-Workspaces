@@ -324,7 +324,7 @@ module "claude-code" {
 # Gemini CLI module
 module "gemini" {
   count   = local.coding_agent == "gemini" ? 1 : 0
-  source  = "github.com/nyc-design/Coder-Workspaces//workspace-modules/gemini-cli"
+  source  = "github.com/nyc-design/Coder-Workspaces//workspace-modules/gemini"
 
   agent_id             = coder_agent.main.id
   folder               = "/workspaces/${local.project_name}"

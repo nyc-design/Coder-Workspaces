@@ -25,7 +25,7 @@ workspace-templates/       # Coder workspace template definitions
 └── repo-envbuilder-agent/ # Repository template with AI agent selection
 
 workspace-modules/         # Reusable Terraform modules for workspace templates
-├── gemini-cli/           # Google Gemini CLI module
+├── gemini/               # Google Gemini CLI module
 └── codex/                # OpenAI Codex module
 
 scripts/                   # Utility scripts

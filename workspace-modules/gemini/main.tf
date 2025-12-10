@@ -177,7 +177,7 @@ EOT
   folder          = trimsuffix(var.folder, "/")
 }
 
-module "agentapi" {
+module "gemini" {
   source  = "registry.coder.com/coder/agentapi/coder"
   version = "2.0.0"
 
@@ -224,7 +224,7 @@ module "agentapi" {
      GEMINI_YOLO_MODE='${var.enable_yolo_mode}' \
      GEMINI_MODEL='${var.gemini_model}' \
      GEMINI_START_DIRECTORY='${var.folder}' \
-     GEMINI_TASK_PROMPT='${var.task_prompt}' \
+     GEMINI_TASK_PROMPT='${base64encode(var.task_prompt)}' \
      /tmp/start.sh
    EOT
 }
@@ -232,5 +232,5 @@ module "agentapi" {
 # Output for Coder Tasks integration
 output "task_app_id" {
   description = "The app ID for the Gemini AgentAPI web app, used by coder_ai_task resource"
-  value       = module.agentapi.task_app_id
+  value       = module.gemini.task_app_id
 }
