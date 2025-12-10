@@ -42,6 +42,24 @@ variable "folder" {
   default     = "/home/coder"
 }
 
+variable "cli_app" {
+  type        = bool
+  description = "Whether to create a CLI app for Codex"
+  default     = false
+}
+
+variable "web_app_display_name" {
+  type        = string
+  description = "Display name for the web app"
+  default     = "Gemini"
+}
+
+variable "cli_app_display_name" {
+  type        = string
+  description = "Display name for the web app"
+  default     = "Gemini CLI"
+}
+
 variable "install_gemini" {
   type        = bool
   description = "Whether to install Gemini."
@@ -114,6 +132,12 @@ variable "additional_extensions" {
   default     = null
 }
 
+variable "continue" {
+  type        = bool
+  description = "Automatically continue existing sessions on workspace restart. When true, resumes existing conversation if found, otherwise runs prompt or starts new session. When false, always starts fresh (ignores existing sessions)."
+  default     = true
+}
+
 variable "gemini_system_prompt" {
   type        = string
   description = "System prompt for Gemini. It will be added to GEMINI.md in the specified folder."
@@ -173,24 +197,43 @@ EOT
   folder          = trimsuffix(var.folder, "/")
 }
 
-module "gemini" {
+module "agentapi" {
   source  = "registry.coder.com/coder/agentapi/coder"
   version = "2.0.0"
 
   agent_id             = var.agent_id
-  folder               = local.folder
   web_app_slug         = local.app_slug
   web_app_order        = var.order
   web_app_group        = var.group
   web_app_icon         = var.icon
-  web_app_display_name = "Gemini"
-  cli_app_slug         = "${local.app_slug}-cli"
-  cli_app_display_name = "Gemini CLI"
+  web_app_display_name = var.web_app_display_name
+  folder               = local.folder
+  cli_app              = var.cli_app
+  cli_app_slug         = var.cli_app ? "${local.app_slug}-cli" : null
+  cli_app_display_name = var.cli_app ? var.cli_app_display_name : null
   module_dir_name      = local.module_dir_name
   install_agentapi     = var.install_agentapi
   agentapi_version     = var.agentapi_version
   pre_install_script   = var.pre_install_script
   post_install_script  = var.post_install_script
+  start_script         = <<-EOT
+    #!/bin/bash
+    set -o errexit
+    set -o pipefail
+
+    echo -n '${base64encode(local.start_script)}' | base64 -d > /tmp/start.sh
+    chmod +x /tmp/start.sh
+    ${var.gemini_api_key != "" ? "GEMINI_API_KEY='${var.gemini_api_key}' \\" : ""}
+    ${var.gemini_api_key != "" ? "GOOGLE_API_KEY='${var.gemini_api_key}' \\" : ""}
+
+    GOOGLE_GENAI_USE_VERTEXAI='${var.use_vertexai}' \
+    GEMINI_YOLO_MODE='${var.enable_yolo_mode}' \
+    GEMINI_MODEL='${var.gemini_model}' \
+    GEMINI_START_DIRECTORY='${var.folder}' \
+    GEMINI_TASK_PROMPT='${base64encode(var.task_prompt)}' \
+    ARG_CONTINUE='${var.continue}' \
+    /tmp/start.sh
+  EOT
   install_script       = <<-EOT
     #!/bin/bash
     set -o errexit
@@ -207,22 +250,6 @@ module "gemini" {
     GEMINI_SYSTEM_PROMPT='${base64encode(var.gemini_system_prompt)}' \
     /tmp/install.sh
   EOT
-  start_script         = <<-EOT
-     #!/bin/bash
-     set -o errexit
-     set -o pipefail
-
-     echo -n '${base64encode(local.start_script)}' | base64 -d > /tmp/start.sh
-     chmod +x /tmp/start.sh
-     ${var.gemini_api_key != "" ? "GEMINI_API_KEY='${var.gemini_api_key}' \\" : ""}
-     ${var.gemini_api_key != "" ? "GOOGLE_API_KEY='${var.gemini_api_key}' \\" : ""}
-     GOOGLE_GENAI_USE_VERTEXAI='${var.use_vertexai}' \
-     GEMINI_YOLO_MODE='${var.enable_yolo_mode}' \
-     GEMINI_MODEL='${var.gemini_model}' \
-     GEMINI_START_DIRECTORY='${var.folder}' \
-     GEMINI_TASK_PROMPT='${var.task_prompt}' \
-     /tmp/start.sh
-   EOT
 }
 
 # Output for Coder Tasks integration
