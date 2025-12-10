@@ -143,22 +143,7 @@ function add_system_prompt_if_exists() {
 function configure_mcp() {
   export CODER_MCP_APP_STATUS_SLUG="gemini"
   export CODER_MCP_AI_AGENTAPI_URL="http://localhost:3284"
-
-  if ! command_exists gemini; then
-    printf "Gemini CLI command not found; skipping configure-mcp flow.\n"
-    return
-  fi
-
-  TARGET_DIR="${GEMINI_START_DIRECTORY:-$PWD}"
-  mkdir -p "$TARGET_DIR"
-
-  (
-    cd "$TARGET_DIR" || exit 1
-    printf "Configuring Gemini MCP server for Coder reporting in %s\n" "$TARGET_DIR"
-    if ! gemini mcp add coder coder exp mcp server; then
-      printf "Error: Failed to register MCP server with Gemini CLI.\n"
-    fi
-  )
+  coder exp mcp configure gemini "${GEMINI_START_DIRECTORY}"
 }
 
 install_gemini
