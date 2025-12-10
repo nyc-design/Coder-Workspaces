@@ -6,9 +6,6 @@ command_exists() {
   command -v "$1" > /dev/null 2>&1
 }
 
-# Ensure any helper binaries we create are available to later steps.
-export PATH="$HOME/.gemini-module/bin:$PATH"
-
 set -o nounset
 
 ARG_GEMINI_CONFIG=$(echo -n "$ARG_GEMINI_CONFIG" | base64 -d)
