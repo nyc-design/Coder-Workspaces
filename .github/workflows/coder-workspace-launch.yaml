@@ -71,7 +71,7 @@ jobs:
             agent_cap="${agent^}"
             workspace_name="${REPO_NAME}-${agent_cap}"
             template="coder-agents"
-            params+=(--parameter coding_agent="$agent")
+            params+=(--parameter coding_agent="$agent" --parameter ai_api_key="")
           fi
 
           existing_json=$(coder ls --output json || echo "[]")
