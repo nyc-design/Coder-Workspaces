@@ -140,7 +140,7 @@ function add_system_prompt_if_exists() {
   fi
 }
 
-configure_mcp() {
+function configure_mcp() {
   export CODER_MCP_APP_STATUS_SLUG="gemini"
   export CODER_MCP_AI_AGENTAPI_URL="http://localhost:3284"
 

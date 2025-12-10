@@ -44,7 +44,7 @@ else
   }
 fi
 
-if [ -n "${GEMINI_TASK_PROMPT:-}" ]; then
+if [ -n "$GEMINI_TASK_PROMPT" ]; then
   printf "Running automated task: %s\n" "$GEMINI_TASK_PROMPT"
   PROMPT="Every step of the way, report tasks to Coder with proper descriptions and statuses. Your task at hand: $GEMINI_TASK_PROMPT"
   PROMPT_FILE="$MODULE_DIR/prompt.txt"
