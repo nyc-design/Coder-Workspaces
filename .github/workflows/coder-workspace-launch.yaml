@@ -56,16 +56,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          mode=$(echo "${MODE:-self}" | tr '[:upper:]' '[:lower:]')
-          agent=$(echo "${AGENT_TYPE:-claude}" | tr '[:upper:]' '[:lower:]')
+          mode="$(echo "${MODE:-self}" | tr '[:upper:]' '[:lower:]')"
+          agent="$(echo "${AGENT_TYPE:-claude}" | tr '[:upper:]' '[:lower:]')"
 
           workspace_name="$REPO_NAME"
           template="repo-envbuilder"
-          params=(--parameter is_existing_project=existing --parameter repo_name="$REPO_NAME")
 
-          if [ -n "${GCP_PROJECT:-}" ]; then
-            params+=(--parameter gcp_project_name="$GCP_PROJECT")
-          fi
+          # Always provide gcp_project_name (empty string allowed) to avoid interactive prompts
+          gcp_project="${GCP_PROJECT:-}"
+          params=(
+            --parameter is_existing_project=existing
+            --parameter repo_name="$REPO_NAME"
+            --parameter gcp_project_name="$gcp_project"
+          )
+
+          preset=""
 
           if [ "$mode" = "agent" ]; then
             agent_cap="${agent^}"
@@ -75,23 +80,25 @@ jobs:
             params+=(--parameter coding_agent="$agent")
           fi
 
-          existing_json=$(coder ls --output json || echo "[]")
-          exists=$(echo "$existing_json" | jq -e --arg NAME "$workspace_name" 'map(.name == $NAME) | any' || echo "false")
+          existing_json="$(coder ls --output json || echo "[]")"
+          exists="$(echo "$existing_json" | jq -e --arg NAME "$workspace_name" 'map(.name == $NAME) | any' >/dev/null 2>&1 && echo "true" || echo "false")"
 
           if [ "$exists" = "true" ]; then
             echo "Workspace '$workspace_name' already exists. Starting (if stopped)..."
             coder start "$workspace_name" --yes || true
           else
             echo "Creating workspace '$workspace_name' with template '$template'..."
-            if [ -n "$preset" ]; then
+            if [ -n "${preset:-}" ]; then
               coder create "$workspace_name" --template "$template" --preset "$preset" "${params[@]}" --yes
             else
-              coder create "$workspace_name" --template "$template" --preset none "${params[@]}" --yes
+              # Don't pass --preset at all if you don't want one (avoid treating "none" as a preset name)
+              coder create "$workspace_name" --template "$template" "${params[@]}" --yes
             fi
           fi
 
-          status=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].status')
-          owner=$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].owner_name // ""')
+          status="$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].status')"
+          owner="$(coder ls --output json | jq -r --arg NAME "$workspace_name" 'map(select(.name==$NAME))[0].owner_name // ""')"
+
           if [ -n "$owner" ] && [ "$owner" != "null" ]; then
             url="${CODER_URL%/}/@${owner}/${workspace_name}"
           else
