@@ -500,8 +500,7 @@ module "code-server" {
     "ms-python.python",
     "detachhead.basedpyright",
     "Supermaven.supermaven",
-    "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist"
+    "ms-azuretools.vscode-docker"
   ]
 }
 
