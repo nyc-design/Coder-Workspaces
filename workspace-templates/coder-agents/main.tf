@@ -370,6 +370,7 @@ module "claude-code" {
   agent_id            = coder_agent.main.id
   claude_code_oauth_token = "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"
   workdir             = "/workspaces/${local.project_name}"
+  model               = "opus"
   install_claude_code = false
   continue            = false
   order               = 999
