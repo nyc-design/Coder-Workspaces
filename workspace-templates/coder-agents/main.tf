@@ -100,9 +100,10 @@ locals{
       2. May check off items: [ ] → [x], but NEVER modify          
   checklist text                                                   
       3. Copy each checklist item as a comment and place           
-  relevant code directly below it                                  
+  relevant code directly below it  
       4. Create individual PRs per function for granular           
-  review: `gh pr create`                                           
+  review: `gh pr create`
+      5. Test your code in the PR, and then review the PR
       5. User reviews line-by-line in VS Code, you read            
   feedback: `gh pr view [PR#] --comments`
 
