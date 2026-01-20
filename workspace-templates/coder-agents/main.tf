@@ -300,6 +300,7 @@ locals {
   # Container and builder configuration
   container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
+  mcp_playwright_start       = true
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
 }
@@ -313,6 +314,37 @@ locals {
   task_repo_url = local.gh_repo != "" ? "https://github.com/${local.gh_repo}.git" : ""
 
   repo_url = local.task_repo_url != "" ? local.task_repo_url : (local.is_new_project ? local.new_repo_url : local.existing_repo_url)
+
+  playwright_mcp_toml = <<-EOT
+    [mcp_servers.Playwright]
+    type = "sse"
+    url = "http://127.0.0.1:3001/sse"
+  EOT
+
+  playwright_mcp_extensions = <<-EOT
+    {
+      "playwright": {
+        "type": "sse",
+        "url": "http://127.0.0.1:3001/sse",
+        "description": "Playwright browser automation",
+        "enabled": true,
+        "name": "Playwright",
+        "timeout": 3000
+      }
+    }
+  EOT
+
+  playwright_mcp_claude = <<-EOT
+    {
+      "mcpServers": {
+        "playwright": {
+          "type": "sse",
+          "url": "http://127.0.0.1:3001/sse",
+          "description": "Playwright browser automation"
+        }
+      }
+    }
+  EOT
 
   # The envbuilder provider requires a key-value map of environment variables.
   envbuilder_env = merge({
@@ -376,6 +408,7 @@ module "claude-code" {
   continue            = false
   order               = 999
   ai_prompt           = data.coder_task.me.prompt
+  mcp                 = local.mcp_playwright_start ? local.playwright_mcp_claude : ""
 }
 
 # Gemini CLI module
@@ -395,6 +428,7 @@ module "gemini" {
   gemini_system_prompt = data.coder_parameter.system_prompt.value
   enable_yolo_mode     = true
   task_prompt          = data.coder_task.me.prompt
+  additional_extensions = local.mcp_playwright_start ? local.playwright_mcp_extensions : null
 }
 
 # Codex module
@@ -415,6 +449,7 @@ module "codex" {
   codex_system_prompt  = data.coder_parameter.system_prompt.value
   ai_prompt            = data.coder_task.me.prompt
   continue             = false
+  additional_mcp_servers = local.mcp_playwright_start ? local.playwright_mcp_toml : ""
 }
 
 # Coder AI Task - dynamically set app_id based on selected agent
@@ -579,6 +614,9 @@ resource "docker_container" "workspace" {
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
     ],
+    local.mcp_playwright_start ? [
+      "MCP_PLAYWRIGHT_START=true",
+    ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
       "NEW_PROJECT_TYPE=${local.project_type}",

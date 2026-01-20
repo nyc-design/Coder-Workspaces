@@ -42,12 +42,6 @@ RUN npm install -g \
     # MCP server for Claude agent browser automation
     @playwright/mcp
 
-# Install Playwright browsers during build to avoid runtime permission issues
-RUN mkdir -p /usr/local/share/playwright-browsers \
- && chmod 755 /usr/local/share/playwright-browsers \
- && PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers npx playwright install chromium \
- && chmod -R 755 /usr/local/share/playwright-browsers
-
 # Create fullstack-specific init script
 COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/20-fullstack-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-fullstack-init.sh

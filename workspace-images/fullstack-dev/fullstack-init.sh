@@ -417,9 +417,10 @@ setup-playwright() {
             npm install --save-dev @playwright/test
         fi
 
-        # Install browsers globally for workspace sharing
-        export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
-        mkdir -p $PLAYWRIGHT_BROWSERS_PATH
+        # Install browsers for the current Playwright version
+        local browsers_path="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+        export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
+        mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
 
         # Only install browsers if they're not already installed
         if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
@@ -499,12 +500,14 @@ E2E_EOF
 start-mcp-playwright() {
     echo "Starting MCP Playwright server for Claude agent browser automation..."
 
+    local browsers_path="${MCP_PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+    export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
+
     # Check if browsers are installed
     if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright browsers..."
-        export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
-        mkdir -p $PLAYWRIGHT_BROWSERS_PATH
-        npx playwright install chromium firefox webkit
+        mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+        npx playwright install chromium
     else
         echo "Playwright browsers already installed"
     fi
@@ -645,7 +648,6 @@ export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 
 # Playwright browser automation (from nextjs-dev)
-export PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 
@@ -730,3 +732,7 @@ chown -R coder:coder /home/coder/.prettierrc /home/coder/.local/share/nextjs-tem
 log "Full-stack development environment setup complete"
 log "Use 'create-monorepo [project-name]' to create a new full-stack project"
 log "Use 'fullstack-tasks' to see available development commands"
+
+if [ "${MCP_PLAYWRIGHT_START:-false}" = "true" ]; then
+    start-mcp-playwright
+fi
