@@ -734,5 +734,21 @@ log "Use 'create-monorepo [project-name]' to create a new full-stack project"
 log "Use 'fullstack-tasks' to see available development commands"
 
 if [ "${MCP_PLAYWRIGHT_START:-false}" = "true" ]; then
-    start-mcp-playwright
+    if type -t start-mcp-playwright >/dev/null 2>&1; then
+        start-mcp-playwright
+    else
+        browsers_path="${MCP_PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+        export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
+
+        if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
+            mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+            npx playwright install chromium
+        fi
+
+        nohup mcp-server-playwright \
+            --port ${MCP_SERVER_PLAYWRIGHT_PORT:-3001} \
+            --host ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost} \
+            --browsers-path "$PLAYWRIGHT_BROWSERS_PATH" \
+            > /tmp/mcp-playwright.log 2>&1 &
+    fi
 fi
