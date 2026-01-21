@@ -300,7 +300,6 @@ locals {
   # Container and builder configuration
   container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
-  mcp_playwright_start       = true
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
 }
@@ -317,15 +316,17 @@ locals {
 
   playwright_mcp_toml = <<-EOT
     [mcp_servers.Playwright]
-    type = "streamable_http"
-    url = "http://localhost:3001/mcp"
+    command = "npx"
+    args = ["@playwright/mcp@latest"]
+    type = "stdio"
   EOT
 
   playwright_mcp_extensions = <<-EOT
     {
       "playwright": {
-        "type": "streamable_http",
-        "url": "http://localhost:3001/mcp",
+        "command": "npx",
+        "args": ["@playwright/mcp@latest"],
+        "type": "stdio",
         "description": "Playwright browser automation",
         "enabled": true,
         "name": "Playwright",
@@ -338,8 +339,8 @@ locals {
     {
       "mcpServers": {
         "playwright": {
-          "type": "streamable_http",
-          "url": "http://localhost:3001/mcp",
+          "command": "npx",
+          "args": ["@playwright/mcp@latest"],
           "description": "Playwright browser automation"
         }
       }
@@ -613,10 +614,8 @@ resource "docker_container" "workspace" {
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
+      "PLAYWRIGHT_MCP_BROWSER=chromium",
     ],
-    local.mcp_playwright_start ? [
-      "MCP_PLAYWRIGHT_START=true",
-    ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
       "NEW_PROJECT_TYPE=${local.project_type}",

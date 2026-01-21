@@ -423,22 +423,3 @@ chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /
 log "Next.js development environment setup complete"
 log "Use 'create-nextjs [project-name]' to create a new Next.js project"
 log "Use 'dev-tasks' to see available development commands"
-
-if [ "${MCP_PLAYWRIGHT_START:-false}" = "true" ]; then
-    if type -t start-mcp-playwright >/dev/null 2>&1; then
-        start-mcp-playwright
-    else
-        browsers_path="${MCP_PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
-        export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
-
-        if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
-            mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
-            npx playwright install chromium
-        fi
-
-        nohup npx -y @playwright/mcp \
-            --port ${MCP_SERVER_PLAYWRIGHT_PORT:-3001} \
-            --host ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost} \
-            > /tmp/mcp-playwright.log 2>&1 &
-    fi
-fi
