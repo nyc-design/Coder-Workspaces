@@ -317,7 +317,7 @@ locals {
   playwright_mcp_toml = <<-EOT
     [mcp_servers.Playwright]
     command = "npx"
-    args = ["@playwright/mcp@latest"]
+    args = ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
     type = "stdio"
   EOT
 
@@ -325,7 +325,7 @@ locals {
     {
       "playwright": {
         "command": "npx",
-        "args": ["@playwright/mcp@latest"],
+        "args": ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
         "type": "stdio",
         "description": "Playwright browser automation",
         "enabled": true,
@@ -340,7 +340,7 @@ locals {
       "mcpServers": {
         "playwright": {
           "command": "npx",
-          "args": ["@playwright/mcp@latest"],
+          "args": ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
           "description": "Playwright browser automation"
         }
       }
