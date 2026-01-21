@@ -409,7 +409,7 @@ module "claude-code" {
   continue            = false
   order               = 999
   ai_prompt           = data.coder_task.me.prompt
-  mcp                 = local.mcp_playwright_start ? local.playwright_mcp_claude : ""
+  mcp                 = local.playwright_mcp_claude
 }
 
 # Gemini CLI module
@@ -429,7 +429,7 @@ module "gemini" {
   gemini_system_prompt = data.coder_parameter.system_prompt.value
   enable_yolo_mode     = true
   task_prompt          = data.coder_task.me.prompt
-  additional_extensions = local.mcp_playwright_start ? local.playwright_mcp_extensions : null
+  additional_extensions = local.playwright_mcp_extensions
 }
 
 # Codex module
@@ -450,7 +450,7 @@ module "codex" {
   codex_system_prompt  = data.coder_parameter.system_prompt.value
   ai_prompt            = data.coder_task.me.prompt
   continue             = false
-  additional_mcp_servers = local.mcp_playwright_start ? local.playwright_mcp_toml : ""
+  additional_mcp_servers = local.playwright_mcp_toml
 }
 
 # Coder AI Task - dynamically set app_id based on selected agent
