@@ -513,10 +513,9 @@ start-mcp-playwright() {
     fi
 
     # Start MCP server in background
-    nohup mcp-server-playwright \
+    nohup npx -y @playwright/mcp \
         --port ${MCP_SERVER_PLAYWRIGHT_PORT:-3001} \
         --host ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost} \
-        --browsers-path $PLAYWRIGHT_BROWSERS_PATH \
         > /tmp/mcp-playwright.log 2>&1 &
 
     echo "🤖 MCP Playwright server started!"
@@ -528,15 +527,15 @@ start-mcp-playwright() {
 
 # Helper to stop MCP Playwright server
 stop-mcp-playwright() {
-    pkill -f "mcp-server-playwright" && echo "🛑 MCP Playwright server stopped" || echo "❌ No MCP Playwright server found running"
+    pkill -f "@playwright/mcp" && echo "🛑 MCP Playwright server stopped" || echo "❌ No MCP Playwright server found running"
 }
 
 # Helper to check MCP Playwright server status
 mcp-playwright-status() {
-    if pgrep -f "mcp-server-playwright" > /dev/null; then
+    if pgrep -f "@playwright/mcp" > /dev/null; then
         echo "✅ MCP Playwright server is running"
         echo "  - Port: ${MCP_SERVER_PLAYWRIGHT_PORT:-3001}"
-        echo "  - PID: $(pgrep -f 'mcp-server-playwright')"
+        echo "  - PID: $(pgrep -f '@playwright/mcp')"
     else
         echo "❌ MCP Playwright server is not running"
     fi
@@ -745,10 +744,9 @@ if [ "${MCP_PLAYWRIGHT_START:-false}" = "true" ]; then
             npx playwright install chromium
         fi
 
-        nohup mcp-server-playwright \
+        nohup npx -y @playwright/mcp \
             --port ${MCP_SERVER_PLAYWRIGHT_PORT:-3001} \
             --host ${MCP_SERVER_PLAYWRIGHT_HOST:-localhost} \
-            --browsers-path "$PLAYWRIGHT_BROWSERS_PATH" \
             > /tmp/mcp-playwright.log 2>&1 &
     fi
 fi
