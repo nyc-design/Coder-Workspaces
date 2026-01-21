@@ -740,7 +740,13 @@ install-playwright-browsers() {
     if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright Chromium..."
         mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
-        npx playwright@latest install chromium
+        local playwright_version
+        playwright_version=$(npm view @playwright/mcp@latest dependencies.playwright 2>/dev/null || true)
+        if [[ -n "$playwright_version" ]]; then
+            npx playwright@"$playwright_version" install chromium
+        else
+            npx playwright@latest install chromium
+        fi
     else
         echo "Playwright Chromium already installed"
     fi
