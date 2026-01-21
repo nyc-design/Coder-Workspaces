@@ -49,8 +49,8 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_FUND=false
 ENV PNPM_HOME=/home/coder/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-# Playwright browser path for MCP server
-ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright-browsers
+# Playwright browser path
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/coder/.cache/ms-playwright
 # MCP server configuration for Claude agents
 ENV MCP_SERVER_PLAYWRIGHT_PORT=3001
 ENV MCP_SERVER_PLAYWRIGHT_HOST=localhost

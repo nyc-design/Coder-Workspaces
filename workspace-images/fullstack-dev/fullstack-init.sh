@@ -647,6 +647,7 @@ export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 
 # Playwright browser automation (from nextjs-dev)
+export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 
@@ -731,3 +732,20 @@ chown -R coder:coder /home/coder/.prettierrc /home/coder/.local/share/nextjs-tem
 log "Full-stack development environment setup complete"
 log "Use 'create-monorepo [project-name]' to create a new full-stack project"
 log "Use 'fullstack-tasks' to see available development commands"
+
+install-playwright-browsers() {
+    local browsers_path="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+    export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
+
+    if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
+        echo "Installing Playwright Chromium..."
+        mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+        npx playwright install chromium
+    else
+        echo "Playwright Chromium already installed"
+    fi
+}
+
+if command -v npx >/dev/null 2>&1; then
+    install-playwright-browsers
+fi

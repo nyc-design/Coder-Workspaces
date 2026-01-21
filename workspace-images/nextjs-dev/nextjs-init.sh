@@ -357,6 +357,7 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
+export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 # ---
@@ -423,3 +424,20 @@ chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /
 log "Next.js development environment setup complete"
 log "Use 'create-nextjs [project-name]' to create a new Next.js project"
 log "Use 'dev-tasks' to see available development commands"
+
+install-playwright-browsers() {
+    local browsers_path="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+    export PLAYWRIGHT_BROWSERS_PATH="$browsers_path"
+
+    if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
+        echo "Installing Playwright Chromium..."
+        mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+        npx playwright install chromium
+    else
+        echo "Playwright Chromium already installed"
+    fi
+}
+
+if command -v npx >/dev/null 2>&1; then
+    install-playwright-browsers
+fi
