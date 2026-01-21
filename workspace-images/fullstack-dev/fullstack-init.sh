@@ -425,7 +425,7 @@ setup-playwright() {
         # Only install browsers if they're not already installed
         if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
             echo "Installing Playwright browsers..."
-            npx playwright install chromium firefox webkit
+            npx playwright@latest install chromium
         else
             echo "Playwright browsers already installed"
         fi
@@ -507,7 +507,7 @@ start-mcp-playwright() {
     if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright browsers..."
         mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
-        npx playwright install chromium
+        npx playwright@latest install chromium
     else
         echo "Playwright browsers already installed"
     fi
@@ -740,7 +740,7 @@ install-playwright-browsers() {
     if [[ -z "$(find "$PLAYWRIGHT_BROWSERS_PATH" -name "chrome" -type f 2>/dev/null)" ]]; then
         echo "Installing Playwright Chromium..."
         mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
-        npx playwright install chromium
+        npx playwright@latest install chromium
     else
         echo "Playwright Chromium already installed"
     fi
