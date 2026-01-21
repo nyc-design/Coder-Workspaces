@@ -317,15 +317,15 @@ locals {
 
   playwright_mcp_toml = <<-EOT
     [mcp_servers.Playwright]
-    type = "sse"
-    url = "http://127.0.0.1:3001/sse"
+    type = "streamable_http"
+    url = "http://127.0.0.1:3001/mcp"
   EOT
 
   playwright_mcp_extensions = <<-EOT
     {
       "playwright": {
-        "type": "sse",
-        "url": "http://127.0.0.1:3001/sse",
+        "type": "streamable_http",
+        "url": "http://127.0.0.1:3001/mcp",
         "description": "Playwright browser automation",
         "enabled": true,
         "name": "Playwright",
@@ -338,8 +338,8 @@ locals {
     {
       "mcpServers": {
         "playwright": {
-          "type": "sse",
-          "url": "http://127.0.0.1:3001/sse",
+          "type": "streamable_http",
+          "url": "http://127.0.0.1:3001/mcp",
           "description": "Playwright browser automation"
         }
       }
