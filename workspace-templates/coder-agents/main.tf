@@ -326,11 +326,13 @@ locals {
     type = "stdio"
   EOT
 
-  context7_mcp_toml = local.context7_api_key != "" ? <<-EOT
+  context7_mcp_toml_raw = <<-EOT
     [mcp_servers.context7]
     url = "https://mcp.context7.com/mcp"
-    http_headers = { "CONTEXT7_API_KEY" = "${local.context7_api_key}", "Accept" = "application/json, text/event-stream" }
-  EOT : ""
+    http_headers = { "CONTEXT7_API_KEY" = "${local.context7_api_key}" }
+  EOT
+
+  context7_mcp_toml = local.context7_api_key != "" ? local.context7_mcp_toml_raw : ""
 
   additional_mcp_toml = trimspace(join("\n", compact([
     local.playwright_mcp_toml,
