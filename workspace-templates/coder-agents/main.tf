@@ -411,6 +411,7 @@ module "claude-code" {
   order               = 999
   ai_prompt           = data.coder_task.me.prompt
   mcp                 = local.playwright_mcp_claude
+  permissions         = "bypassPermissions"
 }
 
 # Gemini CLI module
