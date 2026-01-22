@@ -340,8 +340,9 @@ locals {
       "mcpServers": {
         "playwright": {
           "command": "npx",
-          "args": ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
-          "description": "Playwright browser automation"
+          "args": ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
+          "env": {},
+          "type": "stdio"
         }
       }
     }
