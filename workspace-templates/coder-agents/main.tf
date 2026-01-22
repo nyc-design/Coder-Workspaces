@@ -47,6 +47,10 @@ data "google_secret_manager_secret_version" "github_pat" {
   secret = "GH_PAT"
 }
 
+data "google_secret_manager_secret_version" "context7_api_key" {
+  secret = "CONTEXT7_API_KEY"
+}
+
 data "google_secret_manager_secret_version" "docker_config" {
   secret = "DOCKER_CONFIG"
 }
@@ -285,6 +289,7 @@ locals {
   coding_agent = data.coder_parameter.coding_agent.value
 
   ai_api_key = data.coder_parameter.ai_api_key.value
+  context7_api_key = data.google_secret_manager_secret_version.context7_api_key.secret_data
   
   # Project name logic
   project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
@@ -315,38 +320,74 @@ locals {
   repo_url = local.task_repo_url != "" ? local.task_repo_url : (local.is_new_project ? local.new_repo_url : local.existing_repo_url)
 
   playwright_mcp_toml = <<-EOT
-    [mcp_servers.Playwright]
+    [mcp_servers.playwright]
     command = "npx"
     args = ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
     type = "stdio"
   EOT
 
-  playwright_mcp_extensions = <<-EOT
-    {
-      "playwright": {
-        "command": "npx",
-        "args": ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
-        "type": "stdio",
-        "description": "Playwright browser automation",
-        "enabled": true,
-        "name": "Playwright",
-        "timeout": 3000
-      }
-    }
-  EOT
+  context7_mcp_toml = local.context7_api_key != "" ? <<-EOT
+    [mcp_servers.context7]
+    url = "https://mcp.context7.com/mcp"
+    http_headers = { "CONTEXT7_API_KEY" = "${local.context7_api_key}", "Accept" = "application/json, text/event-stream" }
+  EOT : ""
 
-  playwright_mcp_claude = <<-EOT
-    {
-      "mcpServers": {
-        "playwright": {
-          "command": "npx",
-          "args": ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"],
-          "env": {},
-          "type": "stdio"
-        }
+  additional_mcp_toml = trimspace(join("\n", compact([
+    local.playwright_mcp_toml,
+    local.context7_mcp_toml,
+  ])))
+
+  playwright_mcp_extensions_map = {
+    playwright = {
+      command = "npx"
+      args = ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
+      type = "stdio"
+      description = "Playwright browser automation"
+      enabled = true
+      name = "Playwright"
+      timeout = 3000
+    }
+  }
+
+  context7_mcp_extensions_map = local.context7_api_key != "" ? {
+    context7 = {
+      httpUrl = "https://mcp.context7.com/mcp"
+      headers = {
+        CONTEXT7_API_KEY = local.context7_api_key
+        Accept = "application/json, text/event-stream"
       }
     }
-  EOT
+  } : {}
+
+  additional_extensions_json = jsonencode(merge(
+    local.playwright_mcp_extensions_map,
+    local.context7_mcp_extensions_map,
+  ))
+
+  playwright_mcp_claude_map = {
+    playwright = {
+      command = "npx"
+      args = ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
+      type = "stdio"
+    }
+  }
+
+  context7_mcp_claude_map = local.context7_api_key != "" ? {
+    context7 = {
+      type = "http"
+      url = "https://mcp.context7.com/mcp"
+      headers = {
+        CONTEXT7_API_KEY = local.context7_api_key
+      }
+    }
+  } : {}
+
+  mcp_claude = jsonencode({
+    mcpServers = merge(
+      local.playwright_mcp_claude_map,
+      local.context7_mcp_claude_map,
+    )
+  })
 
   # The envbuilder provider requires a key-value map of environment variables.
   envbuilder_env = merge({
@@ -410,7 +451,7 @@ module "claude-code" {
   continue            = false
   order               = 999
   ai_prompt           = data.coder_task.me.prompt
-  mcp                 = local.playwright_mcp_claude
+  mcp                 = local.mcp_claude
   permission_mode     = "bypassPermissions"
 }
 
@@ -431,7 +472,7 @@ module "gemini" {
   gemini_system_prompt = data.coder_parameter.system_prompt.value
   enable_yolo_mode     = true
   task_prompt          = data.coder_task.me.prompt
-  additional_extensions = local.playwright_mcp_extensions
+  additional_extensions = local.additional_extensions_json
 }
 
 # Codex module
@@ -452,7 +493,7 @@ module "codex" {
   codex_system_prompt  = data.coder_parameter.system_prompt.value
   ai_prompt            = data.coder_task.me.prompt
   continue             = false
-  additional_mcp_servers = local.playwright_mcp_toml
+  additional_mcp_servers = local.additional_mcp_toml
 }
 
 # Coder AI Task - dynamically set app_id based on selected agent
