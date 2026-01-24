@@ -90,9 +90,10 @@ locals{
   but look to CLAUDE.md for workspace-specific additional tools    
    available:                                                      
       - Global tools: file operations, git commands, builds &      
-  installs, one-off shell commands, GitHub CLI (gh), Google        
-  Cloud CLI (gcloud), Python, Node.js                              
-                                                                   
+  installs, docker, one-off shell commands, GitHub CLI (gh), Google        
+  Cloud CLI (gcloud), Python, Node.js, Context7 MCP (to get latest docs for third-party dependencies)
+      - Platform-specific tools: Playwright MCP (when working with frontend or fullstack code)
+
       -- Context --                                                
       Please read the CLAUDE.md, if present in workspace base      
   directory, for project-specific context.                         
@@ -720,6 +721,18 @@ resource "docker_container" "workspace" {
     host_path      = "/home/ubuntu/secrets/.codex"
     read_only      = false
   }
+
+  volumes {
+    container_path = "/home/coder/.claude/agents"
+    host_path      = "/home/ubuntu/secrets/.claude/agents"
+    read_only      = false
+  }
+
+  volumes {
+    container_path = "/home/coder/.claude/skills"
+    host_path      = "/home/ubuntu/secrets/.claude/skills"
+    read_only      = false
+  }
   
   volumes {
     container_path = "/home/coder/.supermaven"
@@ -794,8 +807,7 @@ module "code-server" {
     "ms-python.python",
     "detachhead.basedpyright",
     "Supermaven.supermaven",
-    "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist"
+    "ms-azuretools.vscode-docker"
   ]
 }
 
