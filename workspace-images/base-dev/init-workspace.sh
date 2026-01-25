@@ -177,17 +177,24 @@ sudo tee /usr/local/bin/gcp-refresh-secrets >/dev/null <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
+emit_mode=false
+if [ "${1:-}" = "--emit" ]; then
+  emit_mode=true
+  # Suppress all stderr in emit mode - only clean export statements on stdout
+  exec 2>/dev/null
+fi
+
 if [ -z "${GOOGLE_CLOUD_PROJECT:-}" ]; then
-  echo "GOOGLE_CLOUD_PROJECT is not set."
+  echo "GOOGLE_CLOUD_PROJECT is not set." >&2
   exit 1
 fi
 
 if ! command -v gcloud >/dev/null 2>&1; then
-  echo "gcloud is not available."
+  echo "gcloud is not available." >&2
   exit 1
 fi
 
-gcloud config set project "${GOOGLE_CLOUD_PROJECT}" >/dev/null
+gcloud config set project "${GOOGLE_CLOUD_PROJECT}" >/dev/null 2>&1
 
 secrets_dir="$HOME/.secrets"
 bashrc="$HOME/.bashrc"
@@ -199,7 +206,7 @@ chmod 700 "$secrets_dir"
 
 secret_list=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || true)
 if [ -z "$secret_list" ]; then
-  echo "No secrets found in ${GOOGLE_CLOUD_PROJECT}."
+  $emit_mode || echo "No secrets found in ${GOOGLE_CLOUD_PROJECT}."
   exit 0
 fi
 
@@ -238,7 +245,7 @@ done <<< "$secret_list"
 
 echo "$end_marker" >> "$bashrc"
 
-if [ "${1:-}" = "--emit" ]; then
+if $emit_mode; then
   cat "$env_file"
 else
   echo "Refreshed GCP secrets for ${GOOGLE_CLOUD_PROJECT}."
@@ -335,13 +342,14 @@ gcp-refresh-secrets() {
     echo "gcp-refresh-secrets script not found at $script"
     return 1
   fi
-  # Run script with --emit: updates .bashrc (future shells) and outputs vars
+  # Run script with --emit: updates .bashrc (future shells) and outputs export statements
+  # Stderr goes to terminal (user sees warnings), only stdout captured for eval
   local output
-  if ! output=$("$script" --emit 2>&1); then
-    echo "$output"
+  output=$("$script" --emit) || {
+    echo "Failed to refresh secrets."
     return 1
-  fi
-  # Eval output to load secrets into current shell
+  }
+  # Eval the export statements to load secrets into current shell
   eval "$output"
   echo "GCP secrets refreshed (current shell + future shells)."
 }
