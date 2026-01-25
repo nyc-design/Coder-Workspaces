@@ -173,87 +173,89 @@ if command -v gcloud >/dev/null 2>&1; then
 fi
 
 # --- GCP Secrets Integration ---
-if [[ -n "${CODER_GCP_PROJECT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
-  log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
-  
-  # Set the active GCP project
-  gcloud config set project "${CODER_GCP_PROJECT}"
+cat >/usr/local/bin/gcp-refresh-secrets <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-  # Make it visible to Gemini CLI & other tools
+if [ -z "${GOOGLE_CLOUD_PROJECT:-}" ]; then
+  echo "GOOGLE_CLOUD_PROJECT is not set."
+  exit 1
+fi
+
+if ! command -v gcloud >/dev/null 2>&1; then
+  echo "gcloud is not available."
+  exit 1
+fi
+
+gcloud config set project "${GOOGLE_CLOUD_PROJECT}" >/dev/null
+
+secrets_dir="$HOME/.secrets"
+bashrc="$HOME/.bashrc"
+start_marker="# --- GCP Secrets Auto-Generated ---"
+end_marker="# --- End GCP Secrets ---"
+
+mkdir -p "$secrets_dir"
+chmod 700 "$secrets_dir"
+
+secret_list=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || true)
+if [ -z "$secret_list" ]; then
+  echo "No secrets found in ${GOOGLE_CLOUD_PROJECT}."
+  exit 0
+fi
+
+awk -v start="$start_marker" -v end="$end_marker" '
+  $0 == start { skip=1; next }
+  $0 == end { skip=0; next }
+  skip == 0 { print }
+' "$bashrc" > "${bashrc}.tmp" && mv "${bashrc}.tmp" "$bashrc"
+
+{
+  echo "$start_marker"
+  echo "# Dynamically loaded secrets from GCP Secret Manager"
+} >> "$bashrc"
+
+env_file="$secrets_dir/.env"
+: > "$env_file"
+
+while IFS= read -r secret_name; do
+  [ -z "$secret_name" ] && continue
+
+  if secret_value=$(gcloud secrets versions access latest --secret="$secret_name" --quiet 2>/dev/null); then
+    if echo "$secret_name" | grep -Eq '^[A-Z][A-Z0-9_]*$'; then
+      env_var_name="$secret_name"
+    else
+      env_var_name=$(echo "$secret_name" | sed 's/-/_/g' | tr '[:lower:]' '[:upper:]')
+    fi
+
+    secret_file="$secrets_dir/$secret_name"
+    echo -n "$secret_value" > "$secret_file"
+    chmod 600 "$secret_file"
+
+    echo "export ${env_var_name}=\"\$(cat $secret_file 2>/dev/null || echo '')\"" >> "$bashrc"
+    printf 'export %s=%q\n' "$env_var_name" "$secret_value" >> "$env_file"
+  fi
+done <<< "$secret_list"
+
+echo "$end_marker" >> "$bashrc"
+
+if [ "${1:-}" = "--emit" ]; then
+  cat "$env_file"
+else
+  echo "Refreshed GCP secrets for ${GOOGLE_CLOUD_PROJECT}."
+fi
+EOF
+
+chmod +x /usr/local/bin/gcp-refresh-secrets
+
+if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
+  log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
   export GOOGLE_CLOUD_PROJECT="${CODER_GCP_PROJECT}"
   if ! grep -q "GOOGLE_CLOUD_PROJECT" /home/coder/.bashrc; then
     echo "export GOOGLE_CLOUD_PROJECT=\"${CODER_GCP_PROJECT}\"" >> /home/coder/.bashrc
   fi
-  
-  # Create secrets directory
-  mkdir -p /home/coder/.secrets
-  chmod 700 /home/coder/.secrets
-  
-  # Get list of all secrets in the project
-  log "discovering secrets in GCP project..."
-  SECRET_LIST=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || echo "")
-  
-  if [[ -n "$SECRET_LIST" ]]; then
-    # Prepare bashrc section for secrets
-    if ! grep -q "# --- GCP Secrets Auto-Generated ---" /home/coder/.bashrc; then
-      cat >> /home/coder/.bashrc <<'EOF'
-
-# --- GCP Secrets Auto-Generated ---
-# Dynamically loaded secrets from GCP Secret Manager
-EOF
-    fi
-    
-    secret_count=0
-    while IFS= read -r secret_name; do
-      [[ -z "$secret_name" ]] && continue
-      
-      log "fetching secret: ${secret_name}"
-      
-      # Fetch the secret value
-      if secret_value=$(gcloud secrets versions access latest --secret="${secret_name}" --quiet 2>/dev/null); then
-        # Convert secret name to environment variable name
-        # Smart conversion: handle various naming conventions
-        env_var_name="$secret_name"
-        
-        # If it's already in UPPER_CASE format, keep it as is
-        if [[ "$secret_name" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
-          env_var_name="$secret_name"
-        else
-          # Convert kebab-case or lowercase to UPPER_CASE
-          env_var_name=$(echo "$secret_name" | sed 's/-/_/g' | tr '[:lower:]' '[:upper:]')
-        fi
-        
-        # Save to file for persistence
-        secret_file="/home/coder/.secrets/${secret_name}"
-        echo -n "$secret_value" > "$secret_file"
-        chmod 600 "$secret_file"
-        
-        # Export for current session
-        export "$env_var_name"="$secret_value"
-        
-        # Add to bashrc for future sessions
-        echo "export ${env_var_name}=\"\$(cat /home/coder/.secrets/${secret_name} 2>/dev/null || echo '')\"" >> /home/coder/.bashrc
-        
-        log "configured secret: ${secret_name} -> ${env_var_name}"
-        secret_count=$((secret_count + 1))
-      else
-        log "warning: could not fetch secret '${secret_name}' (no permissions or doesn't exist)"
-      fi
-    done <<< "$SECRET_LIST"
-    
-    # Complete the bashrc section
-    echo "# --- End GCP Secrets ---" >> /home/coder/.bashrc
-    
-    log "GCP secrets configuration complete (configured ${secret_count} secrets)"
-  else
-    log "no secrets found in GCP project ${CODER_GCP_PROJECT}"
-  fi
+  eval "$(/usr/local/bin/gcp-refresh-secrets --emit)"
 else
-  if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
-    log "warning: CODER_GCP_PROJECT set but gcloud not available"
-  else
-    log "no GCP project specified; skipping secrets setup"
-  fi
+  log "no GCP project specified; skipping secrets setup"
 fi
 
 # --- Git Helper Function ---
@@ -321,81 +323,22 @@ EOF
 
 log "gitquick helper function added to ~/.bashrc"
 
-# --- GCP Secrets Refresh Helper ---
 sed -i -e '/^# --- GCP Secrets Refresh Helper ---$/,/^# --- End GCP Secrets Refresh Helper ---$/d' ~/.bashrc || true
 
 cat >> ~/.bashrc <<'EOF'
 
 # --- GCP Secrets Refresh Helper ---
-gcp-refresh-secrets() {
-  if [ -z "${GOOGLE_CLOUD_PROJECT:-}" ]; then
-    echo "GOOGLE_CLOUD_PROJECT is not set."
+gcp-refresh-secrets-env() {
+  if ! command -v gcp-refresh-secrets >/dev/null 2>&1; then
+    echo "gcp-refresh-secrets is not available."
     return 1
   fi
-
-  if ! command -v gcloud >/dev/null 2>&1; then
-    echo "gcloud is not available."
-    return 1
-  fi
-
-  gcloud config set project "${GOOGLE_CLOUD_PROJECT}" >/dev/null
-
-  local secrets_dir="$HOME/.secrets"
-  local bashrc="$HOME/.bashrc"
-  local start_marker="# --- GCP Secrets Auto-Generated ---"
-  local end_marker="# --- End GCP Secrets ---"
-
-  mkdir -p "$secrets_dir"
-  chmod 700 "$secrets_dir"
-
-  local secret_list
-  secret_list=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || true)
-
-  if [ -z "$secret_list" ]; then
-    echo "No secrets found in ${GOOGLE_CLOUD_PROJECT}."
-    return 0
-  fi
-
-  awk -v start="$start_marker" -v end="$end_marker" '
-    $0 == start { skip=1; next }
-    $0 == end { skip=0; next }
-    skip == 0 { print }
-  ' "$bashrc" > "${bashrc}.tmp" && mv "${bashrc}.tmp" "$bashrc"
-
-  {
-    echo "$start_marker"
-    echo "# Dynamically loaded secrets from GCP Secret Manager"
-  } >> "$bashrc"
-
-  local secret_name
-  local secret_value
-  local env_var_name
-  local secret_file
-
-  while IFS= read -r secret_name; do
-    [ -z "$secret_name" ] && continue
-
-    if secret_value=$(gcloud secrets versions access latest --secret="$secret_name" --quiet 2>/dev/null); then
-      if echo "$secret_name" | grep -Eq '^[A-Z][A-Z0-9_]*$'; then
-        env_var_name="$secret_name"
-      else
-        env_var_name=$(echo "$secret_name" | sed 's/-/_/g' | tr '[:lower:]' '[:upper:]')
-      fi
-
-      secret_file="$secrets_dir/$secret_name"
-      echo -n "$secret_value" > "$secret_file"
-      chmod 600 "$secret_file"
-
-      export "$env_var_name"="$secret_value"
-      echo "export ${env_var_name}=\"\$(cat $secret_file 2>/dev/null || echo '')\"" >> "$bashrc"
-    fi
-  done <<< "$secret_list"
-
-  echo "$end_marker" >> "$bashrc"
-  echo "Refreshed GCP secrets for ${GOOGLE_CLOUD_PROJECT}."
+  eval "$(gcp-refresh-secrets --emit)"
+  echo "GCP secrets refreshed in current shell."
 }
 # --- End GCP Secrets Refresh Helper ---
 EOF
+
 
 # Hand off to CMD (e.g., coder agent)
 exit 0
