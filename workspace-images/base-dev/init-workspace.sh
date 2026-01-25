@@ -173,7 +173,7 @@ if command -v gcloud >/dev/null 2>&1; then
 fi
 
 # --- GCP Secrets Integration ---
-cat >/usr/local/bin/gcp-refresh-secrets <<'EOF'
+sudo tee /usr/local/bin/gcp-refresh-secrets >/dev/null <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -245,7 +245,7 @@ else
 fi
 EOF
 
-chmod +x /usr/local/bin/gcp-refresh-secrets
+sudo chmod +x /usr/local/bin/gcp-refresh-secrets
 
 if [[ -n "${CODER_GCP_PROJECT:-}" ]]; then
   log "configuring GCP secrets for project: ${CODER_GCP_PROJECT}"
@@ -328,13 +328,22 @@ sed -i -e '/^# --- GCP Secrets Refresh Helper ---$/,/^# --- End GCP Secrets Refr
 cat >> ~/.bashrc <<'EOF'
 
 # --- GCP Secrets Refresh Helper ---
-gcp-refresh-secrets-env() {
-  if ! command -v gcp-refresh-secrets >/dev/null 2>&1; then
-    echo "gcp-refresh-secrets is not available."
+# Function shadows the script and refreshes secrets in current + future shells
+gcp-refresh-secrets() {
+  local script="/usr/local/bin/gcp-refresh-secrets"
+  if [[ ! -x "$script" ]]; then
+    echo "gcp-refresh-secrets script not found at $script"
     return 1
   fi
-  eval "$(gcp-refresh-secrets --emit)"
-  echo "GCP secrets refreshed in current shell."
+  # Run script with --emit: updates .bashrc (future shells) and outputs vars
+  local output
+  if ! output=$("$script" --emit 2>&1); then
+    echo "$output"
+    return 1
+  fi
+  # Eval output to load secrets into current shell
+  eval "$output"
+  echo "GCP secrets refreshed (current shell + future shells)."
 }
 # --- End GCP Secrets Refresh Helper ---
 EOF
