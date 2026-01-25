@@ -321,5 +321,81 @@ EOF
 
 log "gitquick helper function added to ~/.bashrc"
 
+# --- GCP Secrets Refresh Helper ---
+sed -i -e '/^# --- GCP Secrets Refresh Helper ---$/,/^# --- End GCP Secrets Refresh Helper ---$/d' ~/.bashrc || true
+
+cat >> ~/.bashrc <<'EOF'
+
+# --- GCP Secrets Refresh Helper ---
+gcp-refresh-secrets() {
+  if [ -z "${GOOGLE_CLOUD_PROJECT:-}" ]; then
+    echo "GOOGLE_CLOUD_PROJECT is not set."
+    return 1
+  fi
+
+  if ! command -v gcloud >/dev/null 2>&1; then
+    echo "gcloud is not available."
+    return 1
+  fi
+
+  gcloud config set project "${GOOGLE_CLOUD_PROJECT}" >/dev/null
+
+  local secrets_dir="$HOME/.secrets"
+  local bashrc="$HOME/.bashrc"
+  local start_marker="# --- GCP Secrets Auto-Generated ---"
+  local end_marker="# --- End GCP Secrets ---"
+
+  mkdir -p "$secrets_dir"
+  chmod 700 "$secrets_dir"
+
+  local secret_list
+  secret_list=$(gcloud secrets list --format="value(name)" --quiet 2>/dev/null || true)
+
+  if [ -z "$secret_list" ]; then
+    echo "No secrets found in ${GOOGLE_CLOUD_PROJECT}."
+    return 0
+  fi
+
+  awk -v start="$start_marker" -v end="$end_marker" '
+    $0 == start { skip=1; next }
+    $0 == end { skip=0; next }
+    skip == 0 { print }
+  ' "$bashrc" > "${bashrc}.tmp" && mv "${bashrc}.tmp" "$bashrc"
+
+  {
+    echo "$start_marker"
+    echo "# Dynamically loaded secrets from GCP Secret Manager"
+  } >> "$bashrc"
+
+  local secret_name
+  local secret_value
+  local env_var_name
+  local secret_file
+
+  while IFS= read -r secret_name; do
+    [ -z "$secret_name" ] && continue
+
+    if secret_value=$(gcloud secrets versions access latest --secret="$secret_name" --quiet 2>/dev/null); then
+      if echo "$secret_name" | grep -Eq '^[A-Z][A-Z0-9_]*$'; then
+        env_var_name="$secret_name"
+      else
+        env_var_name=$(echo "$secret_name" | sed 's/-/_/g' | tr '[:lower:]' '[:upper:]')
+      fi
+
+      secret_file="$secrets_dir/$secret_name"
+      echo -n "$secret_value" > "$secret_file"
+      chmod 600 "$secret_file"
+
+      export "$env_var_name"="$secret_value"
+      echo "export ${env_var_name}=\"\$(cat $secret_file 2>/dev/null || echo '')\"" >> "$bashrc"
+    fi
+  done <<< "$secret_list"
+
+  echo "$end_marker" >> "$bashrc"
+  echo "Refreshed GCP secrets for ${GOOGLE_CLOUD_PROJECT}."
+}
+# --- End GCP Secrets Refresh Helper ---
+EOF
+
 # Hand off to CMD (e.g., coder agent)
 exit 0
