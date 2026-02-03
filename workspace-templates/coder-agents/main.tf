@@ -335,9 +335,15 @@ locals {
 
   context7_mcp_toml = local.context7_api_key != "" ? local.context7_mcp_toml_raw : ""
 
+  grep_mcp_toml = <<-EOT
+    [mcp_servers.grep]
+    url = "https://mcp.grep.app"
+  EOT
+
   additional_mcp_toml = trimspace(join("\n", compact([
     local.playwright_mcp_toml,
     local.context7_mcp_toml,
+    local.grep_mcp_toml,
   ])))
 
   playwright_mcp_extensions_map = {
@@ -362,9 +368,16 @@ locals {
     }
   } : {}
 
+  grep_mcp_extensions_map = {
+    grep = {
+      httpUrl = "https://mcp.grep.app"
+    }
+  }
+
   additional_extensions_json = jsonencode(merge(
     local.playwright_mcp_extensions_map,
     local.context7_mcp_extensions_map,
+    local.grep_mcp_extensions_map,
   ))
 
   playwright_mcp_claude_map = {
@@ -385,10 +398,18 @@ locals {
     }
   } : {}
 
+  grep_mcp_claude_map = {
+    grep = {
+      type = "http"
+      url = "https://mcp.grep.app"
+    }
+  }
+
   mcp_claude = jsonencode({
     mcpServers = merge(
       local.playwright_mcp_claude_map,
       local.context7_mcp_claude_map,
+      local.grep_mcp_claude_map,
     )
   })
 
