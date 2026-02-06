@@ -112,7 +112,7 @@ locals{
       5. User reviews line-by-line in VS Code, you read            
   feedback: `gh pr view [PR#] --comments`
 
-  Note: Always make sure to git pull when starting a new task and / or periodically, as the user will be working in a separate workspace on the same repo. Once an implementation checklist is completed, feel free to change the title of the checklist to 'Procedure'.
+  Notes: Always make sure to git pull when starting a new task and / or periodically, as the user will be working in a separate workspace on the same repo. Once an implementation checklist is completed, feel free to change the title of the checklist to 'Procedure'. As you work, please keep the CLAUDE.md up to date with the latest context on the project / repo.
     EOT
 }
 
