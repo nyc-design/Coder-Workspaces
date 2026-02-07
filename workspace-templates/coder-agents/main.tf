@@ -103,7 +103,7 @@ locals{
       - Polish + Deploy — Final design refinements, responsive behavior, loading/error states, accessibility, then ship.
 
     -- Context --
-      Please read the CLAUDE.md, if present in workspace base directory, for project-specific context.                         
+      Please read the CLAUDE.md, if present in workspace base directory, for project-specific context. Also, please keep CLAUDE.md up to date as repo / project changes or when major tasks are done.                      
                                                                    
     -- Code Review Workflow --                                   
       User has GitHub Pull Requests extension in VS Code. Unless otherwise instructed, create individual PRs per work request: 'gh pr create'. Test your code in the PR, and then review the PR. User reviews line-by-line in VS Code, you read feedback: `gh pr view [PR#] --comments`
