@@ -649,8 +649,9 @@ module "code-server" {
   order    = 1
 
   settings = {
-    "workbench.colorTheme" = "Default Dark Modern",
-    "git.useIntegratedAskPass": "false"
+    "workbench.colorTheme"      = "Default Dark Modern",
+    "git.useIntegratedAskPass"  = "false",
+    "likec4.mcp.enabled"        = "true"
   }
 
   extensions = [
@@ -663,7 +664,8 @@ module "code-server" {
     "detachhead.basedpyright",
     "Supermaven.supermaven",
     "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist"
+    "Google.geminicodeassist",
+    "likec4.likec4-vscode"
   ]
 }
 
@@ -677,8 +679,9 @@ module "vscode-web" {
   accept_license = true
 
   settings = {
-    "workbench.colorTheme" = "Default Dark Modern",
-    "git.useIntegratedAskPass": "false"
+    "workbench.colorTheme"      = "Default Dark Modern",
+    "git.useIntegratedAskPass"  = "false",
+    "likec4.mcp.enabled"        = "true"
   }
 
   extensions = [
@@ -690,6 +693,7 @@ module "vscode-web" {
     "openai.chatgpt",
     "ms-python.python",
     "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist"
+    "Google.geminicodeassist",
+    "likec4.likec4-vscode"
   ]
 }

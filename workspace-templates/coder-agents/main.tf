@@ -89,13 +89,28 @@ locals{
       - The following tools are available in every workspace,      
   but look to CLAUDE.md for workspace-specific additional tools    
    available:                                                      
-      - Global tools: file operations, git commands, builds &      
-  installs, docker, one-off shell commands, GitHub CLI (gh), Google        
+      - Global tools: file operations, git commands, builds &
+  installs, docker, one-off shell commands, GitHub CLI (gh), Google
   Cloud CLI (gcloud), Python, Node.js, Context7 MCP (to get latest docs for third-party dependencies)
       - Platform-specific tools: Playwright MCP (when working with frontend or fullstack code)
+      - Architecture tools: LikeC4 MCP (query and update C4 architecture models via *.c4 / *.likec4 files)
 
-      -- Context --                                                
-      Please read the CLAUDE.md, if present in workspace base      
+      -- Architecture-First Development (LikeC4) --
+      Use LikeC4 to model the software architecture before writing
+  code. This ensures both you and the user share the same mental
+  model of the system:
+      1. At project start or before major features, create/update
+  .likec4 files in an `architecture/` directory describing system
+  components, relationships, and deployment views
+      2. Query the LikeC4 MCP to understand existing architecture
+  before making structural changes
+      3. After implementing features, update the architecture model
+  to reflect new components, services, or relationships
+      4. Use `likec4 validate` to check model consistency
+      5. The LikeC4 CLI can export diagrams: `likec4 export png`
+
+      -- Context --
+      Please read the CLAUDE.md, if present in workspace base
   directory, for project-specific context.                         
                                                                    
       -- Code Review Workflow --                                   
@@ -340,10 +355,18 @@ locals {
     url = "https://mcp.grep.app"
   EOT
 
+  likec4_mcp_toml = <<-EOT
+    [mcp_servers.likec4]
+    command = "likec4"
+    args = ["mcp", "--stdio"]
+    type = "stdio"
+  EOT
+
   additional_mcp_toml = trimspace(join("\n", compact([
     local.playwright_mcp_toml,
     local.context7_mcp_toml,
     local.grep_mcp_toml,
+    local.likec4_mcp_toml,
   ])))
 
   playwright_mcp_extensions_map = {
@@ -374,10 +397,23 @@ locals {
     }
   }
 
+  likec4_mcp_extensions_map = {
+    likec4 = {
+      command     = "likec4"
+      args        = ["mcp", "--stdio"]
+      type        = "stdio"
+      description = "LikeC4 architecture modeling"
+      enabled     = true
+      name        = "LikeC4"
+      timeout     = 3000
+    }
+  }
+
   additional_extensions_json = jsonencode(merge(
     local.playwright_mcp_extensions_map,
     local.context7_mcp_extensions_map,
     local.grep_mcp_extensions_map,
+    local.likec4_mcp_extensions_map,
   ))
 
   playwright_mcp_claude_map = {
@@ -405,11 +441,20 @@ locals {
     }
   }
 
+  likec4_mcp_claude_map = {
+    likec4 = {
+      command = "likec4"
+      args    = ["mcp", "--stdio"]
+      type    = "stdio"
+    }
+  }
+
   mcp_claude = jsonencode({
     mcpServers = merge(
       local.playwright_mcp_claude_map,
       local.context7_mcp_claude_map,
       local.grep_mcp_claude_map,
+      local.likec4_mcp_claude_map,
     )
   })
 
@@ -815,8 +860,9 @@ module "code-server" {
   order    = 1
 
   settings = {
-    "workbench.colorTheme" = "Default Dark Modern",
-    "git.useIntegratedAskPass": "false"
+    "workbench.colorTheme"      = "Default Dark Modern",
+    "git.useIntegratedAskPass"  = "false",
+    "likec4.mcp.enabled"        = "true"
   }
 
   extensions = [
@@ -828,7 +874,8 @@ module "code-server" {
     "ms-python.python",
     "detachhead.basedpyright",
     "Supermaven.supermaven",
-    "ms-azuretools.vscode-docker"
+    "ms-azuretools.vscode-docker",
+    "likec4.likec4-vscode"
   ]
 }
 
@@ -842,8 +889,9 @@ module "vscode-web" {
   accept_license = true
 
   settings = {
-    "workbench.colorTheme" = "Default Dark Modern",
-    "git.useIntegratedAskPass": "false"
+    "workbench.colorTheme"      = "Default Dark Modern",
+    "git.useIntegratedAskPass"  = "false",
+    "likec4.mcp.enabled"        = "true"
   }
 
   extensions = [
@@ -855,6 +903,7 @@ module "vscode-web" {
     "openai.chatgpt",
     "ms-python.python",
     "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist"
+    "Google.geminicodeassist",
+    "likec4.likec4-vscode"
   ]
 }

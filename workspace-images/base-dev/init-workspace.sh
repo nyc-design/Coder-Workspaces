@@ -356,6 +356,15 @@ gcp-refresh-secrets() {
 # --- End GCP Secrets Refresh Helper ---
 EOF
 
+# --- LikeC4 Architecture MCP Server ---
+if command -v likec4 &> /dev/null; then
+  LIKEC4_DIR="${LIKEC4_WORKSPACE:-$PWD}"
+  log "starting LikeC4 architecture MCP server (workspace: ${LIKEC4_DIR})"
+  nohup likec4 mcp --http "${LIKEC4_DIR}" -p 33336 > /tmp/likec4-mcp.log 2>&1 &
+  log "LikeC4 MCP server running on http://localhost:33336/mcp"
+else
+  log "likec4 not found; skipping MCP server startup"
+fi
 
 # Hand off to CMD (e.g., coder agent)
 exit 0
