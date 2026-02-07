@@ -356,6 +356,5 @@ gcp-refresh-secrets() {
 # --- End GCP Secrets Refresh Helper ---
 EOF
 
-
 # Hand off to CMD (e.g., coder agent)
 exit 0
