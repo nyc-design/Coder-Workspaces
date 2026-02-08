@@ -99,7 +99,7 @@ locals{
         - Class methods: `'file_name.ClassName.method_name()'` (e.g., `'rd_scanner.RDScanner._process_added()'`)
         - External API endpoints: `'ServicePrefix: HTTP_METHOD /path'` (e.g., `'RD: GET /torrents'`)
         - Frontend pages: descriptive names (e.g., `'Library Page'`)
-    - LikeC4 View Title Prefixes — View titles use category prefixes for organized dropdown navigation: `1.`/`2.`/`3.` for hierarchy levels, `API:`, `Scanner:`, `Service:`, `DB:`, `Client:`, `Ext:`, `WebDAV:` for component drill-downs, `Flow:` for dynamic sequence views.
+    - LikeC4 View Title Prefixes — View titles use category prefixes for organized dropdown navigation: `1.`/`2.`/`3.` for hierarchy levels, `API:`, `Scanner:`, `Service:`, `DB:`, `Client:`, `Ext:`, `WebDAV:`, etc. for component drill-downs, `Flow:` for dynamic sequence views.
     - LikeC4 Maintenance — When modifying code (adding, renaming, or removing functions, endpoints, or services), update the corresponding `.likec4/` model files to keep architecture diagrams in sync. Use the LikeC4 MCP to validate changes parse correctly.
     - API Contracts — For FastAPI backends, Pydantic request/response models for every endpoint — written as stubs before implementation. These contracts are the single source of truth between frontend and backend. TypeScript types are generated from the FastAPI OpenAPI spec via openapi-typescript.
     - Design System Foundation — Component library selection, design tokens (colors, spacing, typography), and a small set of core UI components built in Storybook. Establishes the visual vocabulary used throughout frontend implementation.
