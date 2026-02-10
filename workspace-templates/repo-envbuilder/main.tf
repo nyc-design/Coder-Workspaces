@@ -219,7 +219,13 @@ resource "coder_agent" "main" {
   os             = "linux"
   startup_script = <<-EOT
     set -e
-    
+
+    # Fix ownership that envbuilder's chown may have failed to complete.
+    # envbuilder uses filepath.Walk which aborts on ENOENT if a temp file
+    # (e.g. .codex/tmp, ms-playwright) is deleted mid-walk. This find-based
+    # approach handles vanishing files gracefully.
+    sudo find /home/coder -xdev -not -user coder -exec chown coder:coder {} + 2>/dev/null || true
+
     # Prepare user home with default files on first start.
     if [ ! -f ~/.init_done ]; then
       cp -rT /etc/skel ~
