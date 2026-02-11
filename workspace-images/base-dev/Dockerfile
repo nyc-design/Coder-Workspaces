@@ -44,8 +44,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && npm install -g pnpm \
  && rm -rf /var/lib/apt/lists/*
 
+# Claude Code (native installer)
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
 # AI coding CLIs + architecture tooling
-RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4
+RUN npm install -g @openai/codex @google/gemini-cli likec4
 
 # Minimal user config
 RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
