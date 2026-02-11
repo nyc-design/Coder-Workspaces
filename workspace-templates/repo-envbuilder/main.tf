@@ -434,12 +434,6 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
-    container_path = "/home/coder/.claude.json"
-    host_path      = "/home/ubuntu/secrets/.claude.json"
-    read_only      = false
-  }
-
-  volumes {
     container_path = "/home/coder/.codex"
     host_path      = "/home/ubuntu/secrets/.codex"
     read_only      = false
