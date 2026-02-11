@@ -35,8 +35,8 @@ RUN npm install -g \
     storybook @storybook/cli \
     # Code quality
     husky lint-staged \
-    # MCP server for Claude agent browser automation
-    @playwright/mcp
+    # Playwright browser automation for Claude agents
+    @playwright/mcp @playwright/cli
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh

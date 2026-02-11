@@ -84,7 +84,7 @@ locals{
     -- Tool Selection --
     The following tools are available in every workspace, but look to CLAUDE.md for workspace-specific additional tools available:
     - Global tools: file operations, git commands, builds & installs, docker, one-off shell commands, GitHub CLI (gh), Google Cloud CLI (gcloud), Python, Node.js, Context7 MCP (to get latest docs for third-party dependencies)
-    - Platform-specific tools: Storybook, Playwright MCP (when working with frontend or fullstack code)
+    - Platform-specific tools: Storybook, Playwright CLI (preferred — use the playwright-cli skill for browser automation; more token-efficient than MCP), Playwright MCP (available as fallback when working with frontend or fullstack code)
     - Architecture tools: LikeC4 CLI & MCP (query and update C4 architecture models via *.likec4 files)
 
     -- Application Development Process --
@@ -767,6 +767,12 @@ resource "docker_container" "workspace" {
   volumes {
     container_path = "/home/coder/.config/gcloud"
     host_path      = "/home/ubuntu/secrets/gcloud"
+    read_only      = false
+  }
+
+  volumes {
+    container_path = "/home/coder/.pencil"
+    host_path      = "/home/ubuntu/secrets/.pencil"
     read_only      = false
   }
 

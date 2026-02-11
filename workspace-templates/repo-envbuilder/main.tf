@@ -416,6 +416,12 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
+    container_path = "/home/coder/.pencil"
+    host_path      = "/home/ubuntu/secrets/.pencil"
+    read_only      = false
+  }
+
+  volumes {
     container_path = "/home/coder/.gemini"
     host_path      = "/home/ubuntu/secrets/.gemini"
     read_only      = false

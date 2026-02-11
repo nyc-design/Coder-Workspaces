@@ -433,7 +433,7 @@ install-playwright-browsers() {
         echo "Installing Playwright Chromium..."
         mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
         local playwright_version
-        playwright_version=$(npm view @playwright/mcp@latest dependencies.playwright 2>/dev/null || true)
+        playwright_version=$(npm view @playwright/cli@latest dependencies.playwright 2>/dev/null || true)
         if [[ -n "$playwright_version" ]]; then
             npx playwright@"$playwright_version" install chromium
         else
@@ -447,3 +447,7 @@ install-playwright-browsers() {
 if command -v npx >/dev/null 2>&1; then
     install-playwright-browsers
 fi
+
+# Install Playwright CLI skills for Claude Code (token-efficient browser automation)
+log "Installing playwright-cli skills for Claude Code"
+playwright-cli install --skills 2>/dev/null || true
