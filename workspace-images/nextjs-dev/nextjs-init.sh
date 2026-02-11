@@ -358,6 +358,7 @@ export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
 export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
+export PLAYWRIGHT_MCP_CONFIG="$HOME/.playwright/cli.config.json"
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 # ---
@@ -448,6 +449,8 @@ if command -v npx >/dev/null 2>&1; then
     install-playwright-browsers
 fi
 
-# Install Playwright CLI skills for Claude Code (token-efficient browser automation)
+# Install Playwright CLI skills globally for Claude Code (token-efficient browser automation)
+# Run from /home/coder so skills land in ~/.claude/skills/ (global) and
+# .playwright/ config stays in home dir (picked up via PLAYWRIGHT_MCP_CONFIG env var).
 log "Installing playwright-cli skills for Claude Code"
-playwright-cli install --skills 2>/dev/null || true
+(cd /home/coder && playwright-cli install --skills) 2>/dev/null || true
