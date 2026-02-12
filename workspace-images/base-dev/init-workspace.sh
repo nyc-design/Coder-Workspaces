@@ -266,11 +266,12 @@ else
 fi
 
 # --- LazyVim setup (first start only) ---
-if [ ! -d "$HOME/.config/nvim" ]; then
-  log "setting up LazyVim for neovim"
-  git clone https://github.com/LazyVim/starter "$HOME/.config/nvim" 2>/dev/null || true
-  # Remove .git so user can make it their own
-  rm -rf "$HOME/.config/nvim/.git"
+if [ ! -d "$HOME/.config/nvim" ] && [ -d /opt/lazyvim-starter ]; then
+  log "copying pre-installed LazyVim from image"
+  mkdir -p "$HOME/.config" "$HOME/.local/share" "$HOME/.local/state"
+  cp -r /opt/lazyvim-starter/config "$HOME/.config/nvim"
+  cp -r /opt/lazyvim-starter/data   "$HOME/.local/share/nvim"
+  [ -d /opt/lazyvim-starter/state ] && cp -r /opt/lazyvim-starter/state "$HOME/.local/state/nvim"
 fi
 
 # --- Git Helper Function ---
@@ -338,9 +339,44 @@ EOF
 
 log "gitquick helper function added to ~/.bashrc"
 
+sed -i -e '/^# --- Template Helper Functions ---$/,/^# --- End Template Helper Functions ---$/d' ~/.bashrc || true
 sed -i -e '/^# --- GCP Secrets Refresh Helper ---$/,/^# --- End GCP Secrets Refresh Helper ---$/d' ~/.bashrc || true
 
 cat >> ~/.bashrc <<'EOF'
+
+# --- Template Helper Functions ---
+pencil-template() {
+  local REPO_URL="https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/pencil-templates"
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: pencil-template <filename>"
+    echo "Downloads a Pencil template from the shared library into the current directory."
+    echo ""
+    echo "Available templates:"
+    curl -s "https://api.github.com/repos/nyc-design/Coder-Workspaces/contents/shared-assets/pencil-templates" \
+      | grep -Po '"name": "\K[^"]+' | grep -v '.gitkeep' || echo "  (none yet)"
+    return 0
+  fi
+  local file="$1"
+  echo "Downloading ${file}..."
+  curl -fsSL "${REPO_URL}/${file}" -o "./${file}" && echo "Downloaded ${file} to $(pwd)/" || echo "Failed to download ${file}"
+}
+
+excalidraw-template() {
+  local REPO_URL="https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/excalidraw"
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: excalidraw-template <filename>"
+    echo "Downloads an Excalidraw template from the shared library into the current directory."
+    echo ""
+    echo "Available templates:"
+    curl -s "https://api.github.com/repos/nyc-design/Coder-Workspaces/contents/shared-assets/excalidraw" \
+      | grep -Po '"name": "\K[^"]+' | grep -v 'library.excalidrawlib' || echo "  (none yet)"
+    return 0
+  fi
+  local file="$1"
+  echo "Downloading ${file}..."
+  curl -fsSL "${REPO_URL}/${file}" -o "./${file}" && echo "Downloaded ${file} to $(pwd)/" || echo "Failed to download ${file}"
+}
+# --- End Template Helper Functions ---
 
 # --- GCP Secrets Refresh Helper ---
 # Function shadows the script and refreshes secrets in current + future shells

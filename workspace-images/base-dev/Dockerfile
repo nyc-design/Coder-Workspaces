@@ -84,6 +84,18 @@ USER coder
 RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
  && gh config set git_protocol https || true
 
+# LazyVim — clone starter, install all plugins headlessly, stage for init-time copy
+# (volume mount hides /home/coder build layer, so we stage under /opt/)
+RUN git clone --depth 1 https://github.com/LazyVim/starter /home/coder/.config/nvim \
+ && rm -rf /home/coder/.config/nvim/.git \
+ && nvim --headless "+Lazy! sync" +qa \
+ && mkdir -p /opt/lazyvim-starter \
+ && cp -r /home/coder/.config/nvim       /opt/lazyvim-starter/config \
+ && cp -r /home/coder/.local/share/nvim  /opt/lazyvim-starter/data \
+ && cp -r /home/coder/.local/state/nvim  /opt/lazyvim-starter/state 2>/dev/null; true \
+ && rm -rf /home/coder/.config/nvim /home/coder/.local/share/nvim \
+           /home/coder/.local/state/nvim /home/coder/.cache/nvim
+
 USER root
 COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh
 RUN chmod +x /usr/local/bin/init-workspace.sh

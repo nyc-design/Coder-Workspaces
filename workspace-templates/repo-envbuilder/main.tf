@@ -463,6 +463,12 @@ resource "docker_container" "workspace" {
     read_only      = false
   }
 
+  volumes {
+    container_path = "/home/coder/.excalidraw"
+    host_path      = "/home/ubuntu/secrets/.excalidraw"
+    read_only      = false
+  }
+
   labels {
     label = "coder.owner"
     value = data.coder_workspace_owner.me.name
@@ -503,11 +509,12 @@ module "code-server" {
     "git.useIntegratedAskPass"                   = "false",
     "likec4.mcp.enabled"                         = "true",
     "vscode-neovim.neovimExecutablePaths.linux"  = "/usr/local/bin/nvim",
-    "extensions.experimental.affinity"           = jsonencode({ "asvetliakov.vscode-neovim" = 1 }),
+    "extensions.experimental.affinity"           = { "asvetliakov.vscode-neovim" = 1 },
     "todo-tree.tree.showBadges"                  = "true",
     "todo-tree.tree.disableCompactFolders"       = "false",
     "todo-tree.tree.showCountsInTree"            = "true",
-    "todo-tree.tree.scanMode"                    = "current file"
+    "todo-tree.tree.scanMode"                    = "current file",
+    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
   extensions = [
@@ -548,11 +555,12 @@ module "vscode-web" {
     "git.useIntegratedAskPass"                   = "false",
     "likec4.mcp.enabled"                         = "true",
     "vscode-neovim.neovimExecutablePaths.linux"  = "/usr/local/bin/nvim",
-    "extensions.experimental.affinity"           = jsonencode({ "asvetliakov.vscode-neovim" = 1 }),
+    "extensions.experimental.affinity"           = { "asvetliakov.vscode-neovim" = 1 },
     "todo-tree.tree.showBadges"                  = "true",
     "todo-tree.tree.disableCompactFolders"       = "false",
     "todo-tree.tree.showCountsInTree"            = "true",
-    "todo-tree.tree.scanMode"                    = "current file"
+    "todo-tree.tree.scanMode"                    = "current file",
+    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
   extensions = [
