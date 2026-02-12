@@ -577,10 +577,6 @@ module "vscode-web" {
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
-  machine-settings = {
-    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
-  }
-
   extensions = [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
