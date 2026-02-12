@@ -527,7 +527,7 @@ module "code-server" {
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
-  machine_settings = {
+  machine-settings = {
     "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
 
@@ -577,7 +577,7 @@ module "vscode-web" {
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
-  machine_settings = {
+  machine-settings = {
     "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
 
