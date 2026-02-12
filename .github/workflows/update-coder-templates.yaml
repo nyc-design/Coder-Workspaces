@@ -60,7 +60,7 @@ jobs:
                 [ -z "$template" ] && continue
                 while IFS= read -r module; do
                   [ -z "$module" ] && continue
-                  if rg -q "workspace-modules/${module}" "workspace-templates/${template}"; then
+                  if grep -R -q "workspace-modules/${module}" "workspace-templates/${template}"; then
                     AFFECTED_BY_MODULES="${AFFECTED_BY_MODULES}${template}"$'\n'
                     break
                   fi
