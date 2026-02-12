@@ -41,8 +41,9 @@ locals {
   playwright_mcp_toml = <<-EOT
     [mcp_servers.playwright]
     command = "npx"
-    args = ["@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
+    args = ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
     type = "stdio"
+    startup_timeout_sec = 120
   EOT
 
   playwright_mcp_extensions_map = {
@@ -122,16 +123,20 @@ locals {
   # ---------------------------------------------------------------------------
   likec4_mcp_toml = <<-EOT
     [mcp_servers.likec4]
-    command = "likec4"
-    args = ["mcp", "--stdio"]
+    command = "npx"
+    args = ["-y", "@likec4/mcp"]
     type = "stdio"
+    startup_timeout_sec = 120
+    [mcp_servers.likec4.env]
+    LIKEC4_WORKSPACE = "/workspaces/${local.project_name}"
   EOT
 
   likec4_mcp_extensions_map = {
     likec4 = {
-      command     = "likec4"
-      args        = ["mcp", "--stdio"]
+      command     = "npx"
+      args        = ["-y", "@likec4/mcp"]
       type        = "stdio"
+      env         = { LIKEC4_WORKSPACE = "/workspaces/${local.project_name}" }
       description = "LikeC4 architecture modeling"
       enabled     = true
       name        = "LikeC4"
@@ -141,9 +146,10 @@ locals {
 
   likec4_mcp_claude_map = {
     likec4 = {
-      command = "likec4"
-      args    = ["mcp", "--stdio"]
+      command = "npx"
+      args    = ["-y", "@likec4/mcp"]
       type    = "stdio"
+      env     = { LIKEC4_WORKSPACE = "/workspaces/${local.project_name}" }
     }
   }
 
@@ -153,8 +159,9 @@ locals {
   stitch_mcp_toml = <<-EOT
     [mcp_servers.stitch]
     command = "npx"
-    args = ["@_davideast/stitch-mcp", "proxy"]
+    args = ["-y", "@_davideast/stitch-mcp", "proxy"]
     type = "stdio"
+    startup_timeout_sec = 180
     [mcp_servers.stitch.env]
     STITCH_USE_SYSTEM_GCLOUD = "1"
     STITCH_PROJECT_ID = "coder-nt"

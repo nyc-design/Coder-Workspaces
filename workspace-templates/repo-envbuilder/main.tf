@@ -42,6 +42,10 @@ module "workspace_secrets" {
   source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
 }
 
+module "workspace_startup" {
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-startup?ref=main"
+}
+
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 }
@@ -141,27 +145,7 @@ locals {
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
-  startup_script             = <<-EOT
-    set -e
-
-    # Fix ownership that envbuilder's chown may have failed to complete.
-    # envbuilder uses filepath.Walk which aborts on ENOENT if a temp file
-    # is deleted mid-walk. This find-based approach handles vanishing files.
-    for path in /home/coder /workspaces; do
-      if [ -d "$path" ]; then
-        sudo find "$path" -xdev -not -user coder -exec chown coder:coder {} + 2>/dev/null || true
-      fi
-    done
-
-    # Prepare user home with default files on first start.
-    if [ ! -f ~/.init_done ]; then
-      cp -rT /etc/skel ~
-      touch ~/.init_done
-    fi
-
-    /usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
-    /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
-  EOT
+  startup_script             = module.workspace_startup.startup_script
 }
 
 
