@@ -52,7 +52,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && rm -rf /var/lib/apt/lists/*
 
 # AI coding CLIs + architecture tooling + skills ecosystem
-RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills \
+RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli \
  && chmod -R a+w /usr/lib/node_modules/likec4/
 
 # just (command runner) + just-lsp (language server for VS Code)
