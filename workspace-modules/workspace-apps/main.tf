@@ -6,6 +6,7 @@ terraform {
   }
 }
 
+
 module "cursor" {
   count    = var.enable_apps ? 1 : 0
   source   = "registry.coder.com/coder/cursor/coder"
@@ -13,6 +14,7 @@ module "cursor" {
   agent_id = var.agent_id
   folder   = "/workspaces/${var.project_name}"
 }
+
 
 module "code-server" {
   count  = var.enable_apps ? 1 : 0
@@ -63,6 +65,7 @@ module "code-server" {
   ]
 }
 
+
 module "vscode-web" {
   count  = var.enable_apps ? 1 : 0
   source = "registry.coder.com/coder/vscode-web/coder"
@@ -109,6 +112,7 @@ module "vscode-web" {
   ]
 }
 
+
 resource "coder_app" "neovim" {
   count        = var.enable_apps ? 1 : 0
   agent_id     = var.agent_id
@@ -118,6 +122,7 @@ resource "coder_app" "neovim" {
   command      = "nvim"
   order        = 3
 }
+
 
 module "filebrowser" {
   count         = var.enable_apps ? 1 : 0

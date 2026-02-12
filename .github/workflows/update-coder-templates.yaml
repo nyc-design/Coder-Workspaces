@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "workspace-templates/**"
+      - "workspace-modules/**"
   workflow_dispatch:
 
 jobs:
