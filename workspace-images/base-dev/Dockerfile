@@ -98,6 +98,9 @@ RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && chown coder:coder /home/coder/.ssh/known_hosts \
  && chmod 644 /home/coder/.ssh/known_hosts
 
+# Pre-create LazyVim staging dir (coder can't write to /opt/ directly)
+RUN mkdir -p /opt/lazyvim-starter && chown coder:coder /opt/lazyvim-starter
+
 USER coder
 RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
  && gh config set git_protocol https || true
@@ -107,10 +110,9 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
 RUN git clone --depth 1 https://github.com/LazyVim/starter /home/coder/.config/nvim \
  && rm -rf /home/coder/.config/nvim/.git \
  && nvim --headless "+Lazy! sync" +qa \
- && mkdir -p /opt/lazyvim-starter \
  && cp -r /home/coder/.config/nvim       /opt/lazyvim-starter/config \
  && cp -r /home/coder/.local/share/nvim  /opt/lazyvim-starter/data \
- && cp -r /home/coder/.local/state/nvim  /opt/lazyvim-starter/state 2>/dev/null; true \
+ && (cp -r /home/coder/.local/state/nvim /opt/lazyvim-starter/state 2>/dev/null || true) \
  && rm -rf /home/coder/.config/nvim /home/coder/.local/share/nvim \
            /home/coder/.local/state/nvim /home/coder/.cache/nvim
 
