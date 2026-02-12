@@ -50,6 +50,14 @@ data "google_secret_manager_secret_version" "docker_config" {
   secret = "DOCKER_CONFIG"
 }
 
+data "google_secret_manager_secret_version" "signoz_url" {
+  secret = "SIGNOZ_URL"
+}
+
+data "google_secret_manager_secret_version" "signoz_api_key" {
+  secret = "SIGNOZ_API_KEY"
+}
+
 data "coder_external_auth" "github" {
    id = "github-auth"
 }
@@ -369,6 +377,8 @@ resource "docker_container" "workspace" {
       "GH_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
+      "SIGNOZ_URL=${data.google_secret_manager_secret_version.signoz_url.secret_data}",
+      "SIGNOZ_API_KEY=${data.google_secret_manager_secret_version.signoz_api_key.secret_data}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
@@ -517,6 +527,10 @@ module "code-server" {
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
+  machine_settings = {
+    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
+  }
+
   extensions = [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
@@ -561,6 +575,10 @@ module "vscode-web" {
     "todo-tree.tree.showCountsInTree"            = "true",
     "todo-tree.tree.scanMode"                    = "current file",
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
+  }
+
+  machine_settings = {
+    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
 
   extensions = [

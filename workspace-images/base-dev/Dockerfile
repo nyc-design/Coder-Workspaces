@@ -51,8 +51,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && npm install -g pnpm \
  && rm -rf /var/lib/apt/lists/*
 
-# AI coding CLIs + architecture tooling
-RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 \
+# AI coding CLIs + architecture tooling + skills ecosystem
+RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills \
  && chmod -R a+w /usr/lib/node_modules/likec4/
 
 # just (command runner) + just-lsp (language server for VS Code)
@@ -67,6 +67,14 @@ RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/lat
  && tar xf just-lsp.tar.gz ./just-lsp \
  && install just-lsp -D -t /usr/local/bin/ \
  && rm just-lsp just-lsp.tar.gz
+
+# signoz-mcp-server (observability MCP for traces, logs, metrics)
+RUN SIGNOZ_VERSION=$(curl -s "https://api.github.com/repos/SigNoz/signoz-mcp-server/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
+ && ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="amd64" || ARCH="arm64" \
+ && curl -Lo signoz-mcp.tar.gz "https://github.com/SigNoz/signoz-mcp-server/releases/download/v${SIGNOZ_VERSION}/signoz-mcp-server_linux_${ARCH}.tar.gz" \
+ && tar xf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" \
+ && install "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" -D -t /usr/local/bin/ \
+ && rm -rf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}"
 
 # lazygit (terminal UI for git) — apt only has it for Ubuntu 25.10+, use binary release
 RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \

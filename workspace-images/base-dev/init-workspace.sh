@@ -416,6 +416,25 @@ likec4-dev() {
   likec4 dev --listen 0.0.0.0 --port "$port"
 }
 # --- End LikeC4 Dev Helper ---
+
+# --- Skills Helper ---
+# Shortcut to install skills globally (available across all projects)
+skill-add() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: skill-add <repo> [--skill <name>] [--agent <agent>]"
+    echo "Installs a skill globally for all projects."
+    echo ""
+    echo "Examples:"
+    echo "  skill-add vercel-labs/agent-skills --skill frontend-design"
+    echo "  skill-add vercel-labs/agent-skills -a claude-code -a codex"
+    echo ""
+    echo "Use 'skills list' to see installed skills."
+    echo "Use 'skills search <query>' to find skills."
+    return 0
+  fi
+  skills add -g "$@"
+}
+# --- End Skills Helper ---
 EOF
 
 # Hand off to CMD (e.g., coder agent)

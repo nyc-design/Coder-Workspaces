@@ -55,6 +55,14 @@ data "google_secret_manager_secret_version" "docker_config" {
   secret = "DOCKER_CONFIG"
 }
 
+data "google_secret_manager_secret_version" "signoz_url" {
+  secret = "SIGNOZ_URL"
+}
+
+data "google_secret_manager_secret_version" "signoz_api_key" {
+  secret = "SIGNOZ_API_KEY"
+}
+
 data "coder_external_auth" "github" {
    id = "github-auth"
 }
@@ -294,6 +302,8 @@ locals {
 
   ai_api_key = data.coder_parameter.ai_api_key.value
   context7_api_key = data.google_secret_manager_secret_version.context7_api_key.secret_data
+  signoz_url = data.google_secret_manager_secret_version.signoz_url.secret_data
+  signoz_api_key = data.google_secret_manager_secret_version.signoz_api_key.secret_data
   
   # Project name logic
   project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
@@ -350,11 +360,33 @@ locals {
     type = "stdio"
   EOT
 
+  stitch_mcp_toml = <<-EOT
+    [mcp_servers.stitch]
+    command = "npx"
+    args = ["@_davideast/stitch-mcp", "proxy"]
+    type = "stdio"
+    [mcp_servers.stitch.env]
+    STITCH_USE_SYSTEM_GCLOUD = "1"
+  EOT
+
+  signoz_mcp_toml = <<-EOT
+    [mcp_servers.signoz]
+    command = "signoz-mcp-server"
+    args = []
+    type = "stdio"
+    [mcp_servers.signoz.env]
+    SIGNOZ_URL = "${local.signoz_url}"
+    SIGNOZ_API_KEY = "${local.signoz_api_key}"
+    LOG_LEVEL = "info"
+  EOT
+
   additional_mcp_toml = trimspace(join("\n", compact([
     local.playwright_mcp_toml,
     local.context7_mcp_toml,
     local.grep_mcp_toml,
     local.likec4_mcp_toml,
+    local.stitch_mcp_toml,
+    local.signoz_mcp_toml,
   ])))
 
   playwright_mcp_extensions_map = {
@@ -397,11 +429,43 @@ locals {
     }
   }
 
+  stitch_mcp_extensions_map = {
+    stitch = {
+      command     = "npx"
+      args        = ["@_davideast/stitch-mcp", "proxy"]
+      type        = "stdio"
+      env         = { STITCH_USE_SYSTEM_GCLOUD = "1" }
+      description = "Google Stitch AI design tools"
+      enabled     = true
+      name        = "Stitch"
+      timeout     = 3000
+    }
+  }
+
+  signoz_mcp_extensions_map = {
+    signoz = {
+      command     = "signoz-mcp-server"
+      args        = []
+      type        = "stdio"
+      env         = {
+        SIGNOZ_URL     = local.signoz_url
+        SIGNOZ_API_KEY = local.signoz_api_key
+        LOG_LEVEL      = "info"
+      }
+      description = "SigNoz observability (traces, logs, metrics)"
+      enabled     = true
+      name        = "SigNoz"
+      timeout     = 3000
+    }
+  }
+
   additional_extensions_json = jsonencode(merge(
     local.playwright_mcp_extensions_map,
     local.context7_mcp_extensions_map,
     local.grep_mcp_extensions_map,
     local.likec4_mcp_extensions_map,
+    local.stitch_mcp_extensions_map,
+    local.signoz_mcp_extensions_map,
   ))
 
   playwright_mcp_claude_map = {
@@ -437,12 +501,36 @@ locals {
     }
   }
 
+  stitch_mcp_claude_map = {
+    stitch = {
+      command = "npx"
+      args    = ["-y", "@_davideast/stitch-mcp", "proxy"]
+      type    = "stdio"
+      env     = { STITCH_USE_SYSTEM_GCLOUD = "1" }
+    }
+  }
+
+  signoz_mcp_claude_map = {
+    signoz = {
+      command = "signoz-mcp-server"
+      args    = []
+      type    = "stdio"
+      env     = {
+        SIGNOZ_URL     = local.signoz_url
+        SIGNOZ_API_KEY = local.signoz_api_key
+        LOG_LEVEL      = "info"
+      }
+    }
+  }
+
   mcp_claude = jsonencode({
     mcpServers = merge(
       local.playwright_mcp_claude_map,
       local.context7_mcp_claude_map,
       local.grep_mcp_claude_map,
       local.likec4_mcp_claude_map,
+      local.stitch_mcp_claude_map,
+      local.signoz_mcp_claude_map,
     )
   })
 
@@ -721,6 +809,8 @@ resource "docker_container" "workspace" {
       "GITHUB_TOKEN=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "GITHUB_PAT=${data.google_secret_manager_secret_version.github_pat.secret_data}",
       "PLAYWRIGHT_MCP_BROWSER=chromium",
+      "SIGNOZ_URL=${local.signoz_url}",
+      "SIGNOZ_API_KEY=${local.signoz_api_key}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
@@ -878,6 +968,10 @@ module "code-server" {
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
   }
 
+  machine_settings = {
+    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
+  }
+
   extensions = [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
@@ -922,6 +1016,10 @@ module "vscode-web" {
     "todo-tree.tree.showCountsInTree"            = "true",
     "todo-tree.tree.scanMode"                    = "current file",
     "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
+  }
+
+  machine_settings = {
+    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
 
   extensions = [
