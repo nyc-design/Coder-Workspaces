@@ -30,3 +30,8 @@ data "google_secret_manager_secret_version" "context7_api_key" {
   count  = var.include_context7 ? 1 : 0
   secret = "CONTEXT7_API_KEY"
 }
+
+data "google_secret_manager_secret_version" "hapi_cli_api_token" {
+  count  = var.include_hapi ? 1 : 0
+  secret = "HAPI_CLI_API_TOKEN"
+}

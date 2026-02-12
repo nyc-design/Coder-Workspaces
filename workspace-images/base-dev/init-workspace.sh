@@ -275,6 +275,14 @@ else
   log "no GCP project specified; skipping secrets setup"
 fi
 
+# --- HAPI Runner ---
+if [[ -n "${HAPI_HUB_URL:-}" && -n "${HAPI_CLI_API_TOKEN:-}" ]]; then
+  log "configuring HAPI runner"
+  hapi auth login --token "$HAPI_CLI_API_TOKEN" --hub-url "$HAPI_HUB_URL" 2>/dev/null || true
+  nohup hapi runner start > /tmp/hapi-runner.log 2>&1 &
+  log "HAPI runner started (hub: $HAPI_HUB_URL)"
+fi
+
 # --- LazyVim setup (first start only) ---
 if [ ! -d "$HOME/.config/nvim" ] && [ -d /opt/lazyvim-starter/config ]; then
   log "copying LazyVim starter config from image"

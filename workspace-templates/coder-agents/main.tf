@@ -42,6 +42,7 @@ data "coder_external_auth" "github" {
 module "workspace_secrets" {
   source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
   include_context7 = true
+  include_hapi     = true
 }
 
 module "workspace_startup" {
@@ -226,6 +227,7 @@ locals {
   context7_api_key = module.workspace_secrets.context7_api_key
   signoz_url = module.workspace_secrets.signoz_url
   signoz_api_key = module.workspace_secrets.signoz_api_key
+  hapi_cli_api_token = module.workspace_secrets.hapi_cli_api_token
   
   # Project name logic
   project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
@@ -336,6 +338,8 @@ module "workspace_runtime" {
     [
       "SIGNOZ_URL=${local.signoz_url}",
       "SIGNOZ_API_KEY=${local.signoz_api_key}",
+      "HAPI_HUB_URL=http://host.docker.internal:3006",
+      "HAPI_CLI_API_TOKEN=${local.hapi_cli_api_token}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
@@ -365,4 +369,14 @@ module "workspace_apps" {
   agent_id     = coder_agent.main.id
   project_name = local.project_name
   enable_apps  = true
+}
+
+resource "coder_app" "hapi" {
+  agent_id     = coder_agent.main.id
+  slug         = "hapi"
+  display_name = "HAPI"
+  icon         = "/icon/terminal.svg"
+  url          = "https://hapi.tapiavala.com"
+  external     = true
+  order        = 10
 }

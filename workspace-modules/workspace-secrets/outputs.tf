@@ -26,3 +26,8 @@ output "context7_api_key" {
   value     = var.include_context7 ? data.google_secret_manager_secret_version.context7_api_key[0].secret_data : ""
   sensitive = true
 }
+
+output "hapi_cli_api_token" {
+  value     = var.include_hapi ? data.google_secret_manager_secret_version.hapi_cli_api_token[0].secret_data : ""
+  sensitive = true
+}

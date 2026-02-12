@@ -3,3 +3,9 @@ variable "include_context7" {
   type        = bool
   default     = false
 }
+
+variable "include_hapi" {
+  description = "Whether to fetch HAPI_CLI_API_TOKEN"
+  type        = bool
+  default     = false
+}
