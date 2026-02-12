@@ -499,9 +499,15 @@ module "code-server" {
   order    = 1
 
   settings = {
-    "workbench.colorTheme"      = "Default Dark Modern",
-    "git.useIntegratedAskPass"  = "false",
-    "likec4.mcp.enabled"        = "true"
+    "workbench.colorTheme"                       = "Default Dark Modern",
+    "git.useIntegratedAskPass"                   = "false",
+    "likec4.mcp.enabled"                         = "true",
+    "vscode-neovim.neovimExecutablePaths.linux"  = "/usr/local/bin/nvim",
+    "extensions.experimental.affinity"           = jsonencode({ "asvetliakov.vscode-neovim" = 1 }),
+    "todo-tree.tree.showBadges"                  = "true",
+    "todo-tree.tree.disableCompactFolders"       = "false",
+    "todo-tree.tree.showCountsInTree"            = "true",
+    "todo-tree.tree.scanMode"                    = "current file"
   }
 
   extensions = [
@@ -523,7 +529,7 @@ module "code-server" {
     "usernamehw.errorlens",
     "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
-    "rangav.vscode-thunder-client",
+    "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor"
   ]
 }
@@ -538,9 +544,15 @@ module "vscode-web" {
   accept_license = true
 
   settings = {
-    "workbench.colorTheme"      = "Default Dark Modern",
-    "git.useIntegratedAskPass"  = "false",
-    "likec4.mcp.enabled"        = "true"
+    "workbench.colorTheme"                       = "Default Dark Modern",
+    "git.useIntegratedAskPass"                   = "false",
+    "likec4.mcp.enabled"                         = "true",
+    "vscode-neovim.neovimExecutablePaths.linux"  = "/usr/local/bin/nvim",
+    "extensions.experimental.affinity"           = jsonencode({ "asvetliakov.vscode-neovim" = 1 }),
+    "todo-tree.tree.showBadges"                  = "true",
+    "todo-tree.tree.disableCompactFolders"       = "false",
+    "todo-tree.tree.showCountsInTree"            = "true",
+    "todo-tree.tree.scanMode"                    = "current file"
   }
 
   extensions = [
@@ -562,7 +574,7 @@ module "vscode-web" {
     "usernamehw.errorlens",
     "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
-    "rangav.vscode-thunder-client",
+    "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor"
   ]
 }
@@ -571,7 +583,7 @@ resource "coder_app" "neovim" {
   agent_id     = coder_agent.main.id
   slug         = "neovim"
   display_name = "Neovim"
-  icon         = "${data.coder_workspace.me.access_url}/icon/vim.svg"
+  icon         = "/icon/terminal.svg"
   command      = "nvim"
   order        = 3
 }

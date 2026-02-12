@@ -265,6 +265,14 @@ else
   log "no GCP project specified; skipping secrets setup"
 fi
 
+# --- LazyVim setup (first start only) ---
+if [ ! -d "$HOME/.config/nvim" ]; then
+  log "setting up LazyVim for neovim"
+  git clone https://github.com/LazyVim/starter "$HOME/.config/nvim" 2>/dev/null || true
+  # Remove .git so user can make it their own
+  rm -rf "$HOME/.config/nvim/.git"
+fi
+
 # --- Git Helper Function ---
 log "adding gitquick helper function"
 

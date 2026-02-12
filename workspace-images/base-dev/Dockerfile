@@ -7,8 +7,15 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
-    tree neovim \
+    tree ripgrep fd-find \
  && rm -rf /var/lib/apt/lists/*
+
+# Neovim (0.10+ from GitHub — apt only has 0.9.x on Ubuntu 24.04)
+RUN ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="x86_64" || ARCH="arm64" \
+ && curl -Lo nvim.tar.gz "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${ARCH}.tar.gz" \
+ && tar xf nvim.tar.gz \
+ && cp -r nvim-linux-${ARCH}/* /usr/local/ \
+ && rm -rf nvim.tar.gz nvim-linux-${ARCH}
 
 # Google Cloud CLI (modern method + single RUN per Google’s Docker tip)
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
