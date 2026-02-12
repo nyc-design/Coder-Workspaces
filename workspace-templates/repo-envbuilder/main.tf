@@ -42,28 +42,101 @@ module "workspace_secrets" {
   source = "../../workspace-modules/workspace-secrets"
 }
 
-module "workspace_common_params" {
-  source = "../../workspace-modules/workspace-common-params"
-}
-
-
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+}
+
+data "coder_parameter" "is_existing_project" {
+  name         = "is_existing_project"
+  display_name = "Project Type"
+  type         = "string"
+  default      = "existing"
+  description  = "Use an existing GitHub repository or create a new project?"
+  order        = 0
+
+  option {
+    name  = "Existing Repository"
+    value = "existing"
+  }
+  option {
+    name  = "New Project"
+    value = "new"
+  }
+}
+
+data "coder_parameter" "repo_name" {
+  count        = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "repo_name"
+  display_name = "GitHub Repository"
+  description  = "Enter just the repo name (e.g., shadowscout, stellarscout, etc)."
+  type         = "string"
+  form_type    = "input"
+  order        = 1
+}
+
+data "coder_parameter" "gcp_project_name" {
+  count        = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "gcp_project_name"
+  display_name = "GCP Project (Optional)"
+  default      = ""
+  description  = "Enter a GCP Project to automatically configure secrets and credentials"
+  type         = "string"
+  form_type    = "input"
+  order        = 2
+}
+
+data "coder_parameter" "new_project_type" {
+  count        = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "new_project_type"
+  display_name = "New Project Type"
+  type         = "string"
+  default      = "base"
+  order        = 1
+
+  option {
+    name  = "Base Project"
+    value = "base"
+  }
+  option {
+    name  = "Python Project"
+    value = "python"
+  }
+  option {
+    name  = "Next.js Project"
+    value = "nextjs"
+  }
+  option {
+    name  = "C++ Project"
+    value = "cpp"
+  }
+  option {
+    name  = "Fullstack Project"
+    value = "fullstack"
+  }
+}
+
+data "coder_parameter" "new_project_name" {
+  count        = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "project_name"
+  display_name = "Project Name"
+  type         = "string"
+  default      = "my-new-project"
+  order        = 2
 }
 
 # Step 1: Existing vs New Project
 locals {
   # Determine if this is a new project
-  is_new_project = module.workspace_common_params.is_new_project
+  is_new_project = data.coder_parameter.is_existing_project.value == "new"
   
   # Project name logic
-  project_name = local.is_new_project ? module.workspace_common_params.new_project_name : module.workspace_common_params.repo_name
+  project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
   
   # Project type for workspace image selection
-  project_type = local.is_new_project ? module.workspace_common_params.new_project_type : "base"
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
   
   # GCP project (optional)
-  gcp_project = local.is_new_project == false && module.workspace_common_params.gcp_project_name != "" ? module.workspace_common_params.gcp_project_name : ""
+  gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
   
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
@@ -75,7 +148,7 @@ locals {
 locals {
   new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
 
-  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${module.workspace_common_params.repo_name}.git"
+  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
    
   repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
 
@@ -110,7 +183,7 @@ resource "coder_agent" "main" {
   }
 
   dynamic "metadata" {
-    for_each = module.workspace_common_params.agent_metadata_items
+    for_each = data.coder_workspace.me.start_count > 0 ? module.workspace_apps[0].agent_metadata_items : []
     content {
       display_name = metadata.value.display_name
       key          = metadata.value.key

@@ -44,11 +44,6 @@ module "workspace_secrets" {
   include_context7 = true
 }
 
-module "workspace_common_params" {
-  source = "../../workspace-modules/workspace-common-params"
-}
-
-
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 
@@ -66,45 +61,34 @@ locals{
   
 }
 
-data "coder_workspace_preset" "issue_automation_claude" {
-  name        = "Issue Automation - Claude"
-  description = "Preset for GitHub Issues automation."
-  icon        = "/icon/claude.svg"
-  parameters = {
-    is_existing_project = "existing"
-    ai_api_key     = ""
-    system_prompt  = local.main_system_prompt
-    repo_name      = "Coder-Workspaces"
-    gcp_project_name = ""
-    coding_agent = "claude"
+data "coder_workspace_preset" "issue_automation" {
+  for_each = {
+    claude = {
+      name        = "Issue Automation - Claude"
+      icon        = "/icon/claude.svg"
+      coding_agent = "claude"
+    }
+    gemini = {
+      name        = "Issue Automation - Gemini"
+      icon        = "/icon/gemini.svg"
+      coding_agent = "gemini"
+    }
+    codex = {
+      name        = "Issue Automation - Codex"
+      icon        = "/icon/openai.svg"
+      coding_agent = "codex"
+    }
   }
-}
-
-data "coder_workspace_preset" "issue_automation_gemini" {
-  name        = "Issue Automation - Gemini"
+  name        = each.value.name
   description = "Preset for GitHub Issues automation."
-  icon        = "/icon/gemini.svg"
+  icon        = each.value.icon
   parameters = {
     is_existing_project = "existing"
-    ai_api_key     = ""
-    system_prompt  = local.main_system_prompt
-    repo_name      = "Coder-Workspaces"
-    gcp_project_name = ""
-    coding_agent = "gemini"
-  }
-}
-
-data "coder_workspace_preset" "issue_automation_codex" {
-  name        = "Issue Automation - Codex"
-  description = "Preset for GitHub Issues automation."
-  icon        = "/icon/openai.svg"
-  parameters = {
-    is_existing_project = "existing"
-    ai_api_key     = ""
-    system_prompt  = local.main_system_prompt
-    repo_name      = "Coder-Workspaces"
-    gcp_project_name = ""
-    coding_agent = "codex"
+    ai_api_key          = ""
+    system_prompt       = local.main_system_prompt
+    repo_name           = "Coder-Workspaces"
+    gcp_project_name    = ""
+    coding_agent        = each.value.coding_agent
   }
 }
 
@@ -150,9 +134,87 @@ data "coder_parameter" "ai_api_key" {
   description  = "If set, selected AI agent will use this API key. If left blank, agent will use workspace's added authorization."
 }
 
+data "coder_parameter" "is_existing_project" {
+  name         = "is_existing_project"
+  display_name = "Project Type"
+  type         = "string"
+  default      = "existing"
+  description  = "Use an existing GitHub repository or create a new project?"
+  order        = 0
+
+  option {
+    name  = "Existing Repository"
+    value = "existing"
+  }
+  option {
+    name  = "New Project"
+    value = "new"
+  }
+}
+
+data "coder_parameter" "repo_name" {
+  count        = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "repo_name"
+  display_name = "GitHub Repository"
+  description  = "Enter just the repo name (e.g., shadowscout, stellarscout, etc)."
+  type         = "string"
+  form_type    = "input"
+  order        = 1
+}
+
+data "coder_parameter" "gcp_project_name" {
+  count        = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
+  name         = "gcp_project_name"
+  display_name = "GCP Project (Optional)"
+  default      = ""
+  description  = "Enter a GCP Project to automatically configure secrets and credentials"
+  type         = "string"
+  form_type    = "input"
+  order        = 2
+}
+
+data "coder_parameter" "new_project_type" {
+  count        = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "new_project_type"
+  display_name = "New Project Type"
+  type         = "string"
+  default      = "base"
+  order        = 1
+
+  option {
+    name  = "Base Project"
+    value = "base"
+  }
+  option {
+    name  = "Python Project"
+    value = "python"
+  }
+  option {
+    name  = "Next.js Project"
+    value = "nextjs"
+  }
+  option {
+    name  = "C++ Project"
+    value = "cpp"
+  }
+  option {
+    name  = "Fullstack Project"
+    value = "fullstack"
+  }
+}
+
+data "coder_parameter" "new_project_name" {
+  count        = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
+  name         = "project_name"
+  display_name = "Project Name"
+  type         = "string"
+  default      = "my-new-project"
+  order        = 2
+}
+
 locals {
   # Determine if this is a new project
-  is_new_project = module.workspace_common_params.is_new_project
+  is_new_project = data.coder_parameter.is_existing_project.value == "new"
 
   coding_agent = data.coder_parameter.coding_agent.value
 
@@ -162,13 +224,13 @@ locals {
   signoz_api_key = module.workspace_secrets.signoz_api_key
   
   # Project name logic
-  project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? module.workspace_common_params.new_project_name : module.workspace_common_params.repo_name)
+  project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
   
   # Project type for workspace image selection
-  project_type = local.is_new_project ? module.workspace_common_params.new_project_type : "base"
+  project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
   
   # GCP project (optional)
-  gcp_project = local.is_new_project == false && module.workspace_common_params.gcp_project_name != "" ? module.workspace_common_params.gcp_project_name : ""
+  gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
   
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
@@ -180,7 +242,7 @@ locals {
 locals {
   new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
 
-  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${module.workspace_common_params.repo_name}.git"
+  existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
 
   task_repo_url = local.gh_repo != "" ? "https://github.com/${local.gh_repo}.git" : ""
 
@@ -229,7 +291,7 @@ resource "coder_agent" "main" {
   }
 
   dynamic "metadata" {
-    for_each = module.workspace_common_params.agent_metadata_items
+    for_each = data.coder_workspace.me.start_count > 0 ? module.workspace_apps[0].agent_metadata_items : []
     content {
       display_name = metadata.value.display_name
       key          = metadata.value.key

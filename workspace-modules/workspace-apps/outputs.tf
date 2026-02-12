@@ -1,27 +1,3 @@
-output "is_existing_project" {
-  value = data.coder_parameter.is_existing_project.value
-}
-
-output "is_new_project" {
-  value = data.coder_parameter.is_existing_project.value == "new"
-}
-
-output "repo_name" {
-  value = try(data.coder_parameter.repo_name[0].value, "")
-}
-
-output "gcp_project_name" {
-  value = try(data.coder_parameter.gcp_project_name[0].value, "")
-}
-
-output "new_project_type" {
-  value = try(data.coder_parameter.new_project_type[0].value, "base")
-}
-
-output "new_project_name" {
-  value = try(data.coder_parameter.new_project_name[0].value, "my-new-project")
-}
-
 output "agent_metadata_items" {
   value = [
     {
