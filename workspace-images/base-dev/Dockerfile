@@ -55,9 +55,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 \
  && chmod -R a+w /usr/lib/node_modules/likec4/
 
-# just (command runner) — available via apt on Ubuntu 24.04+
-RUN apt-get update -y && apt-get install -y --no-install-recommends just \
- && rm -rf /var/lib/apt/lists/*
+# just (command runner) + just-lsp (language server for VS Code)
+RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/latest" | grep -Po '"tag_name": "\K[^"]*') \
+ && ARCH=$(uname -m) \
+ && curl -Lo just.tar.gz "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-${ARCH}-unknown-linux-musl.tar.gz" \
+ && tar xf just.tar.gz just \
+ && install just -D -t /usr/local/bin/ \
+ && rm just just.tar.gz \
+ && JUSTLSP_VERSION=$(curl -s "https://api.github.com/repos/terror/just-lsp/releases/latest" | grep -Po '"tag_name": "\K[^"]*') \
+ && curl -Lo just-lsp.tar.gz "https://github.com/terror/just-lsp/releases/download/${JUSTLSP_VERSION}/just-lsp-${JUSTLSP_VERSION}-${ARCH}-unknown-linux-musl.tar.gz" \
+ && tar xf just-lsp.tar.gz ./just-lsp \
+ && install just-lsp -D -t /usr/local/bin/ \
+ && rm just-lsp just-lsp.tar.gz
 
 # lazygit (terminal UI for git) — apt only has it for Ubuntu 25.10+, use binary release
 RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
