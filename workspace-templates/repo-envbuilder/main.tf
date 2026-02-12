@@ -456,6 +456,12 @@ resource "docker_container" "workspace" {
   }
 
   volumes {
+    container_path = "/home/coder/.agents"
+    host_path      = "/home/ubuntu/secrets/.agents"
+    read_only      = false
+  }
+  
+  volumes {
     container_path = "/home/coder/.cache/google-vscode-extension"
     host_path      = "/home/ubuntu/secrets/google-vscode-extension"
     read_only      = false

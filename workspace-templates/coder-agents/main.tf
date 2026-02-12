@@ -889,6 +889,12 @@ resource "docker_container" "workspace" {
     host_path      = "/home/ubuntu/secrets/.claude/skills"
     read_only      = false
   }
+
+  volumes {
+    container_path = "/home/coder/.agents"
+    host_path      = "/home/ubuntu/secrets/.agents"
+    read_only      = false
+  }
   
   volumes {
     container_path = "/home/coder/.supermaven"
