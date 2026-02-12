@@ -105,16 +105,17 @@ USER coder
 RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
  && gh config set git_protocol https || true
 
-# LazyVim — clone starter, install all plugins headlessly, stage for init-time copy
+# LazyVim — clone starter config, enable VSCode extra, stage for init-time copy
 # (volume mount hides /home/coder build layer, so we stage under /opt/)
-RUN git clone --depth 1 https://github.com/LazyVim/starter /home/coder/.config/nvim \
- && rm -rf /home/coder/.config/nvim/.git \
- && nvim --headless "+Lazy! sync" +qa \
- && cp -r /home/coder/.config/nvim       /opt/lazyvim-starter/config \
- && cp -r /home/coder/.local/share/nvim  /opt/lazyvim-starter/data \
- && (cp -r /home/coder/.local/state/nvim /opt/lazyvim-starter/state 2>/dev/null || true) \
- && rm -rf /home/coder/.config/nvim /home/coder/.local/share/nvim \
-           /home/coder/.local/state/nvim /home/coder/.cache/nvim
+# Plugins install on first launch to avoid stale lockfile / version mismatches.
+RUN git clone --depth 1 https://github.com/LazyVim/starter /opt/lazyvim-starter/config \
+ && rm -rf /opt/lazyvim-starter/config/.git \
+ && rm -f /opt/lazyvim-starter/config/lazy-lock.json \
+ && python3 -c "import json,sys; \
+    p='/opt/lazyvim-starter/config/lazyvim.json'; \
+    d=json.load(open(p)); \
+    d['extras']=['lazyvim.plugins.extras.vscode']; \
+    json.dump(d,open(p,'w'),indent=2)"
 
 USER root
 COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh

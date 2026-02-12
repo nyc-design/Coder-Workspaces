@@ -276,12 +276,12 @@ else
 fi
 
 # --- LazyVim setup (first start only) ---
-if [ ! -d "$HOME/.config/nvim" ] && [ -d /opt/lazyvim-starter ]; then
-  log "copying pre-installed LazyVim from image"
-  mkdir -p "$HOME/.config" "$HOME/.local/share" "$HOME/.local/state"
+if [ ! -d "$HOME/.config/nvim" ] && [ -d /opt/lazyvim-starter/config ]; then
+  log "copying LazyVim starter config from image"
+  mkdir -p "$HOME/.config"
   cp -r /opt/lazyvim-starter/config "$HOME/.config/nvim"
-  cp -r /opt/lazyvim-starter/data   "$HOME/.local/share/nvim"
-  [ -d /opt/lazyvim-starter/state ] && cp -r /opt/lazyvim-starter/state "$HOME/.local/state/nvim"
+  log "installing LazyVim plugins in background"
+  nvim --headless "+Lazy! sync" +qa > /tmp/lazyvim-sync.log 2>&1 &
 fi
 
 # --- Git Helper Function ---
