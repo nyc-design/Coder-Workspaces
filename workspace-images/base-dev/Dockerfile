@@ -7,7 +7,7 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
-    tree \
+    tree neovim \
  && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud CLI (modern method + single RUN per Google’s Docker tip)
@@ -44,13 +44,30 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && npm install -g pnpm \
  && rm -rf /var/lib/apt/lists/*
 
-# Claude Code (native installer)
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
 # AI coding CLIs + architecture tooling
-RUN npm install -g @openai/codex @google/gemini-cli likec4
+RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4
 
-# Minimal user config
+# just (command runner) — available via apt on Ubuntu 24.04+
+RUN apt-get update -y && apt-get install -y --no-install-recommends just \
+ && rm -rf /var/lib/apt/lists/*
+
+# lazygit (terminal UI for git) — apt only has it for Ubuntu 25.10+, use binary release
+RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
+ && ARCH=$(uname -m) && [ "$ARCH" = "aarch64" ] && ARCH="arm64" || true \
+ && curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_linux_${ARCH}.tar.gz" \
+ && tar xf lazygit.tar.gz lazygit \
+ && install lazygit -D -t /usr/local/bin/ \
+ && rm lazygit lazygit.tar.gz
+
+# lazydocker (terminal UI for docker) — same binary release pattern
+RUN LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
+ && ARCH=$(uname -m) && [ "$ARCH" = "aarch64" ] && ARCH="arm64" || true \
+ && curl -Lo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/download/v${LAZYDOCKER_VERSION}/lazydocker_${LAZYDOCKER_VERSION}_Linux_${ARCH}.tar.gz" \
+ && tar xf lazydocker.tar.gz lazydocker \
+ && install lazydocker -D -t /usr/local/bin/ \
+ && rm lazydocker lazydocker.tar.gz
+
+# Minimal user onfig
 RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> /home/coder/.ssh/known_hosts \
  && chown coder:coder /home/coder/.ssh/known_hosts \

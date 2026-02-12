@@ -876,7 +876,16 @@ module "code-server" {
     "detachhead.basedpyright",
     "Supermaven.supermaven",
     "ms-azuretools.vscode-docker",
-    "likec4.likec4-vscode"
+    "likec4.likec4-vscode",
+    "nefrob.vscode-just",
+    "asvetliakov.vscode-neovim",
+    "bradlc.vscode-tailwindcss",
+    "Gruntfuggly.todo-tree",
+    "usernamehw.errorlens",
+    "hediet.vscode-drawio",
+    "joshbolduc.story-explorer",
+    "rangav.vscode-thunder-client",
+    "pomdtr.excalidraw-editor"
   ]
 }
 
@@ -906,6 +915,24 @@ module "vscode-web" {
     "ms-python.python",
     "ms-azuretools.vscode-docker",
     "Google.geminicodeassist",
-    "likec4.likec4-vscode"
+    "likec4.likec4-vscode",
+    "nefrob.vscode-just",
+    "asvetliakov.vscode-neovim",
+    "bradlc.vscode-tailwindcss",
+    "Gruntfuggly.todo-tree",
+    "usernamehw.errorlens",
+    "hediet.vscode-drawio",
+    "joshbolduc.story-explorer",
+    "rangav.vscode-thunder-client",
+    "pomdtr.excalidraw-editor"
   ]
+}
+
+resource "coder_app" "neovim" {
+  agent_id     = coder_agent.main.id
+  slug         = "neovim"
+  display_name = "Neovim"
+  icon         = "${data.coder_workspace.me.access_url}/icon/vim.svg"
+  command      = "nvim"
+  order        = 3
 }
