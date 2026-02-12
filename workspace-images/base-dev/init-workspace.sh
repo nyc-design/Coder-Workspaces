@@ -155,6 +155,16 @@ git config --global pull.rebase false || true
 # optional: keep history simple when fast-forward is possible
 git config --global pull.ff only || true
 
+# Global gitignore — keeps .vscode/ and other editor dirs out of repos
+log "configuring global gitignore"
+cat > /home/coder/.gitignore_global <<'EOF'
+.DS_Store
+.idea/
+*.pid
+*.pid.lock
+EOF
+git config --global core.excludesfile /home/coder/.gitignore_global
+
 # --- Default GCP project when none provided (no secrets) ---
 if command -v gcloud >/dev/null 2>&1; then
   if [[ -z "${CODER_GCP_PROJECT:-}" ]]; then
@@ -398,6 +408,14 @@ gcp-refresh-secrets() {
   echo "GCP secrets refreshed (current shell + future shells)."
 }
 # --- End GCP Secrets Refresh Helper ---
+
+# --- LikeC4 Dev Helper ---
+likec4-dev() {
+  local port="${1:-4010}"
+  echo "Starting LikeC4 dev server on port ${port}..."
+  likec4 dev --listen 0.0.0.0 --port "$port"
+}
+# --- End LikeC4 Dev Helper ---
 EOF
 
 # Hand off to CMD (e.g., coder agent)

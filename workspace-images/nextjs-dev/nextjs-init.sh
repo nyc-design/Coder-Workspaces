@@ -359,6 +359,7 @@ export NPM_CONFIG_FUND=false
 export PATH="$HOME/.npm-global/bin:$PATH"
 export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 export PLAYWRIGHT_MCP_CONFIG="$HOME/.playwright/cli.config.json"
+export PLAYWRIGHT_MCP_OUTPUT_DIR="$HOME/.playwright-cli"
 export MCP_SERVER_PLAYWRIGHT_PORT=3001
 export MCP_SERVER_PLAYWRIGHT_HOST=localhost
 # ---

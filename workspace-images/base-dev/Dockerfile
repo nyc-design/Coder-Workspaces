@@ -52,7 +52,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && rm -rf /var/lib/apt/lists/*
 
 # AI coding CLIs + architecture tooling
-RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4
+RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 \
+ && chmod -R a+w /usr/lib/node_modules/likec4/
 
 # just (command runner) — available via apt on Ubuntu 24.04+
 RUN apt-get update -y && apt-get install -y --no-install-recommends just \

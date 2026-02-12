@@ -52,6 +52,7 @@ ENV PATH=$PNPM_HOME:$PATH
 # Playwright browser path and CLI config
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/coder/.cache/ms-playwright
 ENV PLAYWRIGHT_MCP_CONFIG=/home/coder/.playwright/cli.config.json
+ENV PLAYWRIGHT_MCP_OUTPUT_DIR=/home/coder/.playwright-cli
 # MCP server configuration for Claude agents
 ENV MCP_SERVER_PLAYWRIGHT_PORT=3001
 ENV MCP_SERVER_PLAYWRIGHT_HOST=localhost
