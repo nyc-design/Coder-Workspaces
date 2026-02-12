@@ -530,7 +530,7 @@ module "code-server" {
     "todo-tree.tree.disableCompactFolders"       = "false",
     "todo-tree.tree.showCountsInTree"            = "true",
     "todo-tree.tree.scanMode"                    = "current file",
-    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
+    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/library.excalidrawlib"
   }
 
   machine-settings = {
@@ -580,7 +580,7 @@ module "vscode-web" {
     "todo-tree.tree.disableCompactFolders"       = "false",
     "todo-tree.tree.showCountsInTree"            = "true",
     "todo-tree.tree.scanMode"                    = "current file",
-    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/libraries/library.excalidrawlib"
+    "excalidraw.workspaceLibraryPath"            = "/home/coder/.excalidraw/library.excalidrawlib"
   }
 
   extensions = [
