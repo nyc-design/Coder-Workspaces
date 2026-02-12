@@ -615,3 +615,12 @@ resource "coder_app" "neovim" {
   command      = "nvim"
   order        = 3
 }
+
+module "filebrowser" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/filebrowser/coder"
+  version  = "1.0.23"
+  agent_id = coder_agent.main.id
+  folder   = "/workspaces/${local.project_name}"
+  order    = 4
+}

@@ -63,6 +63,10 @@ data "google_secret_manager_secret_version" "signoz_api_key" {
   secret = "SIGNOZ_API_KEY"
 }
 
+data "google_secret_manager_secret_version" "stitch_api_key" {
+  secret = "GOOGLE_STITCH_API_KEY"
+}
+
 data "coder_external_auth" "github" {
    id = "github-auth"
 }
@@ -304,6 +308,7 @@ locals {
   context7_api_key = data.google_secret_manager_secret_version.context7_api_key.secret_data
   signoz_url = data.google_secret_manager_secret_version.signoz_url.secret_data
   signoz_api_key = data.google_secret_manager_secret_version.signoz_api_key.secret_data
+  stitch_api_key = data.google_secret_manager_secret_version.stitch_api_key.secret_data
   
   # Project name logic
   project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
@@ -366,7 +371,7 @@ locals {
     args = ["@_davideast/stitch-mcp", "proxy"]
     type = "stdio"
     [mcp_servers.stitch.env]
-    STITCH_USE_SYSTEM_GCLOUD = "1"
+    STITCH_API_KEY = "${local.stitch_api_key}"
   EOT
 
   signoz_mcp_toml = <<-EOT
@@ -434,7 +439,7 @@ locals {
       command     = "npx"
       args        = ["@_davideast/stitch-mcp", "proxy"]
       type        = "stdio"
-      env         = { STITCH_USE_SYSTEM_GCLOUD = "1" }
+      env         = { STITCH_API_KEY = local.stitch_api_key }
       description = "Google Stitch AI design tools"
       enabled     = true
       name        = "Stitch"
@@ -506,7 +511,7 @@ locals {
       command = "npx"
       args    = ["-y", "@_davideast/stitch-mcp", "proxy"]
       type    = "stdio"
-      env     = { STITCH_USE_SYSTEM_GCLOUD = "1" }
+      env     = { STITCH_API_KEY = local.stitch_api_key }
     }
   }
 
@@ -1055,4 +1060,13 @@ resource "coder_app" "neovim" {
   icon         = "/icon/terminal.svg"
   command      = "nvim"
   order        = 3
+}
+
+module "filebrowser" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/filebrowser/coder"
+  version  = "1.0.23"
+  agent_id = coder_agent.main.id
+  folder   = "/workspaces/${local.project_name}"
+  order    = 4
 }
