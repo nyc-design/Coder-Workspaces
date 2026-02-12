@@ -437,5 +437,13 @@ skill-add() {
 # --- End Skills Helper ---
 EOF
 
+# --- Sync Excalidraw shared library from repo ---
+log "syncing excalidraw shared library"
+mkdir -p /home/coder/.excalidraw
+curl -fsSL "https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/excalidraw/library.excalidrawlib" \
+  -o /home/coder/.excalidraw/library.excalidrawlib \
+  && log "excalidraw library synced" \
+  || log "failed to sync excalidraw library (non-fatal)"
+
 # Hand off to CMD (e.g., coder agent)
 exit 0

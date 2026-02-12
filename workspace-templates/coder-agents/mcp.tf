@@ -6,7 +6,10 @@ locals {
   # ---------------------------------------------------------------------------
   # Pencil — design editor for .pen files (binary from VS Code extension)
   # ---------------------------------------------------------------------------
-  pencil_mcp_cmd = "exec $(ls /home/coder/.local/share/code-server/extensions/highagency.pencildev-*/out/mcp-server-linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x64/') 2>/dev/null | head -1) --app code-server"
+  # NOTE: Avoid single quotes in this command string. The Claude Code Terraform module
+  # applies shell escaping (replace("'", "'\''")) before base64 encoding, which
+  # corrupts JSON containing single quotes and causes jq parse errors.
+  pencil_mcp_cmd = "exec $(ls /home/coder/.local/share/code-server/extensions/highagency.pencildev-*/out/mcp-server-linux-$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/x64/) 2>/dev/null | head -1) --app code-server"
 
   pencil_mcp_toml = <<-EOT
     [mcp_servers.pencil]
