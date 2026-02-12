@@ -18,21 +18,71 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changed template folders
         id: detect
         run: |
+          set -euo pipefail
+
+          ALL_TEMPLATES="$(find workspace-templates -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)"
+
           # Get list of changed files in the last commit
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # For manual runs, update all templates
-            CHANGED_DIRS=$(find workspace-templates -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+            CHANGED_DIRS="$(echo "$ALL_TEMPLATES" | jq -R -s -c 'split("\n")[:-1]')"
           else
-            # Get changed files between HEAD and HEAD~1
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            # Get changed files for the entire push range (supports merge commits and multi-commit pushes)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
 
-            # Extract unique template directories from changed files
-            CHANGED_DIRS=$(echo "$CHANGED_FILES" | grep "^workspace-templates/" | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              CHANGED_FILES="$(git diff --name-only HEAD~1 HEAD)"
+            else
+              CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+            fi
+
+            TEMPLATE_CHANGES="$(
+              echo "$CHANGED_FILES" \
+              | awk -F'/' '/^workspace-templates\/[^/]+\// {print $2}' \
+              | sort -u
+            )"
+
+            CHANGED_MODULES="$(
+              echo "$CHANGED_FILES" \
+              | awk -F'/' '/^workspace-modules\/[^/]+\// {print $2}' \
+              | sort -u
+            )"
+
+            AFFECTED_BY_MODULES=""
+            if [ -n "$CHANGED_MODULES" ]; then
+              while IFS= read -r template; do
+                [ -z "$template" ] && continue
+                while IFS= read -r module; do
+                  [ -z "$module" ] && continue
+                  if rg -q "workspace-modules/${module}" "workspace-templates/${template}"; then
+                    AFFECTED_BY_MODULES="${AFFECTED_BY_MODULES}${template}"$'\n'
+                    break
+                  fi
+                done <<< "$CHANGED_MODULES"
+              done <<< "$ALL_TEMPLATES"
+            fi
+
+            CHANGED_DIRS="$(
+              printf "%s\n%s\n" "$TEMPLATE_CHANGES" "$AFFECTED_BY_MODULES" \
+              | sed '/^$/d' \
+              | sort -u \
+              | jq -R -s -c 'split("\n")[:-1]'
+            )"
+
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+            echo "Template changes:"
+            echo "$TEMPLATE_CHANGES"
+            echo "Changed modules:"
+            echo "$CHANGED_MODULES"
+            echo "Templates affected by module changes:"
+            echo "$AFFECTED_BY_MODULES"
           fi
 
           echo "changed_templates=$CHANGED_DIRS" >> $GITHUB_OUTPUT
