@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    coder = {
+      source = "coder/coder"
+    }
+  }
+}
+
 module "cursor" {
   count    = var.enable_apps ? 1 : 0
   source   = "registry.coder.com/coder/cursor/coder"

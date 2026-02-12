@@ -1,3 +1,19 @@
+terraform {
+  required_providers {
+    google = {
+      source = "hashicorp/google"
+    }
+  }
+}
+
+terraform {
+  required_providers {
+    google = {
+      source = "hashicorp/google"
+    }
+  }
+}
+
 data "google_projects" "gcp_projects" {
   filter = "lifecycleState:ACTIVE"
 }
