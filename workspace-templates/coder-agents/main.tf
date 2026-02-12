@@ -372,6 +372,7 @@ locals {
     type = "stdio"
     [mcp_servers.stitch.env]
     STITCH_API_KEY = "${local.stitch_api_key}"
+    STITCH_PROJECT_ID = "coder-nt"
   EOT
 
   signoz_mcp_toml = <<-EOT
@@ -439,7 +440,7 @@ locals {
       command     = "npx"
       args        = ["@_davideast/stitch-mcp", "proxy"]
       type        = "stdio"
-      env         = { STITCH_API_KEY = local.stitch_api_key }
+      env         = { STITCH_API_KEY = local.stitch_api_key, STITCH_PROJECT_ID = "coder-nt" }
       description = "Google Stitch AI design tools"
       enabled     = true
       name        = "Stitch"
@@ -511,7 +512,7 @@ locals {
       command = "npx"
       args    = ["-y", "@_davideast/stitch-mcp", "proxy"]
       type    = "stdio"
-      env     = { STITCH_API_KEY = local.stitch_api_key }
+      env     = { STITCH_API_KEY = local.stitch_api_key, STITCH_PROJECT_ID = "coder-nt" }
     }
   }
 
