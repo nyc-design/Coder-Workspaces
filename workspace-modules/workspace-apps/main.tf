@@ -1,4 +1,5 @@
 module "cursor" {
+  count    = var.enable_apps ? 1 : 0
   source   = "registry.coder.com/coder/cursor/coder"
   version  = "1.2.1"
   agent_id = var.agent_id
@@ -6,6 +7,7 @@ module "cursor" {
 }
 
 module "code-server" {
+  count  = var.enable_apps ? 1 : 0
   source = "registry.coder.com/coder/code-server/coder"
   folder = "/workspaces/${var.project_name}"
 
@@ -54,6 +56,7 @@ module "code-server" {
 }
 
 module "vscode-web" {
+  count  = var.enable_apps ? 1 : 0
   source = "registry.coder.com/coder/vscode-web/coder"
   folder = "/workspaces/${var.project_name}"
 
@@ -99,6 +102,7 @@ module "vscode-web" {
 }
 
 resource "coder_app" "neovim" {
+  count        = var.enable_apps ? 1 : 0
   agent_id     = var.agent_id
   slug         = "neovim"
   display_name = "Neovim"
@@ -108,6 +112,7 @@ resource "coder_app" "neovim" {
 }
 
 module "filebrowser" {
+  count         = var.enable_apps ? 1 : 0
   source        = "registry.coder.com/coder/filebrowser/coder"
   version       = "1.0.23"
   agent_id      = var.agent_id
