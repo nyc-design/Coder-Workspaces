@@ -288,9 +288,21 @@ data "coder_parameter" "system_prompt" {
 }
 
 resource "coder_agent" "main" {
-  arch           = data.coder_provisioner.me.arch
-  os             = "linux"
-  startup_script = local.startup_script
+  arch             = data.coder_provisioner.me.arch
+  os               = "linux"
+  startup_script   = local.startup_script
+  shutdown_script  = <<-EOT
+    #!/bin/bash
+    # Gracefully stop HAPI runner + sessions so they don't linger as
+    # orphans in the hub dashboard.
+    if command -v hapi &>/dev/null; then
+      echo "[shutdown] stopping HAPI runner..."
+      hapi runner stop 2>/dev/null || true
+      sleep 2
+      echo "[shutdown] cleaning up remaining HAPI processes..."
+      hapi doctor clean 2>/dev/null || true
+    fi
+  EOT
 
   dir = "/workspaces/${local.project_name}"
 
