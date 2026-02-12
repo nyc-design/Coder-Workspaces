@@ -111,7 +111,8 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
 RUN git clone --depth 1 https://github.com/LazyVim/starter /opt/lazyvim-starter/config \
  && rm -rf /opt/lazyvim-starter/config/.git \
  && rm -f /opt/lazyvim-starter/config/lazy-lock.json \
- && sed -i 's/"extras": \[.*\]/"extras": ["lazyvim.plugins.extras.vscode"]/' /opt/lazyvim-starter/config/lazyvim.json
+ && printf '{\n  "extras": ["lazyvim.plugins.extras.vscode"],\n  "version": 8\n}\n' \
+      > /opt/lazyvim-starter/config/lazyvim.json
 
 USER root
 COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh
