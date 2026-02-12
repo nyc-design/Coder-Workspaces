@@ -340,6 +340,8 @@ module "workspace_runtime" {
       "SIGNOZ_API_KEY=${local.signoz_api_key}",
       "HAPI_HUB_URL=http://host.docker.internal:3006",
       "HAPI_CLI_API_TOKEN=${local.hapi_cli_api_token}",
+      "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
+      "HAPI_AGENT=${local.coding_agent}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
