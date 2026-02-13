@@ -272,6 +272,13 @@ resource "coder_agent" "main" {
   startup_script = <<-EOT
     set -euo pipefail
 
+    if ! command -v docker >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y --no-install-recommends docker.io ca-certificates curl
+      rm -rf /var/lib/apt/lists/*
+    fi
+
     if [ ! -f ~/.init_done ]; then
       cp -rT /etc/skel ~
       touch ~/.init_done
@@ -354,7 +361,7 @@ resource "docker_volume" "workspaces_volume" {
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
+  image = "ubuntu:24.04"
   name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}-windows"
 
   command = ["sh", "-c", coder_agent.main.init_script]
