@@ -1,4 +1,4 @@
-# VM Gateway Container Template
+# vm-ssh-gateway Template
 
 This template runs **code-server in a Coder workspace container** and connects to your bare VM over SSH.
 
@@ -37,7 +37,7 @@ This is **not** External Workspace mode.
 
 ## Usage
 
-1. Import template from `workspace-templates/vm-gateway-container/main.tf`.
+1. Import template from `workspace-templates/vm-ssh-gateway/main.tf`.
 2. Create workspace:
    - choose preset **watchparty-vm** or **neil-dev**, or
    - use manual form for a new VM.
