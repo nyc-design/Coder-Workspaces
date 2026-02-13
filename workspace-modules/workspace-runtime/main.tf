@@ -27,7 +27,6 @@ locals {
     { container_path = "/home/coder/.supermaven", host_path = "/home/ubuntu/secrets/.supermaven", read_only = false },
     { container_path = "/home/coder/.local/share/code-server", host_path = "/home/ubuntu/secrets/code-server", read_only = false },
     { container_path = "/home/coder/.excalidraw", host_path = "/home/ubuntu/secrets/.excalidraw", read_only = false },
-    { container_path = "/home/coder/.hapi", host_path = "/home/ubuntu/secrets/.hapi", read_only = false },
   ]
 }
 
