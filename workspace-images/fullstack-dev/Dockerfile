@@ -40,7 +40,7 @@ RUN npm install -g \
     # Code quality
     husky lint-staged \
     # Playwright browser automation for Claude agents
-    @playwright/mcp @playwright/cli
+    playwright @playwright/mcp @playwright/cli
 
 # Create fullstack-specific init script
 COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/20-fullstack-init.sh

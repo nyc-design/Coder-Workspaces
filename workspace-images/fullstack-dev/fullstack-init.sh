@@ -756,6 +756,11 @@ install-playwright-browsers() {
 
 if command -v npx >/dev/null 2>&1; then
     install-playwright-browsers
+    # Also install the Playwright MCP-specific browser build.
+    # @playwright/mcp uses its own chromium build (mcp-chromium-*) separate
+    # from the standard chromium-* used by playwright-cli and @playwright/test.
+    log "Installing Playwright MCP browser build"
+    npx @playwright/mcp@latest install 2>/dev/null || true
 fi
 
 # Install Playwright CLI skills globally for Claude Code (token-efficient browser automation)

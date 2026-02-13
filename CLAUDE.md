@@ -45,6 +45,14 @@ scripts/                   # Utility scripts
 - Auto-executed by Coder agent on workspace startup
 - Handles: Docker daemon, authentication, shell configuration, GCP secrets
 
+### Pencil MCP (Design Editor)
+- `pencil-ready [path]` — Opens a headless Chromium browser to code-server, activates the Pencil VS Code extension, and opens a `.pen` file. The browser session stays alive in the background to maintain the WebSocket connection that the Pencil MCP server needs. Must run before the coding agent's MCP client binds to the Pencil MCP server.
+- `pencil-close` — Terminates the headless browser session started by `pencil-ready`, releasing the Pencil WebSocket connection.
+- **Requires a frontend workspace image** (fullstack-dev or nextjs-dev) — these include Playwright + Chromium. The helper scripts are installed in all workspaces but will exit with an error in base-dev.
+- Workspace trust is pre-disabled in code-server settings to prevent trust dialogs from blocking headless extension activation.
+- PID file: `/tmp/pencil-browser.pid`, Log file: `/tmp/pencil-ready.log`
+- Playwright MCP uses its own `mcp-chromium-*` browser build (separate from standard `chromium-*`). Both are installed during workspace init in fullstack/nextjs images.
+
 ### Shell Configuration
 - Uses Starship prompt with Lion theme
 - Configurations only apply to new shell sessions (not current init context)

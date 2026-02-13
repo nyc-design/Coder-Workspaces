@@ -36,7 +36,7 @@ RUN npm install -g \
     # Code quality
     husky lint-staged \
     # Playwright browser automation for Claude agents
-    @playwright/mcp @playwright/cli
+    playwright @playwright/mcp @playwright/cli
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
