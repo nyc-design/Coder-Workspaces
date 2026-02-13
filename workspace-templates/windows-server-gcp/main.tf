@@ -304,23 +304,10 @@ If prompted by Guacamole login (rare), use:
 EOF
 
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      mkdir -p /home/coder/.guacamole/extensions
-
-      if [ ! -f /home/coder/.guacamole/extensions/guacamole-auth-noauth-1.4.0.jar ]; then
-        rm -rf /tmp/guac-noauth && mkdir -p /tmp/guac-noauth
-        if curl -fsSL https://archive.apache.org/dist/guacamole/1.4.0/binary/guacamole-auth-noauth-1.4.0.tar.gz -o /tmp/guac-noauth/noauth.tar.gz; then
-          tar -xzf /tmp/guac-noauth/noauth.tar.gz -C /tmp/guac-noauth
-          cp /tmp/guac-noauth/guacamole-auth-noauth-1.4.0/guacamole-auth-noauth-1.4.0.jar /home/coder/.guacamole/extensions/
-        else
-          echo "WARNING: Failed to download Guacamole noauth extension. Browser app may require manual auth."
-        fi
-      fi
-
       cat > /home/coder/.guacamole/guacamole.properties <<PROP
 guacd-hostname: 127.0.0.1
 guacd-port: 4822
-noauth-config: /config/user-mapping.xml
-extension-priority: noauth
+user-mapping: /config/user-mapping.xml
 PROP
 
       cat > /home/coder/.guacamole/user-mapping.xml <<MAP
