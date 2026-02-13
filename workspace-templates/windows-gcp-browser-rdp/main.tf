@@ -365,9 +365,9 @@ resource "docker_container" "workspace" {
   name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}-windows"
 
   command = [
-    "sh",
-    "-c",
-    "export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*; ${coder_agent.main.init_script}"
+    "bash",
+    "-lc",
+    "set -euxo pipefail; export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl bash; rm -rf /var/lib/apt/lists/*; exec ${coder_agent.main.init_script}"
   ]
   env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
