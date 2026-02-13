@@ -5,6 +5,7 @@ This template provisions a persistent Windows VM in Google Cloud and adds a brow
 ## What this template optimizes for
 
 - **Native-feeling browser desktop**: `Windows Desktop (Browser)` app in Coder (Guacamole).
+- **ARM-friendly**: Uses a multi-arch Guacamole container (`flcontainers/guacamole`) to avoid amd64 emulation on ARM hosts.
 - **Thin Linux workspace runtime**: uses `ubuntu:24.04` and installs only required runtime tools (Docker CLI + certs + curl).
 - **Persistence**:
   - Windows boot disk is persistent (`auto_delete = false`)

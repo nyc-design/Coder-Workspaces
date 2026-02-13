@@ -305,8 +305,6 @@ EOF
 
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
       cat > /home/coder/.guacamole/guacamole.properties <<PROP
-guacd-hostname: 127.0.0.1
-guacd-port: 4822
 user-mapping: /config/user-mapping.xml
 PROP
 
@@ -331,22 +329,16 @@ PROP
 </user-mapping>
 MAP
 
-      docker rm -f "$${GUAC_WEB_CONTAINER}" "$${GUACD_CONTAINER}" >/dev/null 2>&1 || true
-
-      docker run -d \
-        --name "$${GUACD_CONTAINER}" \
-        --restart unless-stopped \
-        --network "container:$${HOSTNAME}" \
-        guacamole/guacd:1.5.5
+      docker rm -f "$${GUAC_WEB_CONTAINER}" >/dev/null 2>&1 || true
 
       docker run -d \
         --name "$${GUAC_WEB_CONTAINER}" \
         --restart unless-stopped \
         --network "container:$${HOSTNAME}" \
-        -e GUACD_HOSTNAME=127.0.0.1 \
+        --platform linux/arm64/v8 \
         -e GUACAMOLE_HOME=/config \
         -v /home/coder/.guacamole:/config \
-        guacamole/guacamole:1.5.5
+        flcontainers/guacamole:latest
     else
       echo "Docker is not available for starting Guacamole sidecar."
     fi
@@ -354,12 +346,11 @@ MAP
 
   shutdown_script = <<-EOT
     #!/usr/bin/env bash
-    docker rm -f "$${GUAC_WEB_CONTAINER}" "$${GUACD_CONTAINER}" >/dev/null 2>&1 || true
+    docker rm -f "$${GUAC_WEB_CONTAINER}" >/dev/null 2>&1 || true
   EOT
 
   env = {
     CODER_WORKSPACE_ID = data.coder_workspace.me.id
-    GUACD_CONTAINER    = "coder-guacd-${data.coder_workspace.me.id}"
     GUAC_WEB_CONTAINER = "coder-guac-${data.coder_workspace.me.id}"
   }
 
@@ -407,7 +398,6 @@ resource "docker_container" "workspace" {
   env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
     "CODER_WORKSPACE_ID=${data.coder_workspace.me.id}",
-    "GUACD_CONTAINER=coder-guacd-${data.coder_workspace.me.id}",
     "GUAC_WEB_CONTAINER=coder-guac-${data.coder_workspace.me.id}"
   ]
 
