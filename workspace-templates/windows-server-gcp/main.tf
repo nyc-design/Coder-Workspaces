@@ -193,6 +193,8 @@ locals {
     }
 
     Set-ItemProperty -Path "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" -Name "fDenyTSConnections" -Value 0
+    # Disable Network Level Authentication (NLA) so Guacamole can connect with basic RDP security
+    Set-ItemProperty -Path "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp" -Name "UserAuthentication" -Value 0
     Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
     $rawDisk = Get-Disk | Where-Object PartitionStyle -Eq "RAW" | Select-Object -First 1
@@ -351,12 +353,14 @@ EOF
               "port": "3389",
               "username": "${data.coder_parameter.rdp_username.value}",
               "password": "${data.coder_parameter.rdp_password.value}",
-              "security": "any",
+              "security": "tls",
               "ignore-cert": "true",
+              "disable-auth": "false",
               "resize-method": "display-update",
               "enable-wallpaper": "true",
               "enable-full-window-drag": "true",
               "enable-desktop-composition": "true",
+              "enable-font-smoothing": "true",
               "clipboard-encoding": "UTF-8"
             },
             "attributes": {
