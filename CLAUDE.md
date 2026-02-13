@@ -25,6 +25,7 @@ workspace-images/          # Docker images for different development stacks
 
 workspace-templates/       # Coder workspace template definitions
 ├── windows-gcp-browser-rdp/ # Windows VM on GCP with browser-based RDP access
+├── vm-gateway-container/  # Container workspace template with code-server + SSH/SSHFS gateway to bare VMs
 ├── repo-devcontainer/    # Repository-based devcontainer template
 └── repo-envbuilder-agent/ # Repository template with AI agent selection
 
