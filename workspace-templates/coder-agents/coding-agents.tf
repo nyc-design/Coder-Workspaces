@@ -53,7 +53,7 @@ module "codex" {
   report_tasks           = true
   codex_system_prompt    = data.coder_parameter.system_prompt.value
   ai_prompt              = data.coder_task.me.prompt
-  continue               = false
+  continue               = true
   additional_mcp_servers = local.additional_mcp_toml
 }
 
