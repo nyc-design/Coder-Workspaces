@@ -171,16 +171,20 @@ locals {
   rdp_source_ranges  = [for cidr in split(",", data.coder_parameter.rdp_source_cidrs.value) : trimspace(cidr) if trimspace(cidr) != ""]
   vm_desired_status  = data.coder_workspace.me.transition == "start" ? "RUNNING" : "TERMINATED"
   windows_startup_ps = <<-EOT
-    $ErrorActionPreference = "Stop"
+    $ErrorActionPreference = "Continue"
     $username = "${data.coder_parameter.rdp_username.value}"
     $password = "${data.coder_parameter.rdp_password.value}"
-    $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-
-    if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
-      Set-LocalUser -Name $username -Password $securePassword
-    } else {
-      New-LocalUser -Name $username -Password $securePassword -PasswordNeverExpires:$true -AccountNeverExpires:$true
-      Add-LocalGroupMember -Group "Administrators" -Member $username
+    try {
+      $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+      if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
+        Set-LocalUser -Name $username -Password $securePassword
+      } else {
+        New-LocalUser -Name $username -Password $securePassword -PasswordNeverExpires:$true -AccountNeverExpires:$true
+        Add-LocalGroupMember -Group "Administrators" -Member $username
+      }
+    } catch {
+      Write-Host "Failed to create/update local user '$username' (likely Windows password complexity). Error: $($_.Exception.Message)"
+      Write-Host "Use: gcloud compute reset-windows-password ${local.instance_name} --zone ${data.coder_parameter.gcp_zone.value} --user $username"
     }
 
     Set-ItemProperty -Path "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" -Name "fDenyTSConnections" -Value 0

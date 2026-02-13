@@ -33,6 +33,8 @@ You do **not** pay for VM CPU/RAM while it is `TERMINATED`.
 - Change both passwords immediately after first successful login:
   - `Windows RDP Password`
   - `Browser Desktop Portal Password`
+- Windows enforces password complexity for local users. If login fails, run:
+  `gcloud compute reset-windows-password <instance-name> --zone <zone> --user <username>`
 
 ## Recommended Coder auto-stop setup
 
