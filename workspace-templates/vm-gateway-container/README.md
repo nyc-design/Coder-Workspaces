@@ -19,8 +19,8 @@ This is **not** External Workspace mode.
 
 ## Template parameters
 
-- **Workspace Image**: container image for the workspace (default fullstack image).
-  - Default is `ghcr.io/nyc-design/workspace-images/base-dev:latest` for a lean gateway workspace.
+- **Workspace Image**: container image for the workspace.
+  - Default is `codercom/enterprise-base:ubuntu-20250929` for a minimal gateway workspace.
 - **Workspace Directory**: default folder for code-server.
 - **Bare VM Host / User / SSH Port**: SSH target.
 - **Remote Path**: VM path to mount via SSHFS.
