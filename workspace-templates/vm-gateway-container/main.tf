@@ -22,7 +22,7 @@ data "coder_parameter" "workspace_image" {
   display_name = "Workspace Image"
   description  = "Container image where code-server runs."
   type         = "string"
-  default      = "ghcr.io/nyc-design/workspace-images/fullstack-dev:latest"
+  default      = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
   form_type    = "input"
   order        = 1
 }
