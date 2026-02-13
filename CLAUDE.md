@@ -14,11 +14,14 @@ This repository contains Docker build files and initialization scripts for Coder
 
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, Claude Code)
+│   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 08-shell-helpers)
+├── shared/               # Shared install scripts used by multiple images
+│   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
 ├── cpp-dev/              # C++ development environment
-├── fullstack-dev/        # Full-stack web development
-├── nextjs-dev/           # Next.js specific setup
+├── fullstack-dev/        # Full-stack web development (extends nextjs-dev + shared Python)
+├── nextjs-dev/           # Next.js specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
-└── python-dev/           # Python development environment
+└── python-dev/           # Python development environment (uses shared/install-python.sh)
 
 workspace-templates/       # Coder workspace template definitions
 ├── repo-devcontainer/    # Repository-based devcontainer template
@@ -34,16 +37,38 @@ scripts/                   # Utility scripts
 
 ## Key Architecture Concepts
 
-### Base Image Pattern
-- All specialized images inherit from `base-dev/`
-- Base image provides: Docker-in-Docker, GCP CLI, GitHub CLI, Node.js, AI coding tools
-- Language-specific images add their own tooling and init scripts
+### Docker Image Hierarchy
+```
+base-dev (core tools, Docker, Git, GCP, AI CLIs)
+├── python-dev (uses shared/install-python.sh)
+├── nextjs-dev (Node.js, npm globals, Playwright)
+│   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
+├── cpp-dev
+└── playwright-dev
+```
 
 ### Initialization System
-- Master init script: `workspace-images/base-dev/init-workspace.sh` (copied to `/usr/local/bin/`)
-- Language-specific scripts placed in `/usr/local/share/workspace-init.d/`
+- Modular init scripts in `workspace-images/base-dev/init.d/` are COPY'd to `/usr/local/share/workspace-init.d/`
+- `run-workspace-inits` runner iterates `workspace-init.d/*.sh` in sorted order
+- Numbering convention: `01-09` base-dev core, `20-29` language-specific, `30-39` composite
+- Language-specific scripts placed in `/usr/local/share/workspace-init.d/` by child Dockerfiles
 - Auto-executed by Coder agent on workspace startup
-- Handles: Docker daemon, authentication, shell configuration, GCP secrets
+
+#### Base-dev Init Scripts (01-08)
+| Script | Purpose |
+|--------|---------|
+| `01-docker.sh` | Docker daemon startup, socket permissions |
+| `02-starship.sh` | Starship prompt + Lion theme |
+| `03-git.sh` | GitHub auth, git pull defaults, global gitignore |
+| `04-gcp.sh` | GCP project setup, secrets discovery + loading |
+| `05-code-server.sh` | Workspace trust pre-configuration |
+| `06-pencil.sh` | pencil-ready + pencil-close helpers |
+| `07-hapi.sh` | HAPI runner + agent session |
+| `08-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
+
+### Shared Install Scripts
+- `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
+- Eliminates duplication: both images COPY and RUN the same script
 
 ### Pencil MCP (Design Editor)
 - `pencil-ready [path]` — Opens a headless Chromium browser to code-server, activates the Pencil VS Code extension, and opens a `.pen` file. The browser session stays alive in the background to maintain the WebSocket connection that the Pencil MCP server needs. Must run before the coding agent's MCP client binds to the Pencil MCP server.
@@ -68,10 +93,11 @@ scripts/                   # Utility scripts
 - Tagged with both `:latest` and `:sha-{commit}` for version control
 
 ### Modifying Init Scripts
-1. Edit the master script in `workspace-images/base-dev/init-workspace.sh`
-2. Push changes to trigger automatic Docker build via GitHub Actions
-3. New images automatically available in GCP Artifact Registry
-4. Test in new workspace to verify changes
+1. Edit the relevant script in `workspace-images/base-dev/init.d/` (01-08 for base concerns)
+2. For language-specific init, edit `workspace-images/{image}/` init scripts
+3. Push changes to trigger automatic Docker build via GitHub Actions
+4. New images automatically available in the container registry
+5. Test in new workspace to verify changes
 
 ### Adding New Language Support
 1. Create new directory under `workspace-images/`
@@ -112,8 +138,16 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Merges digests into single multi-arch manifest with `docker buildx imagetools create`
 - Automatically cleans up individual digest versions to reduce registry clutter
 
+### Build Chain
+```
+base-dev → python-dev
+base-dev → nextjs-dev → fullstack-dev
+base-dev → cpp-dev
+```
+
 ### Build Triggers
-- **Path-based**: Changes to `workspace-images/{image-name}/**` or workflow files
+- **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/shared/**`, or workflow files
+- **Cascade**: Parent image builds trigger child image rebuilds via `workflow_run`
 - **Manual**: `workflow_dispatch` for on-demand builds
 - **Authentication**: Uses workload identity with `GCP_SA_KEY` secret
 
@@ -154,10 +188,11 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 ## Common Tasks
 
-- **Update base tools**: Modify `base-dev/Dockerfile` and `init-workspace.sh`, push to trigger build
+- **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
+- **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
-- **Debug init issues**: Check `/usr/local/bin/init-workspace.sh` exists and is executable
+- **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output
 - **Test shell config**: Use `exec bash` or restart workspace to see prompt changes
 - **Troubleshoot secrets**: Verify `CODER_GCP_PROJECT` is set and GCP authentication works
 - **Monitor builds**: Watch GitHub Actions for build status and multi-arch manifest creation

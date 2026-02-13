@@ -15,5 +15,4 @@ if [ ! -f ~/.init_done ]; then
   touch ~/.init_done
 fi
 
-/usr/local/bin/init-workspace.sh >> /tmp/workspace-init.log 2>&1 || true
 /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true

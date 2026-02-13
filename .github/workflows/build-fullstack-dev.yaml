@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "workspace-images/fullstack-dev/**"
+      - "workspace-images/shared/**"
+      - "workspace-images/python-dev/python-init.sh"
       - ".github/workflows/build-fullstack-dev.yaml"
   workflow_dispatch:
   workflow_run:
-    workflows: ["Build & Push python-dev (multi-arch, native runners) - GHCR"]
+    workflows: ["Build & Push nextjs-dev (multi-arch, native runners) - GHCR"]
     types:
       - completed
     branches:

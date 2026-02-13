@@ -115,10 +115,10 @@ RUN git clone --depth 1 https://github.com/LazyVim/starter /opt/lazyvim-starter/
       > /opt/lazyvim-starter/config/lazyvim.json
 
 USER root
-COPY workspace-images/base-dev/init-workspace.sh /usr/local/bin/init-workspace.sh
-RUN chmod +x /usr/local/bin/init-workspace.sh
-
 RUN install -d -m 0755 /usr/local/share/workspace-init.d
+
+COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
+RUN chmod +x /usr/local/share/workspace-init.d/*.sh
 
 COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits
