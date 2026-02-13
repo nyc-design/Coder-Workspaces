@@ -339,6 +339,19 @@ EOF
           | sed -n 's/.*"authToken":"\([^"]*\)".*/\1/p')
       fi
 
+      # Wait for Windows VM RDP port to be reachable
+      echo "Waiting for Windows VM RDP port (${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}:3389)..."
+      for i in $(seq 1 90); do
+        if timeout 2 bash -c "echo >/dev/tcp/${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}/3389" 2>/dev/null; then
+          echo "Windows VM RDP port is reachable."
+          break
+        fi
+        if [ "$i" = "90" ]; then
+          echo "Warning: Windows VM RDP port not reachable after 3 minutes. VM may still be booting."
+        fi
+        sleep 2
+      done
+
       if [ -n "$${GUAC_TOKEN}" ]; then
         # Create the Windows Desktop RDP connection
         curl -sf -X POST \
@@ -353,9 +366,8 @@ EOF
               "port": "3389",
               "username": "${data.coder_parameter.rdp_username.value}",
               "password": "${data.coder_parameter.rdp_password.value}",
-              "security": "tls",
+              "security": "any",
               "ignore-cert": "true",
-              "disable-auth": "false",
               "resize-method": "display-update",
               "enable-wallpaper": "true",
               "enable-full-window-drag": "true",
