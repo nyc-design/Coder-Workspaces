@@ -304,11 +304,13 @@ If prompted by Guacamole login (rare), use:
 EOF
 
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      cat > /home/coder/.guacamole/guacamole.properties <<PROP
-user-mapping: /config/user-mapping.xml
+      mkdir -p /home/coder/.guacamole/guacamole
+
+      cat > /home/coder/.guacamole/guacamole/guacamole.properties <<PROP
+user-mapping: /config/guacamole/user-mapping.xml
 PROP
 
-      cat > /home/coder/.guacamole/user-mapping.xml <<MAP
+      cat > /home/coder/.guacamole/guacamole/user-mapping.xml <<MAP
 <user-mapping>
   <authorize username="coder" password="coder">
     <connection name="Windows Desktop">
@@ -336,7 +338,6 @@ MAP
         --restart unless-stopped \
         --network "container:$${HOSTNAME}" \
         --platform linux/arm64/v8 \
-        -e GUACAMOLE_HOME=/config \
         -v /home/coder/.guacamole:/config \
         flcontainers/guacamole:latest
     else
@@ -430,7 +431,7 @@ resource "coder_app" "windows_desktop" {
   slug         = "windows-desktop"
   display_name = "Windows Desktop (Browser)"
   icon         = "/icon/terminal.svg"
-  url          = "http://127.0.0.1:8080/guacamole/"
+  url          = "http://127.0.0.1:8080/"
   order        = 1
 }
 
