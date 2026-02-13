@@ -354,7 +354,7 @@ resource "docker_volume" "workspaces_volume" {
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = "us-central1-docker.pkg.dev/coder-nt/workspace-images/base-dev:latest"
+  image = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
   name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}-windows"
 
   command = ["sh", "-c", coder_agent.main.init_script]
