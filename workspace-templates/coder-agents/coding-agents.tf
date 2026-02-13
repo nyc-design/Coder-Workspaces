@@ -10,6 +10,7 @@ module "claude-code" {
   install_claude_code     = false
   continue                = true
   order                   = 999
+  system_prompt           = data.coder_parameter.system_prompt.value
   ai_prompt               = data.coder_task.me.prompt
   mcp                     = local.mcp_claude
   permission_mode         = "bypassPermissions"
