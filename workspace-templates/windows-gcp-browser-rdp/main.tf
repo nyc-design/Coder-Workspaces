@@ -306,11 +306,14 @@ EOF
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
       mkdir -p /home/coder/.guacamole/extensions
 
-      if [ ! -f /home/coder/.guacamole/extensions/guacamole-auth-noauth-1.5.5.jar ]; then
+      if [ ! -f /home/coder/.guacamole/extensions/guacamole-auth-noauth-1.4.0.jar ]; then
         rm -rf /tmp/guac-noauth && mkdir -p /tmp/guac-noauth
-        curl -fsSL https://downloads.apache.org/guacamole/1.5.5/binary/guacamole-auth-noauth-1.5.5.tar.gz \
-          | tar -xz -C /tmp/guac-noauth
-        cp /tmp/guac-noauth/guacamole-auth-noauth-1.5.5/guacamole-auth-noauth-1.5.5.jar /home/coder/.guacamole/extensions/
+        if curl -fsSL https://archive.apache.org/dist/guacamole/1.4.0/binary/guacamole-auth-noauth-1.4.0.tar.gz -o /tmp/guac-noauth/noauth.tar.gz; then
+          tar -xzf /tmp/guac-noauth/noauth.tar.gz -C /tmp/guac-noauth
+          cp /tmp/guac-noauth/guacamole-auth-noauth-1.4.0/guacamole-auth-noauth-1.4.0.jar /home/coder/.guacamole/extensions/
+        else
+          echo "WARNING: Failed to download Guacamole noauth extension. Browser app may require manual auth."
+        fi
       fi
 
       cat > /home/coder/.guacamole/guacamole.properties <<PROP
