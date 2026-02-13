@@ -160,6 +160,8 @@ locals {
   data_disk_name     = "${local.instance_name}-data"
   rdp_source_ranges  = [for cidr in split(",", data.coder_parameter.rdp_source_cidrs.value) : trimspace(cidr) if trimspace(cidr) != ""]
   vm_desired_status  = data.coder_workspace.me.transition == "start" ? "RUNNING" : "TERMINATED"
+  container_name     = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}-windows"
+  guac_container     = "coder-guac-${data.coder_workspace.me.id}"
   windows_startup_ps = <<-EOT
     $ErrorActionPreference = "Continue"
     $username = "${data.coder_parameter.rdp_username.value}"
@@ -336,8 +338,7 @@ MAP
       docker run -d \
         --name "$${GUAC_WEB_CONTAINER}" \
         --restart unless-stopped \
-        --network "container:$${HOSTNAME}" \
-        --platform linux/arm64/v8 \
+        --network "container:$${WORKSPACE_CONTAINER}" \
         -v /home/coder/.guacamole:/config \
         flcontainers/guacamole:latest
     else
@@ -351,8 +352,9 @@ MAP
   EOT
 
   env = {
-    CODER_WORKSPACE_ID = data.coder_workspace.me.id
-    GUAC_WEB_CONTAINER = "coder-guac-${data.coder_workspace.me.id}"
+    CODER_WORKSPACE_ID  = data.coder_workspace.me.id
+    GUAC_WEB_CONTAINER  = local.guac_container
+    WORKSPACE_CONTAINER = local.container_name
   }
 
   metadata {
@@ -389,7 +391,7 @@ resource "docker_volume" "workspaces_volume" {
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
   image = "ubuntu:24.04"
-  name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}-windows"
+  name  = local.container_name
 
   command = [
     "bash",
@@ -398,8 +400,10 @@ resource "docker_container" "workspace" {
   ]
   env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
+    "CODER_AGENT_URL=${replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")}",
     "CODER_WORKSPACE_ID=${data.coder_workspace.me.id}",
-    "GUAC_WEB_CONTAINER=coder-guac-${data.coder_workspace.me.id}"
+    "GUAC_WEB_CONTAINER=${local.guac_container}",
+    "WORKSPACE_CONTAINER=${local.container_name}",
   ]
 
   host {

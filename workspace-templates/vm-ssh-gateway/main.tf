@@ -96,26 +96,16 @@ data "coder_parameter" "ssh_key_filename" {
   order        = 8
 }
 
-data "coder_parameter" "code_server_port" {
-  name         = "code_server_port"
-  display_name = "code-server Port"
-  description  = "Port inside workspace container for code-server."
-  type         = "string"
-  default      = "13337"
-  form_type    = "input"
-  order        = 9
-}
-
 locals {
   workspace_image     = data.coder_parameter.workspace_image.value
   workspace_dir       = data.coder_parameter.workspace_dir.value
+  project_name        = trimprefix(data.coder_parameter.workspace_dir.value, "/workspaces/")
   vm_host             = data.coder_parameter.vm_host.value
   vm_user             = data.coder_parameter.vm_user.value
   vm_port             = data.coder_parameter.vm_port.value
   remote_path         = data.coder_parameter.remote_path.value
   auto_mount_remote   = data.coder_parameter.auto_mount_remote.value
   ssh_key_filename    = data.coder_parameter.ssh_key_filename.value
-  code_server_port    = data.coder_parameter.code_server_port.value
 
   vm_presets = {
     vm1 = {
@@ -159,7 +149,6 @@ data "coder_workspace_preset" "bare_vms" {
     remote_path       = each.value.remote_path
     auto_mount_remote = "true"
     ssh_key_filename  = each.value.ssh_key
-    code_server_port  = local.code_server_port
   }
 }
 
@@ -200,6 +189,12 @@ resource "docker_volume" "workspaces" {
     label = "coder.workspace_id"
     value = data.coder_workspace.me.id
   }
+}
+
+# ── Workspace Apps (phase 1: metadata only, for coder_agent) ────────────────
+module "workspace_apps_metadata" {
+  source      = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
+  enable_apps = false
 }
 
 resource "coder_agent" "main" {
@@ -247,6 +242,7 @@ CFG
       echo "[vm-gateway] vm_host is empty; skipping SSH config + auto mount."
     fi
 
+    # Install sshfs if not present
     if ! command -v sshfs >/dev/null 2>&1; then
       if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update
@@ -254,18 +250,7 @@ CFG
       fi
     fi
 
-    if ! command -v code-server >/dev/null 2>&1; then
-      curl -fsSL https://code-server.dev/install.sh | sh
-    fi
-
-    if ! pgrep -f "code-server.*--bind-addr 127.0.0.1:${local.code_server_port}" >/dev/null 2>&1; then
-      nohup code-server \
-        --auth none \
-        --bind-addr 127.0.0.1:${local.code_server_port} \
-        "${local.workspace_dir}" \
-        >/tmp/code-server.log 2>&1 &
-    fi
-
+    # Auto-mount remote VM filesystem via SSHFS
     if [ "${local.auto_mount_remote}" = "true" ] && [ -n "${local.vm_host}" ] && command -v sshfs >/dev/null 2>&1; then
       mkdir -p /workspaces/remote-vm
       if mountpoint -q /workspaces/remote-vm; then
@@ -284,6 +269,19 @@ CFG
     port_forwarding_helper = true
   }
 
+  # Standard workspace metrics (CPU, RAM, disk, etc.)
+  dynamic "metadata" {
+    for_each = module.workspace_apps_metadata.agent_metadata_items
+    content {
+      display_name = metadata.value.display_name
+      key          = metadata.value.key
+      script       = metadata.value.script
+      interval     = metadata.value.interval
+      timeout      = metadata.value.timeout
+    }
+  }
+
+  # VM-gateway-specific metadata
   metadata {
     display_name = "Gateway Target"
     key          = "gateway_target"
@@ -357,23 +355,16 @@ resource "docker_container" "workspace" {
   }
 }
 
-resource "coder_app" "code_server" {
+# ── Workspace Apps (phase 2: actual apps — code-server, cursor, vscode-web, etc.) ──
+module "workspace_apps" {
+  count        = data.coder_workspace.me.start_count
+  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
   agent_id     = coder_agent.main.id
-  slug         = "code-server"
-  display_name = "Code Server"
-  icon         = "${data.coder_workspace.me.access_url}/icon/code.svg"
-  url          = "http://127.0.0.1:${local.code_server_port}/"
-  share        = "owner"
-  subdomain    = false
-  open_in      = "slim-window"
-
-  healthcheck {
-    url       = "http://127.0.0.1:${local.code_server_port}/healthz"
-    interval  = 10
-    threshold = 6
-  }
+  project_name = local.project_name
+  enable_apps  = true
 }
 
+# ── VM-gateway-specific apps ───────────────────────────────────────────────────
 resource "coder_app" "ssh_vm" {
   agent_id     = coder_agent.main.id
   slug         = "ssh-vm"
