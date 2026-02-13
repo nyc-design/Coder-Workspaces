@@ -300,47 +300,73 @@ Windows Username: ${data.coder_parameter.rdp_username.value}
 Windows Password: ${data.coder_parameter.rdp_password.value}
 
 Open the "Windows Desktop (Browser)" app in Coder.
-If prompted by Guacamole login (rare), use:
-  username: coder
-  password: coder
+Guacamole login: guacadmin / guacadmin
+(auto-connects to the Windows Desktop RDP session)
 EOF
 
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      mkdir -p /home/coder/.guacamole/guacamole
-
-      cat > /home/coder/.guacamole/guacamole/guacamole.properties <<PROP
-user-mapping: /config/guacamole/user-mapping.xml
-PROP
-
-      cat > /home/coder/.guacamole/guacamole/user-mapping.xml <<MAP
-<user-mapping>
-  <authorize username="coder" password="coder">
-    <connection name="Windows Desktop">
-      <protocol>rdp</protocol>
-      <param name="hostname">${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}</param>
-      <param name="port">3389</param>
-      <param name="username">${data.coder_parameter.rdp_username.value}</param>
-      <param name="password">${data.coder_parameter.rdp_password.value}</param>
-      <param name="security">any</param>
-      <param name="ignore-cert">true</param>
-      <param name="resize-method">display-update</param>
-      <param name="enable-wallpaper">true</param>
-      <param name="enable-full-window-drag">true</param>
-      <param name="enable-desktop-composition">true</param>
-      <param name="clipboard-encoding">UTF-8</param>
-    </connection>
-  </authorize>
-</user-mapping>
-MAP
-
       docker rm -f "$${GUAC_WEB_CONTAINER}" >/dev/null 2>&1 || true
 
       docker run -d \
         --name "$${GUAC_WEB_CONTAINER}" \
         --restart unless-stopped \
         --network "container:$${WORKSPACE_CONTAINER}" \
-        -v /home/coder/.guacamole:/config \
         flcontainers/guacamole:latest
+
+      # Wait for Guacamole API to be ready (try both /guacamole and / context paths)
+      echo "Waiting for Guacamole to start..."
+      GUAC_BASE=""
+      for i in $(seq 1 60); do
+        if curl -sf http://127.0.0.1:8080/guacamole/api/languages >/dev/null 2>&1; then
+          GUAC_BASE="http://127.0.0.1:8080/guacamole"
+          break
+        elif curl -sf http://127.0.0.1:8080/api/languages >/dev/null 2>&1; then
+          GUAC_BASE="http://127.0.0.1:8080"
+          break
+        fi
+        sleep 2
+      done
+      echo "Guacamole API at: $${GUAC_BASE:-NOT FOUND}"
+
+      # Authenticate and get API token
+      GUAC_TOKEN=""
+      if [ -n "$${GUAC_BASE}" ]; then
+        GUAC_TOKEN=$(curl -sf \
+          -d 'username=guacadmin&password=guacadmin' \
+          "$${GUAC_BASE}/api/tokens" \
+          | sed -n 's/.*"authToken":"\([^"]*\)".*/\1/p')
+      fi
+
+      if [ -n "$${GUAC_TOKEN}" ]; then
+        # Create the Windows Desktop RDP connection
+        curl -sf -X POST \
+          -H "Content-Type: application/json" \
+          "$${GUAC_BASE}/api/session/data/postgresql/connections?token=$${GUAC_TOKEN}" \
+          -d '{
+            "parentIdentifier": "ROOT",
+            "name": "Windows Desktop",
+            "protocol": "rdp",
+            "parameters": {
+              "hostname": "${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}",
+              "port": "3389",
+              "username": "${data.coder_parameter.rdp_username.value}",
+              "password": "${data.coder_parameter.rdp_password.value}",
+              "security": "any",
+              "ignore-cert": "true",
+              "resize-method": "display-update",
+              "enable-wallpaper": "true",
+              "enable-full-window-drag": "true",
+              "enable-desktop-composition": "true",
+              "clipboard-encoding": "UTF-8"
+            },
+            "attributes": {
+              "max-connections": "",
+              "max-connections-per-user": ""
+            }
+          }' && echo "RDP connection created successfully." || echo "Warning: failed to create RDP connection (may already exist)."
+      else
+        echo "Warning: could not authenticate with Guacamole API."
+      fi
     else
       echo "Docker is not available for starting Guacamole sidecar."
     fi
@@ -436,7 +462,15 @@ resource "coder_app" "windows_desktop" {
   display_name = "Windows Desktop (Browser)"
   icon         = "/icon/terminal.svg"
   url          = "http://127.0.0.1:8080/"
+  subdomain    = true
+  share        = "owner"
   order        = 1
+
+  healthcheck {
+    url       = "http://127.0.0.1:8080/"
+    interval  = 10
+    threshold = 12
+  }
 }
 
 resource "coder_app" "connection_guide" {
