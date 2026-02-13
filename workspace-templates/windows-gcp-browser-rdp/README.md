@@ -1,10 +1,10 @@
 # Windows VM on GCP + Browser RDP (Coder Template)
 
-This template provisions a persistent Windows VM in Google Cloud and adds a browser-based desktop app inside Coder using Remmina Web.
+This template provisions a persistent Windows VM in Google Cloud and adds a browser-based desktop app inside Coder using Apache Guacamole.
 
 ## What this template optimizes for
 
-- **Native-feeling browser desktop**: `Windows Desktop (Browser)` app in Coder.
+- **Native-feeling browser desktop**: `Windows Desktop (Browser)` app in Coder (Guacamole).
 - **Thin Linux workspace runtime**: uses `ubuntu:24.04` and installs only required runtime tools (Docker CLI + certs + curl).
 - **Persistence**:
   - Windows boot disk is persistent (`auto_delete = false`)
@@ -30,9 +30,7 @@ You do **not** pay for VM CPU/RAM while it is `TERMINATED`.
 ## Security notes
 
 - Tighten `Allowed RDP CIDRs` to your trusted IP ranges (avoid `0.0.0.0/0` in production).
-- Change both passwords immediately after first successful login:
-  - `Windows RDP Password`
-  - `Browser Desktop Portal Password`
+- Change the Windows password after first successful login.
 - Windows enforces password complexity for local users. If login fails, run:
   `gcloud compute reset-windows-password <instance-name> --zone <zone> --user <username>`
 
@@ -47,12 +45,10 @@ That ensures workspaces transition to stop quickly, which in turn sets VM status
 1. Create workspace from this template.
 2. Open **Connection Guide** app to see current VM IP + credentials reference.
 3. Open **Windows Desktop (Browser)** app.
-4. Log into the browser portal:
+4. If prompted by Guacamole login, use:
    - Username: `coder`
-   - Password: your `Browser Desktop Portal Password`
-5. In Remmina, create an **RDP** connection to the VM public IP shown in the guide.
-   - Username: `Windows RDP Username`
-   - Password: `Windows RDP Password`
+   - Password: `coder`
+5. You should land directly in the preconfigured Windows RDP session.
 
 ## Persistence behavior summary
 

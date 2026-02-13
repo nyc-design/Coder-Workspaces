@@ -115,7 +115,7 @@ data "coder_parameter" "rdp_password" {
   type         = "string"
   form_type    = "input"
   mutable      = true
-  default      = "neil2730"
+  default      = "neil2730!"
   order        = 9
 }
 
@@ -147,16 +147,6 @@ data "coder_parameter" "reserve_static_ip" {
   }
 }
 
-data "coder_parameter" "remmina_web_password" {
-  name         = "remmina_web_password"
-  display_name = "Browser Desktop Portal Password"
-  type         = "string"
-  form_type    = "input"
-  mutable      = true
-  default      = "neil2730"
-  order        = 12
-}
-
 provider "google" {
   project = data.coder_parameter.gcp_project_id.value
   region  = data.coder_parameter.gcp_region.value
@@ -174,6 +164,19 @@ locals {
     $ErrorActionPreference = "Continue"
     $username = "${data.coder_parameter.rdp_username.value}"
     $password = "${data.coder_parameter.rdp_password.value}"
+
+    # Relax local password policy for this personal-use VM to allow simple passwords.
+    try {
+      secedit /export /cfg C:\Windows\Temp\secpol.cfg | Out-Null
+      (Get-Content C:\Windows\Temp\secpol.cfg) `
+        -replace '^PasswordComplexity\\s*=\\s*\\d+', 'PasswordComplexity = 0' `
+        -replace '^MinimumPasswordLength\\s*=\\s*\\d+', 'MinimumPasswordLength = 0' `
+        | Set-Content C:\Windows\Temp\secpol.cfg
+      secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Temp\secpol.cfg /areas SECURITYPOLICY | Out-Null
+    } catch {
+      Write-Host "Unable to relax local password policy: $($_.Exception.Message)"
+    }
+
     try {
       $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
       if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
@@ -292,44 +295,82 @@ resource "coder_agent" "main" {
     cat > ~/WINDOWS_CONNECTION_INFO.txt <<'EOF'
 Windows VM Public IP: ${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}
 Windows Username: ${data.coder_parameter.rdp_username.value}
-Windows Password: (the template parameter value you set)
+Windows Password: ${data.coder_parameter.rdp_password.value}
 
-Inside the "Windows Desktop (Browser)" app:
-1) Sign in with username: coder
-2) Password: the "Browser Desktop Portal Password" template parameter
-3) Open Remmina and create an RDP connection to:
-   Host: ${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}
-   Username: ${data.coder_parameter.rdp_username.value}
-   Password: your Windows RDP password
+Open the "Windows Desktop (Browser)" app in Coder.
+If prompted by Guacamole login (rare), use:
+  username: coder
+  password: coder
 EOF
 
     if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      docker rm -f "$${REMMINA_CONTAINER}" >/dev/null 2>&1 || true
+      mkdir -p /home/coder/.guacamole/extensions
+
+      if [ ! -f /home/coder/.guacamole/extensions/guacamole-auth-noauth-1.5.5.jar ]; then
+        rm -rf /tmp/guac-noauth && mkdir -p /tmp/guac-noauth
+        curl -fsSL https://downloads.apache.org/guacamole/1.5.5/binary/guacamole-auth-noauth-1.5.5.tar.gz \
+          | tar -xz -C /tmp/guac-noauth
+        cp /tmp/guac-noauth/guacamole-auth-noauth-1.5.5/guacamole-auth-noauth-1.5.5.jar /home/coder/.guacamole/extensions/
+      fi
+
+      cat > /home/coder/.guacamole/guacamole.properties <<PROP
+guacd-hostname: 127.0.0.1
+guacd-port: 4822
+noauth-config: /config/user-mapping.xml
+extension-priority: noauth
+PROP
+
+      cat > /home/coder/.guacamole/user-mapping.xml <<MAP
+<user-mapping>
+  <authorize username="coder" password="coder">
+    <connection name="Windows Desktop">
+      <protocol>rdp</protocol>
+      <param name="hostname">${google_compute_instance.windows.network_interface[0].access_config[0].nat_ip}</param>
+      <param name="port">3389</param>
+      <param name="username">${data.coder_parameter.rdp_username.value}</param>
+      <param name="password">${data.coder_parameter.rdp_password.value}</param>
+      <param name="security">any</param>
+      <param name="ignore-cert">true</param>
+      <param name="resize-method">display-update</param>
+      <param name="enable-wallpaper">true</param>
+      <param name="enable-full-window-drag">true</param>
+      <param name="enable-desktop-composition">true</param>
+      <param name="clipboard-encoding">UTF-8</param>
+    </connection>
+  </authorize>
+</user-mapping>
+MAP
+
+      docker rm -f "$${GUAC_WEB_CONTAINER}" "$${GUACD_CONTAINER}" >/dev/null 2>&1 || true
+
       docker run -d \
-        --name "$${REMMINA_CONTAINER}" \
+        --name "$${GUACD_CONTAINER}" \
         --restart unless-stopped \
         --network "container:$${HOSTNAME}" \
-        -e PUID=1000 \
-        -e PGID=1000 \
-        -e TZ=UTC \
-        -e CUSTOM_USER=coder \
-        -e PASSWORD="$${REMMINA_WEB_PASSWORD}" \
-        -v "coder-$${CODER_WORKSPACE_ID}-remmina:/config" \
-        lscr.io/linuxserver/remmina:latest
+        guacamole/guacd:1.5.5
+
+      docker run -d \
+        --name "$${GUAC_WEB_CONTAINER}" \
+        --restart unless-stopped \
+        --network "container:$${HOSTNAME}" \
+        -e GUACD_HOSTNAME=127.0.0.1 \
+        -e GUACAMOLE_HOME=/config \
+        -v /home/coder/.guacamole:/config \
+        guacamole/guacamole:1.5.5
     else
-      echo "Docker is not available for starting Remmina sidecar."
+      echo "Docker is not available for starting Guacamole sidecar."
     fi
   EOT
 
   shutdown_script = <<-EOT
     #!/usr/bin/env bash
-    docker rm -f "$${REMMINA_CONTAINER}" >/dev/null 2>&1 || true
+    docker rm -f "$${GUAC_WEB_CONTAINER}" "$${GUACD_CONTAINER}" >/dev/null 2>&1 || true
   EOT
 
   env = {
-    CODER_WORKSPACE_ID   = data.coder_workspace.me.id
-    REMMINA_CONTAINER    = "coder-remmina-${data.coder_workspace.me.id}"
-    REMMINA_WEB_PASSWORD = data.coder_parameter.remmina_web_password.value
+    CODER_WORKSPACE_ID = data.coder_workspace.me.id
+    GUACD_CONTAINER    = "coder-guacd-${data.coder_workspace.me.id}"
+    GUAC_WEB_CONTAINER = "coder-guac-${data.coder_workspace.me.id}"
   }
 
   metadata {
@@ -376,8 +417,8 @@ resource "docker_container" "workspace" {
   env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
     "CODER_WORKSPACE_ID=${data.coder_workspace.me.id}",
-    "REMMINA_CONTAINER=coder-remmina-${data.coder_workspace.me.id}",
-    "REMMINA_WEB_PASSWORD=${data.coder_parameter.remmina_web_password.value}"
+    "GUACD_CONTAINER=coder-guacd-${data.coder_workspace.me.id}",
+    "GUAC_WEB_CONTAINER=coder-guac-${data.coder_workspace.me.id}"
   ]
 
   host {
@@ -409,7 +450,7 @@ resource "coder_app" "windows_desktop" {
   slug         = "windows-desktop"
   display_name = "Windows Desktop (Browser)"
   icon         = "/icon/terminal.svg"
-  url          = "http://127.0.0.1:3000/"
+  url          = "http://127.0.0.1:8080/guacamole/"
   order        = 1
 }
 
