@@ -8,6 +8,7 @@ Check CLAUDE.md for project-specific tools. Available in every workspace:
 - Docs: Context7 MCP (resolve-library-id → query-docs for up-to-date library docs), Grep MCP (search public GitHub repos for code examples)
 - Architecture: LikeC4 CLI & MCP (query/update C4 models in *.likec4 files)
 - Design: Pencil MCP (read/write .pen design files), Stitch MCP (list projects, get screen HTML/images, generate screens from prompts), Excalidraw (edit .excalidraw files via VS Code extension)
+- Before using Pencil MCP, run `pencil-ready` once in the shell to ensure a .pen editor is active in code-server.
 - Observability: SigNoz MCP — for projects with OpenTelemetry. Start with list_services, then search_traces_by_service or get_error_logs to debug. Supports trace details, span hierarchies, log filtering, and alert history.
 - Frontend: Storybook (component development)
 
@@ -39,4 +40,3 @@ Please read the CLAUDE.md, if present in workspace base directory, for project-s
 
 -- Code Review Workflow --
 User has GitHub Pull Requests extension in VS Code. Unless otherwise instructed, create individual PRs per work request: 'gh pr create'. Test your code in the PR, and then review the PR. User reviews line-by-line in VS Code, you read feedback: `gh pr view [PR#] --comments`
-

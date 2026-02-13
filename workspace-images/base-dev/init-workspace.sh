@@ -275,6 +275,84 @@ else
   log "no GCP project specified; skipping secrets setup"
 fi
 
+# --- Pencil MCP readiness helper ---
+log "installing pencil-ready helper"
+sudo tee /usr/local/bin/pencil-ready >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+TIMEOUT_SECS="${PENCIL_READY_TIMEOUT_SECS:-180}"
+TARGET="${1:-}"
+
+CODE_SERVER_BIN="/tmp/code-server/bin/code-server"
+if [ ! -x "$CODE_SERVER_BIN" ]; then
+  CODE_SERVER_BIN="$(command -v code-server || true)"
+fi
+
+if [ -z "$CODE_SERVER_BIN" ] || [ ! -x "$CODE_SERVER_BIN" ]; then
+  echo "[pencil-ready] code-server binary not found" >&2
+  exit 1
+fi
+
+find_pen_file() {
+  local target="${1:-}"
+  local project_name="${CODER_PROJECT_NAME:-}"
+
+  if [ -n "$target" ]; then
+    if [ -f "$target" ] && [[ "$target" == *.pen ]]; then
+      echo "$target"
+      return 0
+    fi
+    if [ -d "$target" ]; then
+      find "$target" -maxdepth 6 -type f -name "*.pen" 2>/dev/null | head -1
+      return 0
+    fi
+  fi
+
+  if [ -n "$project_name" ] && [ -d "/workspaces/$project_name/.pencil" ]; then
+    find "/workspaces/$project_name/.pencil" -maxdepth 4 -type f -name "*.pen" 2>/dev/null | head -1
+    return 0
+  fi
+
+  if [ -d "$PWD/.pencil" ]; then
+    find "$PWD/.pencil" -maxdepth 4 -type f -name "*.pen" 2>/dev/null | head -1
+    return 0
+  fi
+
+  find /workspaces -maxdepth 6 -type f -name "*.pen" 2>/dev/null | head -1
+}
+
+PEN_FILE="$(find_pen_file "$TARGET" || true)"
+if [ -z "$PEN_FILE" ]; then
+  echo "[pencil-ready] no .pen file found (pass one explicitly: pencil-ready /path/file.pen)" >&2
+  exit 1
+fi
+
+for _ in $(seq 1 "$TIMEOUT_SECS"); do
+  has_pencil_ext="false"
+  if ls -d /home/coder/.local/share/code-server/extensions/highagency.pencildev-* >/dev/null 2>&1; then
+    has_pencil_ext="true"
+  elif ls -d /home/coder/.vscode-server/extensions/highagency.pencildev-* >/dev/null 2>&1; then
+    has_pencil_ext="true"
+  fi
+
+  if [ "$has_pencil_ext" = "true" ] \
+    && curl -fsS "http://127.0.0.1:13337/" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+if ! curl -fsS "http://127.0.0.1:13337/" >/dev/null 2>&1; then
+  echo "[pencil-ready] code-server app on 127.0.0.1:13337 is not ready" >&2
+  exit 1
+fi
+
+"$CODE_SERVER_BIN" --reuse-window "$PEN_FILE" >/tmp/code-server-open-pen.log 2>&1 || true
+echo "[pencil-ready] active .pen editor prepared: $PEN_FILE"
+EOF
+sudo chmod +x /usr/local/bin/pencil-ready
+
 # --- HAPI Runner ---
 if [[ -n "${HAPI_HUB_URL:-}" && -n "${HAPI_CLI_API_TOKEN:-}" ]]; then
   log "configuring HAPI runner"
