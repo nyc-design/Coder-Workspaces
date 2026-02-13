@@ -24,6 +24,7 @@ workspace-images/          # Docker images for different development stacks
 └── python-dev/           # Python development environment (uses shared/install-python.sh)
 
 workspace-templates/       # Coder workspace template definitions
+├── windows-gcp-browser-rdp/ # Windows VM on GCP with browser-based RDP access
 ├── repo-devcontainer/    # Repository-based devcontainer template
 └── repo-envbuilder-agent/ # Repository template with AI agent selection
 
