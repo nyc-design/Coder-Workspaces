@@ -115,7 +115,7 @@ data "coder_parameter" "rdp_password" {
   type         = "string"
   form_type    = "input"
   mutable      = true
-  default      = "neil2730!"
+  default      = "CoderRDP2024!"
   order        = 9
 }
 
@@ -167,39 +167,48 @@ locals {
     $username = "${data.coder_parameter.rdp_username.value}"
     $password = "${data.coder_parameter.rdp_password.value}"
 
-    # Relax local password policy for this personal-use VM to allow simple passwords.
-    try {
-      secedit /export /cfg C:\Windows\Temp\secpol.cfg | Out-Null
-      (Get-Content C:\Windows\Temp\secpol.cfg) `
-        -replace '^PasswordComplexity\\s*=\\s*\\d+', 'PasswordComplexity = 0' `
-        -replace '^MinimumPasswordLength\\s*=\\s*\\d+', 'MinimumPasswordLength = 0' `
-        | Set-Content C:\Windows\Temp\secpol.cfg
-      secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Temp\secpol.cfg /areas SECURITYPOLICY | Out-Null
-    } catch {
-      Write-Host "Unable to relax local password policy: $($_.Exception.Message)"
-    }
-
-    try {
-      $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-      if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
-        Set-LocalUser -Name $username -Password $securePassword
-      } else {
-        New-LocalUser -Name $username -Password $securePassword -PasswordNeverExpires:$true -AccountNeverExpires:$true
-        Add-LocalGroupMember -Group "Administrators" -Member $username
-      }
-    } catch {
-      Write-Host "Failed to create/update local user '$username' (likely Windows password complexity). Error: $($_.Exception.Message)"
-      Write-Host "Use: gcloud compute reset-windows-password ${local.instance_name} --zone ${data.coder_parameter.gcp_zone.value} --user $username"
-    }
-
-    Set-ItemProperty -Path "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" -Name "fDenyTSConnections" -Value 0
-    # Disable Network Level Authentication (NLA) so Guacamole can connect with basic RDP security
-    Set-ItemProperty -Path "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp" -Name "UserAuthentication" -Value 0
+    # --- Enable RDP and disable NLA (must happen FIRST, before user creation) ---
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 0
     Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+    Write-Host "RDP enabled, NLA disabled."
 
+    # --- Relax password policy using net accounts (more reliable than secedit on fresh VMs) ---
+    net accounts /minpwlen:0 /maxpwage:unlimited /uniquepw:0
+    Write-Host "Password policy relaxed via net accounts."
+
+    # Also try secedit as belt-and-suspenders
+    try {
+      $cfg = "C:\Windows\Temp\secpol.cfg"
+      secedit /export /cfg $cfg | Out-Null
+      $content = Get-Content $cfg -Raw
+      $content = $content -replace '(?m)^PasswordComplexity\s*=\s*\d+', 'PasswordComplexity = 0'
+      $content = $content -replace '(?m)^MinimumPasswordLength\s*=\s*\d+', 'MinimumPasswordLength = 0'
+      Set-Content -Path $cfg -Value $content
+      secedit /configure /db C:\Windows\security\local.sdb /cfg $cfg /areas SECURITYPOLICY | Out-Null
+      Write-Host "Password complexity disabled via secedit."
+    } catch {
+      Write-Host "secedit fallback skipped: $($_.Exception.Message)"
+    }
+
+    # --- Create or update the RDP user via net user (works after policy relaxation) ---
+    $userExists = net user $username 2>&1 | Select-String "User name"
+    if ($userExists) {
+      net user $username $password
+      Write-Host "Updated password for user '$username'."
+    } else {
+      net user $username $password /add /passwordchg:no /expires:never /active:yes
+      net localgroup Administrators $username /add
+      Write-Host "Created user '$username' and added to Administrators."
+    }
+
+    # --- Format any raw data disk ---
     $rawDisk = Get-Disk | Where-Object PartitionStyle -Eq "RAW" | Select-Object -First 1
     if ($null -ne $rawDisk) {
-      Initialize-Disk -Number $rawDisk.Number -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | Format-Volume -FileSystem NTFS -NewFileSystemLabel "Data" -Confirm:$false
+      Initialize-Disk -Number $rawDisk.Number -PartitionStyle GPT -PassThru |
+        New-Partition -UseMaximumSize -AssignDriveLetter |
+        Format-Volume -FileSystem NTFS -NewFileSystemLabel "Data" -Confirm:$false
+      Write-Host "Formatted raw data disk."
     }
   EOT
 }
@@ -315,15 +324,15 @@ EOF
         --network "container:$${WORKSPACE_CONTAINER}" \
         flcontainers/guacamole:latest
 
-      # Wait for Guacamole API to be ready (try both /guacamole and / context paths)
+      # Wait for Guacamole API to be ready (try root path first, then /guacamole)
       echo "Waiting for Guacamole to start..."
       GUAC_BASE=""
       for i in $(seq 1 60); do
-        if curl -sf http://127.0.0.1:8080/guacamole/api/languages >/dev/null 2>&1; then
-          GUAC_BASE="http://127.0.0.1:8080/guacamole"
-          break
-        elif curl -sf http://127.0.0.1:8080/api/languages >/dev/null 2>&1; then
+        if curl -sf http://127.0.0.1:8080/api/languages >/dev/null 2>&1; then
           GUAC_BASE="http://127.0.0.1:8080"
+          break
+        elif curl -sf http://127.0.0.1:8080/guacamole/api/languages >/dev/null 2>&1; then
+          GUAC_BASE="http://127.0.0.1:8080/guacamole"
           break
         fi
         sleep 2
@@ -368,11 +377,15 @@ EOF
               "password": "${data.coder_parameter.rdp_password.value}",
               "security": "any",
               "ignore-cert": "true",
+              "color-depth": "24",
+              "dpi": "96",
               "resize-method": "display-update",
-              "enable-wallpaper": "true",
-              "enable-full-window-drag": "true",
-              "enable-desktop-composition": "true",
               "enable-font-smoothing": "true",
+              "enable-wallpaper": "false",
+              "enable-full-window-drag": "false",
+              "enable-desktop-composition": "false",
+              "enable-theming": "true",
+              "enable-menu-animations": "false",
               "clipboard-encoding": "UTF-8"
             },
             "attributes": {
@@ -483,7 +496,7 @@ resource "coder_app" "windows_desktop" {
   order        = 1
 
   healthcheck {
-    url       = "http://127.0.0.1:8080/"
+    url       = "http://127.0.0.1:8080/api/languages"
     interval  = 10
     threshold = 12
   }
