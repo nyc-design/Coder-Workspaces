@@ -370,8 +370,6 @@ module "workspace_runtime" {
   )
 
   extra_mounts = [
-    { container_path = "/home/coder/.claude/agents", host_path = "/home/ubuntu/secrets/.claude/agents", read_only = false },
-    { container_path = "/home/coder/.claude/skills", host_path = "/home/ubuntu/secrets/.claude/skills", read_only = false },
     { container_path = "/home/coder/.vscode-server", host_path = "/home/ubuntu/secrets/.vscode-server", read_only = false },
     { container_path = "/home/coder/.local/share/keyrings", host_path = "/home/ubuntu/secrets/keyrings", read_only = false },
   ]

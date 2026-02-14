@@ -239,7 +239,6 @@ module "workspace_runtime" {
   )
 
   extra_mounts = [
-    { container_path = "/home/coder/.claude", host_path = "/home/ubuntu/secrets/.claude", read_only = false },
     { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false },
     { container_path = "/home/coder/.cache/google-vscode-extension", host_path = "/home/ubuntu/secrets/google-vscode-extension", read_only = false },
   ]
