@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# mcp-cleanup — kill orphaned MCP server processes (PPID=1).
+#
+# Targets stdio-based MCP servers that were spawned by a now-dead Claude/HAPI
+# session and reparented to PID 1.  Does NOT touch processes with a living
+# parent (i.e. active sessions).
+#
+# Safe to run at any time — only kills processes whose parent is literally
+# PID 1 (init), which means the original parent is gone.
+#
+# Usage:
+#   mcp-cleanup          # one-shot: kill current orphans
+#   mcp-cleanup --watch  # loop every 5 minutes
+
+set -euo pipefail
+
+# MCP server process patterns to look for (the actual node/binary processes)
+PATTERNS=(
+    'likec4-mcp-server'
+    'stitch-mcp'
+    'signoz-mcp-server'
+    'playwright-mcp'
+    'mcp-server-linux-'   # pencil binary
+)
+
+kill_orphans() {
+    local killed=0
+    for pattern in "${PATTERNS[@]}"; do
+        # Find processes matching pattern whose PPID is 1
+        while IFS= read -r line; do
+            pid=$(echo "$line" | awk '{print $1}')
+            ppid=$(echo "$line" | awk '{print $2}')
+            if [[ "$ppid" == "1" && -n "$pid" ]]; then
+                cmd=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}')
+                echo "[mcp-cleanup] killing orphan PID $pid: $cmd"
+                kill "$pid" 2>/dev/null || true
+                ((killed++)) || true
+            fi
+        done < <(ps -eo pid,ppid,args 2>/dev/null | grep -F "$pattern" | grep -v grep | grep -v mcp-cleanup || true)
+    done
+
+    # Also kill orphaned npx/npm parent processes for MCP servers
+    while IFS= read -r line; do
+        pid=$(echo "$line" | awk '{print $1}')
+        ppid=$(echo "$line" | awk '{print $2}')
+        if [[ "$ppid" == "1" && -n "$pid" ]]; then
+            cmd=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}')
+            echo "[mcp-cleanup] killing orphan npm/npx PID $pid: $cmd"
+            kill "$pid" 2>/dev/null || true
+            ((killed++)) || true
+        fi
+    done < <(ps -eo pid,ppid,args 2>/dev/null | grep -E 'npm exec @(likec4|_davideast/stitch|playwright)' | grep -v grep | grep -v mcp-cleanup || true)
+
+    if [[ $killed -gt 0 ]]; then
+        echo "[mcp-cleanup] killed $killed orphaned MCP process(es)"
+        # Give SIGTERM a moment, then SIGKILL stragglers
+        sleep 2
+        for pattern in "${PATTERNS[@]}"; do
+            while IFS= read -r line; do
+                pid=$(echo "$line" | awk '{print $1}')
+                ppid=$(echo "$line" | awk '{print $2}')
+                if [[ "$ppid" == "1" && -n "$pid" ]]; then
+                    kill -9 "$pid" 2>/dev/null || true
+                fi
+            done < <(ps -eo pid,ppid,args 2>/dev/null | grep -F "$pattern" | grep -v grep | grep -v mcp-cleanup || true)
+        done
+    fi
+    return 0
+}
+
+if [[ "${1:-}" == "--watch" ]]; then
+    echo "[mcp-cleanup] starting watch mode (every 5 minutes)"
+    while true; do
+        kill_orphans
+        sleep 300
+    done
+else
+    kill_orphans
+fi

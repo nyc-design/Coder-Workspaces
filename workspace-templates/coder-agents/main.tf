@@ -293,6 +293,11 @@ resource "coder_agent" "main" {
   startup_script   = local.startup_script
   shutdown_script  = <<-EOT
     #!/bin/bash
+    # Kill orphaned MCP servers before shutdown to free resources
+    if command -v mcp-cleanup &>/dev/null; then
+      echo "[shutdown] cleaning up MCP servers..."
+      mcp-cleanup 2>/dev/null || true
+    fi
     # Gracefully stop HAPI runner + sessions so they don't linger as
     # orphans in the hub dashboard.
     if command -v hapi &>/dev/null; then

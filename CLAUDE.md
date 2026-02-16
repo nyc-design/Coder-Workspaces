@@ -56,7 +56,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 - Language-specific scripts placed in `/usr/local/share/workspace-init.d/` by child Dockerfiles
 - Auto-executed by Coder agent on workspace startup
 
-#### Base-dev Init Scripts (01-08)
+#### Base-dev Init Scripts (01-09)
 | Script | Purpose |
 |--------|---------|
 | `01-docker.sh` | Docker daemon startup, socket permissions |
@@ -67,6 +67,18 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `06-pencil.sh` | pencil-ready + pencil-close helpers |
 | `07-hapi.sh` | HAPI runner + agent session |
 | `08-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
+| `09-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
+
+### MCP Server Lifecycle Management
+Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
+
+1. **`mcp-wrap`** (`/usr/local/bin/mcp-wrap`) — Python wrapper that sets `PR_SET_PDEATHSIG(SIGTERM)` before `exec`'ing the real MCP server. The kernel automatically sends SIGTERM when the parent agent process dies. All stdio MCP commands in `mcp.tf` are wrapped: `command = "mcp-wrap"`, `args = ["original-cmd", ...]`. This is the primary defense.
+
+2. **`mcp-cleanup`** (`/usr/local/bin/mcp-cleanup`) — Bash script that finds and kills MCP processes whose PPID is 1 (reparented to init = orphaned). Runs as a background watcher every 5 minutes via `09-mcp-cleanup.sh` init script, and once during workspace shutdown. This is the safety net for edge cases (grandchild processes, npx wrappers).
+
+- HTTP-type MCP servers (context7, grep) are remote and unaffected
+- VS Code extension MCP configs (Gemini) are not wrapped — VS Code manages those lifecycles
+- The Coder MCP server is managed by the Coder agent itself
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

@@ -1,6 +1,15 @@
 # MCP server configurations for all agent types (Coder TOML, VS Code extensions, Claude Code)
 # These locals are consumed by main.tf via local.additional_mcp_toml,
 # local.additional_extensions_json, and local.mcp_claude.
+#
+# Stdio-type MCP servers are wrapped with `mcp-wrap` (Claude Code, Codex)
+# which sets PR_SET_PDEATHSIG so the kernel auto-kills them when the parent
+# agent process exits.  This prevents orphaned MCP servers from accumulating
+# across session restarts.
+#
+# VS Code extension configs (Gemini) are NOT wrapped — VS Code manages those
+# process lifecycles itself.  HTTP-type servers (context7, grep) don't spawn
+# local processes and are unaffected.
 
 locals {
   # ---------------------------------------------------------------------------
@@ -13,8 +22,8 @@ locals {
 
   pencil_mcp_toml = <<-EOT
     [mcp_servers.pencil]
-    command = "bash"
-    args = ["-c", "${local.pencil_mcp_cmd}"]
+    command = "mcp-wrap"
+    args = ["bash", "-c", "${local.pencil_mcp_cmd}"]
     type = "stdio"
   EOT
 
@@ -32,8 +41,8 @@ locals {
 
   pencil_mcp_claude_map = {
     pencil = {
-      command = "bash"
-      args    = ["-c", local.pencil_mcp_cmd]
+      command = "mcp-wrap"
+      args    = ["bash", "-c", local.pencil_mcp_cmd]
       type    = "stdio"
     }
   }
@@ -43,8 +52,8 @@ locals {
   # ---------------------------------------------------------------------------
   playwright_mcp_toml = <<-EOT
     [mcp_servers.playwright]
-    command = "npx"
-    args = ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
+    command = "mcp-wrap"
+    args = ["npx", "-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
     type = "stdio"
     startup_timeout_sec = 120
   EOT
@@ -63,14 +72,14 @@ locals {
 
   playwright_mcp_claude_map = {
     playwright = {
-      command = "npx"
-      args    = ["-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
+      command = "mcp-wrap"
+      args    = ["npx", "-y", "@playwright/mcp@latest", "--browser=chromium", "--no-sandbox", "--headless"]
       type    = "stdio"
     }
   }
 
   # ---------------------------------------------------------------------------
-  # Context7 — up-to-date library documentation
+  # Context7 — up-to-date library documentation (HTTP — no wrapping needed)
   # ---------------------------------------------------------------------------
   context7_mcp_toml_raw = <<-EOT
     [mcp_servers.context7]
@@ -101,7 +110,7 @@ locals {
   } : {}
 
   # ---------------------------------------------------------------------------
-  # Grep — search public GitHub repos for code examples
+  # Grep — search public GitHub repos for code examples (HTTP — no wrapping needed)
   # ---------------------------------------------------------------------------
   grep_mcp_toml = <<-EOT
     [mcp_servers.grep]
@@ -126,8 +135,8 @@ locals {
   # ---------------------------------------------------------------------------
   likec4_mcp_toml = <<-EOT
     [mcp_servers.likec4]
-    command = "npx"
-    args = ["-y", "@likec4/mcp"]
+    command = "mcp-wrap"
+    args = ["npx", "-y", "@likec4/mcp"]
     type = "stdio"
     startup_timeout_sec = 120
     [mcp_servers.likec4.env]
@@ -149,8 +158,8 @@ locals {
 
   likec4_mcp_claude_map = {
     likec4 = {
-      command = "npx"
-      args    = ["-y", "@likec4/mcp"]
+      command = "mcp-wrap"
+      args    = ["npx", "-y", "@likec4/mcp"]
       type    = "stdio"
       env     = { LIKEC4_WORKSPACE = "/workspaces/${local.project_name}" }
     }
@@ -161,8 +170,8 @@ locals {
   # ---------------------------------------------------------------------------
   stitch_mcp_toml = <<-EOT
     [mcp_servers.stitch]
-    command = "npx"
-    args = ["-y", "@_davideast/stitch-mcp", "proxy"]
+    command = "mcp-wrap"
+    args = ["npx", "-y", "@_davideast/stitch-mcp", "proxy"]
     type = "stdio"
     startup_timeout_sec = 180
     [mcp_servers.stitch.env]
@@ -185,8 +194,8 @@ locals {
 
   stitch_mcp_claude_map = {
     stitch = {
-      command = "npx"
-      args    = ["-y", "@_davideast/stitch-mcp", "proxy"]
+      command = "mcp-wrap"
+      args    = ["npx", "-y", "@_davideast/stitch-mcp", "proxy"]
       type    = "stdio"
       env     = { STITCH_USE_SYSTEM_GCLOUD = "1", STITCH_PROJECT_ID = "coder-nt" }
     }
@@ -197,8 +206,8 @@ locals {
   # ---------------------------------------------------------------------------
   signoz_mcp_toml = <<-EOT
     [mcp_servers.signoz]
-    command = "signoz-mcp-server"
-    args = []
+    command = "mcp-wrap"
+    args = ["signoz-mcp-server"]
     type = "stdio"
     [mcp_servers.signoz.env]
     SIGNOZ_URL = "${local.signoz_url}"
@@ -225,8 +234,8 @@ locals {
 
   signoz_mcp_claude_map = {
     signoz = {
-      command = "signoz-mcp-server"
-      args    = []
+      command = "mcp-wrap"
+      args    = ["signoz-mcp-server"]
       type    = "stdio"
       env     = {
         SIGNOZ_URL     = local.signoz_url
