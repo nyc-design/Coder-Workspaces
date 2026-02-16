@@ -21,16 +21,16 @@ This is **not** External Workspace mode.
 
 - **Workspace Image**: container image for the workspace.
   - Default is `codercom/enterprise-base:ubuntu-20250929` for a minimal gateway workspace.
-- **Workspace Directory**: default folder for code-server.
+- **Project Name**: folder name under `/workspaces` opened by workspace apps.
 - **Bare VM Host / User / SSH Port**: SSH target.
 - **Remote Path**: VM path to mount via SSHFS.
 - **Auto-mount Remote Files**: mount remote path at startup.
 - **SSH Key Filename**: key file name from mounted secrets path `/home/coder/secrets/ssh` (default `id_ed25519`).
-- **code-server Port**: local code-server port in container.
 
 ## Apps exposed in Coder
 
-- **Code Server**: browser IDE in container.
+- **Code Server**: browser IDE in container (from shared `workspace-apps` module).
+- **Cursor / VSCode Web / File Browser / Neovim**: standard apps from shared `workspace-apps` module.
 - **SSH to VM**: terminal app runs `ssh barevm`.
 - **Remote Files Shell**: terminal app opens in `/workspaces/remote-vm`.
 - **Remount Remote Files**: re-runs SSHFS mount command.
