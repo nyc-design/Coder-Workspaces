@@ -332,10 +332,9 @@ resource "coder_agent" "main" {
 
 }
 
-# Pin the "opus" and "default" model aliases to Opus 4.5 for Claude Code.
-# Without this, the aliases resolve to the latest (Opus 4.6).
+# Pin the "opus" model alias to Opus 4.5 for Claude Code.
+# Without this, the alias resolves to the latest (Opus 4.6).
 resource "coder_env" "anthropic_default_opus_model" {
-  count    = local.coding_agent == "claude" ? 1 : 0
   agent_id = coder_agent.main.id
   name     = "ANTHROPIC_DEFAULT_OPUS_MODEL"
   value    = "claude-opus-4-5-20251101"
