@@ -13,6 +13,8 @@ locals {
       "GH_TOKEN=${var.github_pat}",
       "GITHUB_TOKEN=${var.github_pat}",
       "GITHUB_PAT=${var.github_pat}",
+      # Pin the "opus" model alias to Opus 4.5 for Claude Code
+      "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-5-20251101",
     ],
     var.include_playwright_mcp_browser ? ["PLAYWRIGHT_MCP_BROWSER=chromium"] : []
   )
