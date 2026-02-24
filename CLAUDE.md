@@ -85,21 +85,27 @@ Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become 
 RTK automatically optimizes command output to reduce token costs across all AI agents.
 
 **How it works:**
-- **Auto-active via PreToolUse hook** — All Bash commands from Claude Code are transparently rewritten to use `rtk` prefix
-- **Cross-agent support** — Shell integration via `~/.rtkrc` works for Codex, Gemini, and other agents
-- **Intelligent summarization** — Recognizes and optimizes output from git, ls, tree, find, ps, docker, kubectl, npm, pip, cargo, and more
-- **Token savings tracking** — Run `rtk gain` to see cumulative token reduction
+- **Claude Code** — PreToolUse hooks transparently rewrite Bash commands before execution
+- **Codex/Gemini/HAPI** — Shell aliases automatically wrap common commands (git, ls, docker, kubectl, npm, pip, etc.)
+- **Intelligent summarization** — Recognizes and optimizes output from 20+ common CLI tools
+- **Token savings tracking** — Run `rtk gain` to see cumulative token reduction across all agents
 
-**Initialization:**
-- Uses RTK's built-in `rtk init -g --auto-patch` command (runs automatically on workspace startup)
-- RTK handles settings backup, hook script creation, and JSON patching
-- No manual configuration required
+**Dual initialization strategy:**
+1. **Claude Code hooks** — Uses RTK's built-in `rtk init -g --auto-patch` for PreToolUse integration
+   - RTK handles settings backup, hook script creation, and JSON patching
+   - Requires Claude Code restart after first init to activate
+
+2. **Shell aliases** — Auto-configured in `~/.rtk_aliases` and sourced in `~/.bashrc`
+   - Active for non-Claude agents (Codex, Gemini, HAPI) in non-interactive shells
+   - Covers: git, ls, tree, find, cat, head, tail, grep, ps, docker, kubectl, npm, pip, cargo
+   - Doesn't interfere with user's interactive terminal sessions
 
 **Key files:**
 - `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (created by rtk init)
 - `~/.claude/settings.json` — Hook registration (backed up to .bak by rtk init)
+- `~/.rtk_aliases` — Shell alias definitions for Codex/Gemini/HAPI
+- `~/.bashrc` — Sources RTK aliases (appended during init)
 - `~/.claude/RTK.md` — Minimal reference documentation (reduces inline token cost)
-- `~/.rtkrc` — Shell integration config for non-Claude agents
 
 **Manual usage:**
 ```bash
@@ -109,8 +115,9 @@ rtk gain                    # Check token savings
 
 **Installation:**
 - Binary installed to `/usr/local/bin/rtk` during Docker build (multi-arch support)
-- Hook configuration runs automatically via `05-rtk.sh` on workspace startup
-- Requires restart of Claude Code after first init to activate hooks
+- Dual configuration runs automatically via `05-rtk.sh` on workspace startup
+- Claude Code: restart required after first init
+- Codex/Gemini/HAPI: active immediately in new shell sessions
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
