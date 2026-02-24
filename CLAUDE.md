@@ -90,9 +90,14 @@ RTK automatically optimizes command output to reduce token costs across all AI a
 - **Intelligent summarization** — Recognizes and optimizes output from git, ls, tree, find, ps, docker, kubectl, npm, pip, cargo, and more
 - **Token savings tracking** — Run `rtk gain` to see cumulative token reduction
 
+**Initialization:**
+- Uses RTK's built-in `rtk init -g --auto-patch` command (runs automatically on workspace startup)
+- RTK handles settings backup, hook script creation, and JSON patching
+- No manual configuration required
+
 **Key files:**
-- `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (auto-configured by init)
-- `~/.claude/settings.json` — Hook registration (backed up before modification)
+- `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (created by rtk init)
+- `~/.claude/settings.json` — Hook registration (backed up to .bak by rtk init)
 - `~/.claude/RTK.md` — Minimal reference documentation (reduces inline token cost)
 - `~/.rtkrc` — Shell integration config for non-Claude agents
 

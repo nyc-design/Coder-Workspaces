@@ -7,7 +7,7 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
-    tree ripgrep fd-find jq \
+    tree ripgrep fd-find \
  && rm -rf /var/lib/apt/lists/*
 
 # Neovim (0.10+ from GitHub — apt only has 0.9.x on Ubuntu 24.04)
