@@ -13,8 +13,8 @@ This repository contains Docker build files and initialization scripts for Coder
 └── build-python-dev.yaml # Python development image build
 
 workspace-images/          # Docker images for different development stacks
-├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, Claude Code)
-│   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 08-shell-helpers)
+├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, Claude Code, RTK)
+│   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 05-rtk, ..., 10-mcp-cleanup)
 ├── shared/               # Shared install scripts used by multiple images
 │   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
 ├── cpp-dev/              # C++ development environment
@@ -52,22 +52,23 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ### Initialization System
 - Modular init scripts in `workspace-images/base-dev/init.d/` are COPY'd to `/usr/local/share/workspace-init.d/`
 - `run-workspace-inits` runner iterates `workspace-init.d/*.sh` in sorted order
-- Numbering convention: `01-09` base-dev core, `20-29` language-specific, `30-39` composite
+- Numbering convention: `01-10` base-dev core, `20-29` language-specific, `30-39` composite
 - Language-specific scripts placed in `/usr/local/share/workspace-init.d/` by child Dockerfiles
 - Auto-executed by Coder agent on workspace startup
 
-#### Base-dev Init Scripts (01-09)
+#### Base-dev Init Scripts (01-10)
 | Script | Purpose |
 |--------|---------|
 | `01-docker.sh` | Docker daemon startup, socket permissions |
 | `02-starship.sh` | Starship prompt + Lion theme |
 | `03-git.sh` | GitHub auth, git pull defaults, global gitignore |
 | `04-gcp.sh` | GCP project setup, secrets discovery + loading |
-| `05-code-server.sh` | Workspace trust pre-configuration |
-| `06-pencil.sh` | pencil-ready + pencil-close helpers |
-| `07-hapi.sh` | HAPI runner + agent session |
-| `08-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
-| `09-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
+| `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
+| `06-code-server.sh` | Workspace trust pre-configuration |
+| `07-pencil.sh` | pencil-ready + pencil-close helpers |
+| `08-hapi.sh` | HAPI runner + agent session |
+| `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
+| `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
 
 ### MCP Server Lifecycle Management
 Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
@@ -79,6 +80,32 @@ Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become 
 - HTTP-type MCP servers (context7, grep) are remote and unaffected
 - VS Code extension MCP configs (Gemini) are not wrapped — VS Code manages those lifecycles
 - The Coder MCP server is managed by the Coder agent itself
+
+### RTK (Reducer ToolKit) — LLM Context Optimization
+RTK automatically optimizes command output to reduce token costs across all AI agents.
+
+**How it works:**
+- **Auto-active via PreToolUse hook** — All Bash commands from Claude Code are transparently rewritten to use `rtk` prefix
+- **Cross-agent support** — Shell integration via `~/.rtkrc` works for Codex, Gemini, and other agents
+- **Intelligent summarization** — Recognizes and optimizes output from git, ls, tree, find, ps, docker, kubectl, npm, pip, cargo, and more
+- **Token savings tracking** — Run `rtk gain` to see cumulative token reduction
+
+**Key files:**
+- `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (auto-configured by init)
+- `~/.claude/settings.json` — Hook registration (backed up before modification)
+- `~/.claude/RTK.md` — Minimal reference documentation (reduces inline token cost)
+- `~/.rtkrc` — Shell integration config for non-Claude agents
+
+**Manual usage:**
+```bash
+rtk git log --oneline -20  # Explicitly wrap any command
+rtk gain                    # Check token savings
+```
+
+**Installation:**
+- Binary installed to `/usr/local/bin/rtk` during Docker build (multi-arch support)
+- Hook configuration runs automatically via `05-rtk.sh` on workspace startup
+- Requires restart of Claude Code after first init to activate hooks
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
@@ -107,7 +134,7 @@ Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become 
 - Tagged with both `:latest` and `:sha-{commit}` for version control
 
 ### Modifying Init Scripts
-1. Edit the relevant script in `workspace-images/base-dev/init.d/` (01-08 for base concerns)
+1. Edit the relevant script in `workspace-images/base-dev/init.d/` (01-10 for base concerns)
 2. For language-specific init, edit `workspace-images/{image}/` init scripts
 3. Push changes to trigger automatic Docker build via GitHub Actions
 4. New images automatically available in the container registry

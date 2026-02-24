@@ -7,7 +7,7 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
-    tree ripgrep fd-find \
+    tree ripgrep fd-find jq \
  && rm -rf /var/lib/apt/lists/*
 
 # Neovim (0.10+ from GitHub — apt only has 0.9.x on Ubuntu 24.04)
@@ -54,6 +54,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # AI coding CLIs + architecture tooling + skills ecosystem
 RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli @twsxtd/hapi likec4 skills tree-sitter-cli \
  && chmod -R a+w /usr/lib/node_modules/likec4/
+
+# RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
+# Install to /usr/local/bin for system-wide availability across all agents
+RUN ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && RTK_ARCH="x86_64" || RTK_ARCH="aarch64" \
+ && curl -fsSL "https://github.com/rtk-ai/rtk/releases/latest/download/rtk-${RTK_ARCH}-unknown-linux-musl.tar.gz" \
+    | tar xz -C /usr/local/bin/ \
+ && chmod +x /usr/local/bin/rtk
 
 # just (command runner) + just-lsp (language server for VS Code)
 RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/latest" | grep -Po '"tag_name": "\K[^"]*') \
