@@ -96,9 +96,10 @@ RTK automatically optimizes command output to reduce token costs across all AI a
    - Requires Claude Code restart after first init to activate
 
 2. **Shell aliases** — Auto-configured in `~/.rtk_aliases` and sourced in `~/.bashrc`
-   - Active for non-Claude agents (Codex, Gemini, HAPI) in non-interactive shells
+   - Active ONLY in non-interactive shells (AI agent command execution)
    - Covers: git, ls, tree, find, cat, head, tail, grep, ps, docker, kubectl, npm, pip, cargo
-   - Doesn't interfere with user's interactive terminal sessions
+   - Automatically disabled in interactive terminals (user sessions won't see aliases)
+   - Detection: Checks if shell flags (`$-`) contain 'i' (interactive mode)
 
 **Key files:**
 - `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (created by rtk init)

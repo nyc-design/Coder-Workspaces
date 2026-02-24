@@ -43,12 +43,15 @@ echo "[RTK] Configuring shell aliases for Codex/Gemini/HAPI..."
 RTK_ALIASES="$HOME/.rtk_aliases"
 cat > "$RTK_ALIASES" << 'EOF'
 # RTK (Reducer ToolKit) — Shell aliases for automatic context optimization
-# These aliases make common commands use rtk automatically for all AI agents.
+# These aliases make common commands use rtk automatically for AI agents.
 # Claude Code uses PreToolUse hooks instead, so these won't affect it.
 
-# Only enable aliases for non-interactive shells (AI agent sessions)
-# This prevents conflicts with user's manual terminal usage
-if [[ $- != *i* ]] || [[ -n "${CODER_AGENT_TOKEN:-}" ]]; then
+# Only enable aliases for AI agent command execution (non-interactive shells)
+# Explicitly DISABLE for interactive terminals to prevent user interference
+# Detection strategy:
+#   - Interactive shells ($- contains 'i'): DISABLE (user's terminal)
+#   - Non-interactive shells: ENABLE (AI agents executing commands)
+if [[ $- != *i* ]]; then
   # Version control
   alias git='rtk git'
 
