@@ -57,7 +57,8 @@ RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli @t
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
 # Install to /usr/local/bin for system-wide availability across all agents
-RUN ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && RTK_ARCH="x86_64" || RTK_ARCH="aarch64" \
+RUN ARCH=$(uname -m) \
+ && if [ "$ARCH" = "x86_64" ]; then RTK_ARCH="x86_64"; else RTK_ARCH="aarch64"; fi \
  && curl -fsSL "https://github.com/rtk-ai/rtk/releases/latest/download/rtk-${RTK_ARCH}-unknown-linux-musl.tar.gz" \
     | tar xz -C /usr/local/bin/ \
  && chmod +x /usr/local/bin/rtk
