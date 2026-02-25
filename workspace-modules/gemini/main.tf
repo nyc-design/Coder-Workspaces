@@ -172,25 +172,22 @@ resource "coder_env" "gemini_use_vertex_ai" {
 
 locals {
   # Only include Coder MCP extension when AgentAPI is enabled
-  base_extensions = var.install_agentapi ? <<-EOT
-{
-  "coder": {
-    "args": ["exp", "mcp","server"],
-    "command": "coder",
-    "description": "Report ALL tasks and statuses (in progress, done, failed) you are working on.",
-    "enabled": true,
-    "env": {
-      "CODER_MCP_APP_STATUS_SLUG": "${local.app_slug}",
-      "CODER_MCP_AI_AGENTAPI_URL": "http://localhost:3284"
-    },
-    "name": "Coder",
-    "timeout": 3000,
-    "type": "stdio",
-    "trust": true
-  }
-}
-EOT
-  : "{}"  # Empty JSON when AgentAPI disabled
+  base_extensions = var.install_agentapi ? jsonencode({
+    coder = {
+      args        = ["exp", "mcp", "server"]
+      command     = "coder"
+      description = "Report ALL tasks and statuses (in progress, done, failed) you are working on."
+      enabled     = true
+      env = {
+        CODER_MCP_APP_STATUS_SLUG = local.app_slug
+        CODER_MCP_AI_AGENTAPI_URL = "http://localhost:3284"
+      }
+      name    = "Coder"
+      timeout = 3000
+      type    = "stdio"
+      trust   = true
+    }
+  }) : "{}"
 
   app_slug        = "gemini"
   install_script  = file("${path.module}/scripts/install.sh")
