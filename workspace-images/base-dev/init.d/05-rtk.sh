@@ -38,6 +38,14 @@ fi
 # 2. Create shell aliases for Codex, Gemini, and HAPI agents
 # Since RTK's PreToolUse hooks only work in Claude Code, we need shell-level
 # aliases to make common commands automatically use rtk for other agents.
+#
+# Loading strategy:
+#   - BASH_ENV: Primary mechanism. Bash sources $BASH_ENV for every
+#     non-interactive shell invocation (how AI agents run commands).
+#   - .profile: Fallback for login shells (bash -l).
+#   - .bashrc: Fallback for interactive shells that source it.
+#   - The alias file itself guards with [[ $- != *i* ]] so aliases
+#     only activate in non-interactive shells (AI agent execution).
 echo "[RTK] Configuring shell aliases for Codex/Gemini/HAPI..."
 
 RTK_ALIASES="$HOME/.rtk_aliases"
@@ -54,20 +62,16 @@ cat > "$RTK_ALIASES" << 'EOF'
 if [[ $- != *i* ]]; then
   # Version control
   alias git='rtk git'
+  alias gh='rtk gh'
 
   # File listing and navigation
   alias ls='rtk ls'
   alias tree='rtk tree'
   alias find='rtk find'
 
-  # File viewing
-  alias cat='rtk cat'
-  alias head='rtk head'
-  alias tail='rtk tail'
+  # File search
   alias grep='rtk grep'
-
-  # Process management
-  alias ps='rtk ps'
+  alias rg='rtk rg'
 
   # Container tools
   alias docker='rtk docker'
@@ -76,25 +80,42 @@ if [[ $- != *i* ]]; then
   # Package managers
   alias npm='rtk npm'
   alias pip='rtk pip'
-  alias cargo='rtk cargo'
 fi
 EOF
 
-# Source aliases in .bashrc if not already present
-if ! grep -q "source.*\.rtk_aliases" "$HOME/.bashrc" 2>/dev/null; then
+# 3. Set BASH_ENV so non-interactive shells source the aliases file.
+# This is the critical path — .bashrc exits early for non-interactive shells,
+# and .profile only loads for login shells. BASH_ENV is the only mechanism
+# that reliably loads for `bash -c "command"` invocations used by AI agents.
+
+# Add BASH_ENV to .profile (login shells propagate it to child processes)
+if ! grep -q 'BASH_ENV=.*\.rtk_aliases' "$HOME/.profile" 2>/dev/null; then
+  cat >> "$HOME/.profile" << 'EOF'
+
+# RTK: ensure aliases load in non-interactive shells (AI agent commands)
+export BASH_ENV="$HOME/.rtk_aliases"
+EOF
+  echo "[RTK] ✓ BASH_ENV export added to .profile"
+else
+  echo "[RTK] ✓ BASH_ENV already configured in .profile"
+fi
+
+# Add BASH_ENV to .bashrc (covers interactive shells that spawn subshells)
+if ! grep -q 'BASH_ENV=.*\.rtk_aliases' "$HOME/.bashrc" 2>/dev/null; then
   cat >> "$HOME/.bashrc" << 'EOF'
 
-# RTK context optimization aliases (auto-configured by workspace init)
-if [ -f "$HOME/.rtk_aliases" ]; then
-  source "$HOME/.rtk_aliases"
-fi
+# RTK: ensure aliases load in non-interactive shells (AI agent commands)
+export BASH_ENV="$HOME/.rtk_aliases"
 EOF
-  echo "[RTK] ✓ Shell aliases added to .bashrc"
+  echo "[RTK] ✓ BASH_ENV export added to .bashrc"
 else
-  echo "[RTK] ✓ Shell aliases already configured in .bashrc"
+  echo "[RTK] ✓ BASH_ENV already configured in .bashrc"
 fi
 
-# 3. Create minimal RTK reference document (reduces token cost vs inline docs)
+# Also set BASH_ENV for the current init session so subsequent scripts inherit it
+export BASH_ENV="$RTK_ALIASES"
+
+# 4. Create minimal RTK reference document (reduces token cost vs inline docs)
 # This is separate from RTK's built-in docs and tailored for workspace usage
 CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
@@ -109,12 +130,12 @@ RTK (Reducer ToolKit) optimizes LLM context by intelligently summarizing command
 **Manual usage**: `rtk <command>` for any shell command
 **Check savings**: `rtk gain` shows cumulative token reduction
 
-Supports: git, ls, tree, find, ps, docker, kubectl, npm, pip, cargo, and more.
+Supports: git, ls, tree, find, grep, rg, docker, kubectl, npm, pip, gh, pytest, and more.
 EOF
 
 echo "[RTK] ✓ Created reference document at $CLAUDE_DIR/RTK.md"
 echo ""
 echo "[RTK] Initialization complete! Configuration summary:"
 echo "  • Claude Code: PreToolUse hooks (restart Claude Code to activate)"
-echo "  • Codex/Gemini/HAPI: Shell aliases (active in new shell sessions)"
+echo "  • Codex/Gemini/HAPI: Shell aliases via BASH_ENV (active in new shells)"
 echo "  • Token savings tracked automatically with: rtk gain"

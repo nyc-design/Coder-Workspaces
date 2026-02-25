@@ -52,11 +52,11 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ### Initialization System
 - Modular init scripts in `workspace-images/base-dev/init.d/` are COPY'd to `/usr/local/share/workspace-init.d/`
 - `run-workspace-inits` runner iterates `workspace-init.d/*.sh` in sorted order
-- Numbering convention: `01-10` base-dev core, `20-29` language-specific, `30-39` composite
+- Numbering convention: `01-11` base-dev core, `20-29` language-specific, `30-39` composite
 - Language-specific scripts placed in `/usr/local/share/workspace-init.d/` by child Dockerfiles
 - Auto-executed by Coder agent on workspace startup
 
-#### Base-dev Init Scripts (01-10)
+#### Base-dev Init Scripts (01-11)
 | Script | Purpose |
 |--------|---------|
 | `01-docker.sh` | Docker daemon startup, socket permissions |
@@ -69,6 +69,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
+| `11-agent-prompts.sh` | Write system prompt to all agent config home dirs |
 
 ### MCP Server Lifecycle Management
 Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
@@ -95,17 +96,18 @@ RTK automatically optimizes command output to reduce token costs across all AI a
    - RTK handles settings backup, hook script creation, and JSON patching
    - Requires Claude Code restart after first init to activate
 
-2. **Shell aliases** — Auto-configured in `~/.rtk_aliases` and sourced in `~/.bashrc`
+2. **Shell aliases** — Auto-configured in `~/.rtk_aliases`, loaded via `BASH_ENV`
    - Active ONLY in non-interactive shells (AI agent command execution)
-   - Covers: git, ls, tree, find, cat, head, tail, grep, ps, docker, kubectl, npm, pip, cargo
-   - Automatically disabled in interactive terminals (user sessions won't see aliases)
-   - Detection: Checks if shell flags (`$-`) contain 'i' (interactive mode)
+   - Covers: git, gh, ls, tree, find, grep, rg, docker, kubectl, npm, pip
+   - Loaded via `BASH_ENV` — bash sources this file for every non-interactive shell
+   - `.profile` and `.bashrc` export `BASH_ENV=$HOME/.rtk_aliases`
+   - Alias file guards with `[[ $- != *i* ]]` to disable in interactive terminals
 
 **Key files:**
 - `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (created by rtk init)
 - `~/.claude/settings.json` — Hook registration (backed up to .bak by rtk init)
 - `~/.rtk_aliases` — Shell alias definitions for Codex/Gemini/HAPI
-- `~/.bashrc` — Sources RTK aliases (appended during init)
+- `~/.profile` / `~/.bashrc` — Export `BASH_ENV` pointing to aliases file
 - `~/.claude/RTK.md` — Minimal reference documentation (reduces inline token cost)
 
 **Manual usage:**
