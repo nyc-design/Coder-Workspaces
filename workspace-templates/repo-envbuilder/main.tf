@@ -202,23 +202,20 @@ resource "coder_agent" "main" {
   os             = "linux"
   startup_script = local.startup_script
 
-  shutdown_script = local.is_agent_mode ? <<-EOT
+  # Shutdown cleanup is safe in both modes — commands no-op if nothing's running
+  shutdown_script = <<-EOT
     #!/bin/bash
-    # Kill orphaned MCP servers before shutdown to free resources
     if command -v mcp-cleanup &>/dev/null; then
       echo "[shutdown] cleaning up MCP servers..."
       mcp-cleanup 2>/dev/null || true
     fi
-    # Gracefully stop HAPI runner + sessions
     if command -v hapi &>/dev/null; then
       echo "[shutdown] stopping HAPI runner..."
       hapi runner stop 2>/dev/null || true
       sleep 2
-      echo "[shutdown] cleaning up remaining HAPI processes..."
       hapi doctor clean 2>/dev/null || true
     fi
   EOT
-  : null
 
   dir = "/workspaces/${local.project_name}"
 
