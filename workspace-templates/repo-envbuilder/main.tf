@@ -39,7 +39,9 @@ data "coder_external_auth" "github" {
 }
 
 module "workspace_secrets" {
-  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+  include_hapi     = local.is_agent_mode
+  include_context7 = local.is_agent_mode
 }
 
 module "workspace_startup" {
@@ -48,6 +50,25 @@ module "workspace_startup" {
 
 locals{
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  is_agent_mode   = data.coder_parameter.workspace_mode.value == "agent"
+}
+
+data "coder_parameter" "workspace_mode" {
+  name         = "workspace_mode"
+  display_name = "Workspace Mode"
+  type         = "string"
+  default      = "self"
+  description  = "Self: personal development workspace. Agent: HAPI-managed AI agent workspace."
+  order        = -1
+
+  option {
+    name  = "Personal"
+    value = "self"
+  }
+  option {
+    name  = "AI Agent (HAPI)"
+    value = "agent"
+  }
 }
 
 data "coder_parameter" "is_existing_project" {
@@ -132,16 +153,16 @@ data "coder_parameter" "new_project_name" {
 locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
-  
+
   # Project name logic
   project_name = local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value
-  
+
   # Project type for workspace image selection
   project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
-  
+
   # GCP project (optional)
   gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
-  
+
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
@@ -153,9 +174,8 @@ locals {
   new_repo_url = local.is_new_project ? "https://github.com/nyc-design/Project-Scaffolds.git#scaffold/${local.project_type}" : ""
 
   existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
-   
-  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
 
+  repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
 }
 
 module "workspace_envbuilder" {
@@ -182,6 +202,24 @@ resource "coder_agent" "main" {
   os             = "linux"
   startup_script = local.startup_script
 
+  shutdown_script = local.is_agent_mode ? <<-EOT
+    #!/bin/bash
+    # Kill orphaned MCP servers before shutdown to free resources
+    if command -v mcp-cleanup &>/dev/null; then
+      echo "[shutdown] cleaning up MCP servers..."
+      mcp-cleanup 2>/dev/null || true
+    fi
+    # Gracefully stop HAPI runner + sessions
+    if command -v hapi &>/dev/null; then
+      echo "[shutdown] stopping HAPI runner..."
+      hapi runner stop 2>/dev/null || true
+      sleep 2
+      echo "[shutdown] cleaning up remaining HAPI processes..."
+      hapi doctor clean 2>/dev/null || true
+    fi
+  EOT
+  : null
+
   dir = "/workspaces/${local.project_name}"
 
   env = {
@@ -201,12 +239,6 @@ resource "coder_agent" "main" {
       timeout      = metadata.value.timeout
     }
   }
-
-
-
-
-
-
 }
 
 module "workspace_runtime" {
@@ -220,11 +252,19 @@ module "workspace_runtime" {
   agent_id                   = coder_agent.main.id
   docker_env                 = module.workspace_envbuilder.docker_env
   github_pat                 = module.workspace_secrets.github_pat
+  include_playwright_mcp_browser = local.is_agent_mode
+
   extra_env = concat(
     [
       "SIGNOZ_URL=${module.workspace_secrets.signoz_url}",
       "SIGNOZ_API_KEY=${module.workspace_secrets.signoz_api_key}",
     ],
+    local.is_agent_mode ? [
+      "HAPI_HUB_URL=http://host.docker.internal:3006",
+      "HAPI_CLI_API_TOKEN=${module.workspace_secrets.hapi_cli_api_token}",
+      "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
+      "HAPI_AGENT=claude"
+    ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
       "NEW_PROJECT_TYPE=${local.project_type}",
@@ -233,7 +273,10 @@ module "workspace_runtime" {
     ] : [],
     local.gcp_project != "" ? [
       "CODER_GCP_PROJECT=${local.gcp_project}",
-    ] : []
+      "GOOGLE_CLOUD_PROJECT=${local.gcp_project}",
+    ] : [
+      "GOOGLE_CLOUD_PROJECT=coder-nt",
+    ]
   )
 
   extra_mounts = [
@@ -248,4 +291,16 @@ module "workspace_apps" {
   agent_id     = coder_agent.main.id
   project_name = local.project_name
   enable_apps  = true
+}
+
+# HAPI dashboard link — only in agent mode
+resource "coder_app" "hapi" {
+  count        = local.is_agent_mode ? 1 : 0
+  agent_id     = coder_agent.main.id
+  slug         = "hapi"
+  display_name = "HAPI"
+  icon         = "/icon/terminal.svg"
+  url          = "https://hapi.tapiavala.com"
+  external     = true
+  order        = 10
 }

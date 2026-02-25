@@ -62,8 +62,7 @@ jobs:
 
           if [ "$mode" = "agent" ]; then
             workspace_name="${REPO_NAME}-Agents"
-            template="coder-agents"
-            preset="HAPI Workspace"
+            params+=(--parameter workspace_mode=agent)
           fi
 
           existing_json="$(coder ls --output json || echo "[]")"
@@ -104,7 +103,7 @@ jobs:
         run: |
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
           Workspace: $WORKSPACE_NAME  
-          Template: $([[ "$MODE" == "agent" ]] && echo "coder-agents" || echo "repo-envbuilder")  
+          Template: repo-envbuilder$([[ "$MODE" == "agent" ]] && echo " (agent mode)" || echo "")
           Status: $WORKSPACE_STATUS  
           Link: $WORKSPACE_URL
           EOF

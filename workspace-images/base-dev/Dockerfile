@@ -133,6 +133,8 @@ COPY workspace-images/base-dev/bin/mcp-wrap /usr/local/bin/mcp-wrap
 COPY workspace-images/base-dev/bin/mcp-cleanup /usr/local/bin/mcp-cleanup
 RUN chmod +x /usr/local/bin/mcp-wrap /usr/local/bin/mcp-cleanup
 
+COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-init.d/system_prompt.txt
+
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
 RUN chmod +x /usr/local/share/workspace-init.d/*.sh
 

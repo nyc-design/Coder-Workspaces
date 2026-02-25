@@ -1,18 +1,16 @@
-# Claude Code module
-# HAPI mode: always installed (count=1), install_agentapi=false, report_tasks=false
-# Task mode: installed only when selected (count based on coding_agent), install_agentapi=true, report_tasks=true
+# Claude Code module — task mode only
 module "claude-code" {
-  count                   = local.install_agentapi ? (local.coding_agent == "claude" ? 1 : 0) : 1
+  count                   = local.coding_agent == "claude" ? 1 : 0
   source                  = "registry.coder.com/coder/claude-code/coder"
   version                 = "4.7.5"
   agent_id                = coder_agent.main.id
-  claude_code_oauth_token = "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"
+  claude_code_oauth_token = local.claude_oauth_token
   workdir                 = "/workspaces/${local.project_name}"
   model                   = "opus"
   install_claude_code     = false
-  install_agentapi        = local.install_agentapi  # false in HAPI mode, true in task mode
+  install_agentapi        = true
   agentapi_version        = "v0.10.0"
-  report_tasks            = local.install_agentapi  # false in HAPI mode, true in task mode
+  report_tasks            = true
   continue                = true
   order                   = 999
   system_prompt           = data.coder_parameter.system_prompt.value
@@ -21,11 +19,9 @@ module "claude-code" {
   permission_mode         = "bypassPermissions"
 }
 
-# Gemini CLI module
-# HAPI mode: always installed with install_agentapi=false
-# Task mode: installed only when selected with install_agentapi=true
+# Gemini CLI module — task mode only
 module "gemini" {
-  count  = local.install_agentapi ? (local.coding_agent == "gemini" ? 1 : 0) : 1
+  count  = local.coding_agent == "gemini" ? 1 : 0
   source = "github.com/nyc-design/Coder-Workspaces//workspace-modules/gemini"
 
   agent_id              = coder_agent.main.id
@@ -34,7 +30,7 @@ module "gemini" {
   icon                  = "/icon/gemini.svg"
   install_gemini        = false # Already installed in base image
   gemini_api_key        = local.ai_api_key
-  install_agentapi      = local.install_agentapi  # false in HAPI mode, true in task mode
+  install_agentapi      = true
   agentapi_version      = "v0.10.0"
   gemini_system_prompt  = data.coder_parameter.system_prompt.value
   enable_yolo_mode      = true
@@ -42,11 +38,9 @@ module "gemini" {
   additional_extensions = local.additional_extensions_json
 }
 
-# Codex module
-# HAPI mode: always installed with install_agentapi=false, report_tasks=false
-# Task mode: installed only when selected with install_agentapi=true, report_tasks=true
+# Codex module — task mode only
 module "codex" {
-  count  = local.install_agentapi ? (local.coding_agent == "codex" ? 1 : 0) : 1
+  count  = local.coding_agent == "codex" ? 1 : 0
   source = "github.com/nyc-design/Coder-Workspaces//workspace-modules/codex"
 
   agent_id               = coder_agent.main.id
@@ -56,19 +50,17 @@ module "codex" {
   web_app_display_name   = "Codex"
   install_codex          = false
   openai_api_key         = local.ai_api_key
-  install_agentapi       = local.install_agentapi  # false in HAPI mode, true in task mode
+  install_agentapi       = true
   agentapi_version       = "v0.10.0"
-  report_tasks           = local.install_agentapi  # false in HAPI mode, true in task mode
+  report_tasks           = true
   codex_system_prompt    = data.coder_parameter.system_prompt.value
   ai_prompt              = data.coder_task.me.prompt
   continue               = true
   additional_mcp_servers = local.additional_mcp_toml
 }
 
-# Coder AI Task - only created in task automation mode
+# Coder AI Task — routes the task prompt to the selected agent's agentapi
 resource "coder_ai_task" "task" {
-  count = local.install_agentapi ? 1 : 0
-
   app_id = (
     local.coding_agent == "claude" && length(module.claude-code) > 0 ? module.claude-code[0].task_app_id :
     local.coding_agent == "gemini" && length(module.gemini) > 0 ? module.gemini[0].task_app_id :
@@ -76,4 +68,3 @@ resource "coder_ai_task" "task" {
     ""
   )
 }
-

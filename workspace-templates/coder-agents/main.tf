@@ -42,7 +42,6 @@ data "coder_external_auth" "github" {
 module "workspace_secrets" {
   source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
   include_context7 = true
-  include_hapi     = true
 }
 
 module "workspace_startup" {
@@ -63,7 +62,9 @@ locals{
 
   gh_project_name = local.gh_repo != "" ? (length(split("/", local.gh_repo)) > 1 ? element(split("/", local.gh_repo), 1) : local.gh_repo) : ""
   main_system_prompt = trimspace(file("${path.module}/system_prompt.txt"))
-  
+
+  # OAuth token for Claude Code module
+  claude_oauth_token = "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"
 }
 
 data "coder_workspace_preset" "issue_automation" {
@@ -93,31 +94,8 @@ data "coder_workspace_preset" "issue_automation" {
     system_prompt       = local.main_system_prompt
     repo_name           = "Coder-Workspaces"
     gcp_project_name    = ""
-    install_agentapi    = "true"
     coding_agent        = each.value.coding_agent
   }
-}
-
-data "coder_workspace_preset" "hapi_workspace" {
-  name        = "HAPI Workspace"
-  description = "All agents installed, managed via HAPI - no task reporting."
-  icon        = "/icon/github.svg"
-  parameters = {
-    is_existing_project = "existing"
-    ai_api_key          = ""
-    system_prompt       = local.main_system_prompt
-    install_agentapi    = "false"
-    coding_agent        = "claude"
-  }
-}
-
-data "coder_parameter" "install_agentapi" {
-  name         = "install_agentapi"
-  display_name = "Install AgentAPI"
-  type         = "bool"
-  default      = false
-  description  = "Install AgentAPI for web UI and task reporting (disable for HAPI-managed workflows)"
-  order        = 0
 }
 
 data "coder_parameter" "coding_agent" {
@@ -125,7 +103,7 @@ data "coder_parameter" "coding_agent" {
   display_name = "Coding Agent"
   type         = "string"
   default      = "claude"
-  description  = "Which coding agent for task automation (only used when install_agentapi=true)"
+  description  = "Which coding agent to use for task automation"
   order        = 1
 
   option {
@@ -233,26 +211,23 @@ locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
 
-  install_agentapi = data.coder_parameter.install_agentapi.value
-
-  # coding_agent is always available, but only used when install_agentapi = true
+  # coding_agent selects which module to install
   coding_agent = data.coder_parameter.coding_agent.value
 
   ai_api_key = data.coder_parameter.ai_api_key.value
   context7_api_key = module.workspace_secrets.context7_api_key
   signoz_url = module.workspace_secrets.signoz_url
   signoz_api_key = module.workspace_secrets.signoz_api_key
-  hapi_cli_api_token = module.workspace_secrets.hapi_cli_api_token
-  
+
   # Project name logic
   project_name = local.gh_project_name != "" ? local.gh_project_name : (local.is_new_project ? data.coder_parameter.new_project_name[0].value : data.coder_parameter.repo_name[0].value)
-  
+
   # Project type for workspace image selection
   project_type = local.is_new_project ? data.coder_parameter.new_project_type[0].value : "base"
-  
+
   # GCP project (optional)
   gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
-  
+
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
   git_author_email           = data.coder_workspace_owner.me.email
@@ -343,8 +318,6 @@ resource "coder_agent" "main" {
       timeout      = metadata.value.timeout
     }
   }
-
-
 }
 
 module "workspace_runtime" {
@@ -364,10 +337,6 @@ module "workspace_runtime" {
     [
       "SIGNOZ_URL=${local.signoz_url}",
       "SIGNOZ_API_KEY=${local.signoz_api_key}",
-      "HAPI_HUB_URL=http://host.docker.internal:3006",
-      "HAPI_CLI_API_TOKEN=${local.hapi_cli_api_token}",
-      "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
-      "HAPI_AGENT=${local.coding_agent}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
@@ -395,14 +364,4 @@ module "workspace_apps" {
   agent_id     = coder_agent.main.id
   project_name = local.project_name
   enable_apps  = true
-}
-
-resource "coder_app" "hapi" {
-  agent_id     = coder_agent.main.id
-  slug         = "hapi"
-  display_name = "HAPI"
-  icon         = "/icon/terminal.svg"
-  url          = "https://hapi.tapiavala.com"
-  external     = true
-  order        = 10
 }
