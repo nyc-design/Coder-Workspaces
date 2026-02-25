@@ -69,23 +69,23 @@ locals{
 data "coder_workspace_preset" "issue_automation" {
   for_each = {
     claude = {
-      name        = "Issue Automation - Claude"
-      icon        = "/icon/claude.svg"
+      name         = "Issue Automation - Claude"
+      icon         = "/icon/claude.svg"
       coding_agent = "claude"
     }
     gemini = {
-      name        = "Issue Automation - Gemini"
-      icon        = "/icon/gemini.svg"
+      name         = "Issue Automation - Gemini"
+      icon         = "/icon/gemini.svg"
       coding_agent = "gemini"
     }
     codex = {
-      name        = "Issue Automation - Codex"
-      icon        = "/icon/openai.svg"
+      name         = "Issue Automation - Codex"
+      icon         = "/icon/openai.svg"
       coding_agent = "codex"
     }
   }
   name        = each.value.name
-  description = "Preset for GitHub Issues automation."
+  description = "Preset for GitHub Issues automation with task reporting."
   icon        = each.value.icon
   parameters = {
     is_existing_project = "existing"
@@ -93,29 +93,41 @@ data "coder_workspace_preset" "issue_automation" {
     system_prompt       = local.main_system_prompt
     repo_name           = "Coder-Workspaces"
     gcp_project_name    = ""
+    install_agentapi    = "true"
     coding_agent        = each.value.coding_agent
   }
 }
 
-data "coder_workspace_preset" "agent-workspace" {
-  name        = "Agent Workspace"
-  description = "Preset for launching a workspace with an AI agent."
+data "coder_workspace_preset" "hapi_workspace" {
+  name        = "HAPI Workspace"
+  description = "All agents installed, managed via HAPI - no task reporting."
   icon        = "/icon/github.svg"
   parameters = {
     is_existing_project = "existing"
-    ai_api_key     = ""
-    system_prompt  = local.main_system_prompt
+    ai_api_key          = ""
+    system_prompt       = local.main_system_prompt
+    install_agentapi    = "false"
   }
 }
 
+data "coder_parameter" "install_agentapi" {
+  name         = "install_agentapi"
+  display_name = "Install AgentAPI"
+  type         = "bool"
+  default      = false
+  description  = "Install AgentAPI for web UI and task reporting (disable for HAPI-managed workflows)"
+  order        = 0
+}
+
 data "coder_parameter" "coding_agent" {
+  count        = data.coder_parameter.install_agentapi.value ? 1 : 0
   name         = "coding_agent"
   display_name = "Coding Agent"
   type         = "string"
   default      = "claude"
-  description  = "Which coding agent should be used?"
-  order = 0
-  
+  description  = "Which coding agent for task automation?"
+  order        = 1
+
   option {
     name  = "Claude Code"
     value = "claude"
@@ -127,7 +139,7 @@ data "coder_parameter" "coding_agent" {
   option {
     name  = "Google Gemini"
     value = "gemini"
-  }  
+  }
 }
 
 data "coder_parameter" "ai_api_key" {
@@ -221,7 +233,11 @@ locals {
   # Determine if this is a new project
   is_new_project = data.coder_parameter.is_existing_project.value == "new"
 
-  coding_agent = data.coder_parameter.coding_agent.value
+  install_agentapi = data.coder_parameter.install_agentapi.value
+
+  # In HAPI mode (agentapi=false), coding_agent is empty
+  # In task mode (agentapi=true), coding_agent is selected
+  coding_agent = local.install_agentapi && length(data.coder_parameter.coding_agent) > 0 ? data.coder_parameter.coding_agent[0].value : ""
 
   ai_api_key = data.coder_parameter.ai_api_key.value
   context7_api_key = module.workspace_secrets.context7_api_key

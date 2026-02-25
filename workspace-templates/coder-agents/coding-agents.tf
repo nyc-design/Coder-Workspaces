@@ -1,6 +1,8 @@
 # Claude Code module
+# HAPI mode: always installed (count=1)
+# Task mode: installed only when selected (count based on coding_agent)
 module "claude-code" {
-  count                   = local.coding_agent == "claude" ? 1 : 0
+  count                   = local.install_agentapi ? (local.coding_agent == "claude" ? 1 : 0) : 1
   source                  = "registry.coder.com/coder/claude-code/coder"
   version                 = "4.7.5"
   agent_id                = coder_agent.main.id
@@ -8,6 +10,9 @@ module "claude-code" {
   workdir                 = "/workspaces/${local.project_name}"
   model                   = "opus"
   install_claude_code     = false
+  install_agentapi        = local.install_agentapi  # false in HAPI mode, true in task mode
+  agentapi_version        = "v0.10.0"
+  report_tasks            = local.install_agentapi  # false in HAPI mode, true in task mode
   continue                = true
   order                   = 999
   system_prompt           = data.coder_parameter.system_prompt.value
@@ -17,8 +22,10 @@ module "claude-code" {
 }
 
 # Gemini CLI module
+# HAPI mode: always installed with install_agentapi=false
+# Task mode: installed only when selected with install_agentapi=true
 module "gemini" {
-  count  = local.coding_agent == "gemini" ? 1 : 0
+  count  = local.install_agentapi ? (local.coding_agent == "gemini" ? 1 : 0) : 1
   source = "github.com/nyc-design/Coder-Workspaces//workspace-modules/gemini"
 
   agent_id              = coder_agent.main.id
@@ -27,8 +34,7 @@ module "gemini" {
   icon                  = "/icon/gemini.svg"
   install_gemini        = false # Already installed in base image
   gemini_api_key        = local.ai_api_key
-  use_vertexai          = false
-  install_agentapi      = true
+  install_agentapi      = local.install_agentapi  # false in HAPI mode, true in task mode
   agentapi_version      = "v0.10.0"
   gemini_system_prompt  = data.coder_parameter.system_prompt.value
   enable_yolo_mode      = true
@@ -37,8 +43,10 @@ module "gemini" {
 }
 
 # Codex module
+# HAPI mode: always installed with install_agentapi=false, report_tasks=false
+# Task mode: installed only when selected with install_agentapi=true, report_tasks=true
 module "codex" {
-  count  = local.coding_agent == "codex" ? 1 : 0
+  count  = local.install_agentapi ? (local.coding_agent == "codex" ? 1 : 0) : 1
   source = "github.com/nyc-design/Coder-Workspaces//workspace-modules/codex"
 
   agent_id               = coder_agent.main.id
@@ -48,17 +56,19 @@ module "codex" {
   web_app_display_name   = "Codex"
   install_codex          = false
   openai_api_key         = local.ai_api_key
-  install_agentapi       = true
+  install_agentapi       = local.install_agentapi  # false in HAPI mode, true in task mode
   agentapi_version       = "v0.10.0"
-  report_tasks           = true
+  report_tasks           = local.install_agentapi  # false in HAPI mode, true in task mode
   codex_system_prompt    = data.coder_parameter.system_prompt.value
   ai_prompt              = data.coder_task.me.prompt
   continue               = true
   additional_mcp_servers = local.additional_mcp_toml
 }
 
-# Coder AI Task - dynamically set app_id based on selected agent
+# Coder AI Task - only created in task automation mode
 resource "coder_ai_task" "task" {
+  count = local.install_agentapi ? 1 : 0
+
   app_id = (
     local.coding_agent == "claude" && length(module.claude-code) > 0 ? module.claude-code[0].task_app_id :
     local.coding_agent == "gemini" && length(module.gemini) > 0 ? module.gemini[0].task_app_id :

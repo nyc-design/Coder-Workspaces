@@ -171,7 +171,8 @@ resource "coder_env" "gemini_use_vertex_ai" {
 }
 
 locals {
-  base_extensions = <<-EOT
+  # Only include Coder MCP extension when AgentAPI is enabled
+  base_extensions = var.install_agentapi ? <<-EOT
 {
   "coder": {
     "args": ["exp", "mcp","server"],
@@ -189,6 +190,7 @@ locals {
   }
 }
 EOT
+  : "{}"  # Empty JSON when AgentAPI disabled
 
   app_slug        = "gemini"
   install_script  = file("${path.module}/scripts/install.sh")
