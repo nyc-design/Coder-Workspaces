@@ -107,6 +107,7 @@ data "coder_workspace_preset" "hapi_workspace" {
     ai_api_key          = ""
     system_prompt       = local.main_system_prompt
     install_agentapi    = "false"
+    coding_agent        = "claude"
   }
 }
 
@@ -120,12 +121,11 @@ data "coder_parameter" "install_agentapi" {
 }
 
 data "coder_parameter" "coding_agent" {
-  count        = data.coder_parameter.install_agentapi.value ? 1 : 0
   name         = "coding_agent"
   display_name = "Coding Agent"
   type         = "string"
   default      = "claude"
-  description  = "Which coding agent for task automation?"
+  description  = "Which coding agent for task automation (only used when install_agentapi=true)"
   order        = 1
 
   option {
@@ -235,9 +235,8 @@ locals {
 
   install_agentapi = data.coder_parameter.install_agentapi.value
 
-  # In HAPI mode (agentapi=false), coding_agent is empty
-  # In task mode (agentapi=true), coding_agent is selected
-  coding_agent = local.install_agentapi && length(data.coder_parameter.coding_agent) > 0 ? data.coder_parameter.coding_agent[0].value : ""
+  # coding_agent is always available, but only used when install_agentapi = true
+  coding_agent = data.coder_parameter.coding_agent.value
 
   ai_api_key = data.coder_parameter.ai_api_key.value
   context7_api_key = module.workspace_secrets.context7_api_key

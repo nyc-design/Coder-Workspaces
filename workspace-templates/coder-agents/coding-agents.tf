@@ -1,6 +1,6 @@
 # Claude Code module
-# HAPI mode: always installed (count=1)
-# Task mode: installed only when selected (count based on coding_agent)
+# HAPI mode: always installed (count=1), install_agentapi=false, report_tasks=false
+# Task mode: installed only when selected (count based on coding_agent), install_agentapi=true, report_tasks=true
 module "claude-code" {
   count                   = local.install_agentapi ? (local.coding_agent == "claude" ? 1 : 0) : 1
   source                  = "registry.coder.com/coder/claude-code/coder"
