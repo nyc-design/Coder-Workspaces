@@ -138,7 +138,7 @@ jobs:
           fi
 
       - name: Clean up old GHCR versions (manifests + per-arch digests)
-        uses: snok/container-retention-policy@v3.0.0
+        uses: snok/container-retention-policy@v3.0.1
         with:
           # Personal account; if this is an org, use the org name instead
           account: user
