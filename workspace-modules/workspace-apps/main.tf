@@ -28,8 +28,8 @@ module "code-server" {
     "workbench.colorTheme"                      = "Default Dark Modern",
     "git.useIntegratedAskPass"                  = "false",
     "likec4.mcp.enabled"                        = "true",
-    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
-    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
+#    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
+#    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
     "todo-tree.tree.showBadges"                 = "true",
     "todo-tree.tree.disableCompactFolders"      = "false",
     "todo-tree.tree.showCountsInTree"           = "true",
@@ -37,9 +37,12 @@ module "code-server" {
     "excalidraw.workspaceLibraryPath"           = "/home/coder/.excalidraw/library.excalidrawlib"
   }
 
+/*
   machine_settings = {
     "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
+*/
+
 
   extensions = [
     "GitHub.vscode-github-actions",
@@ -54,14 +57,15 @@ module "code-server" {
     "ms-azuretools.vscode-docker",
     "likec4.likec4-vscode",
     "nefrob.vscode-just-syntax",
-    "asvetliakov.vscode-neovim",
     "bradlc.vscode-tailwindcss",
     "Gruntfuggly.todo-tree",
     "usernamehw.errorlens",
     "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
     "bruno-api-client.bruno",
-    "pomdtr.excalidraw-editor"
+    "pomdtr.excalidraw-editor",
+    "hashicorp.terraform",
+#    "asvetliakov.vscode-neovim",
   ]
 }
 
@@ -79,8 +83,8 @@ module "vscode-web" {
     "workbench.colorTheme"                      = "Default Dark Modern",
     "git.useIntegratedAskPass"                  = "false",
     "likec4.mcp.enabled"                        = "true",
-    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
-    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
+#    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
+#    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
     "todo-tree.tree.showBadges"                 = "true",
     "todo-tree.tree.disableCompactFolders"      = "false",
     "todo-tree.tree.showCountsInTree"           = "true",
@@ -101,14 +105,15 @@ module "vscode-web" {
     "Google.geminicodeassist",
     "likec4.likec4-vscode",
     "nefrob.vscode-just-syntax",
-    "asvetliakov.vscode-neovim",
     "bradlc.vscode-tailwindcss",
     "Gruntfuggly.todo-tree",
     "usernamehw.errorlens",
     "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
     "bruno-api-client.bruno",
-    "pomdtr.excalidraw-editor"
+    "pomdtr.excalidraw-editor",
+    "hashicorp.terraform",
+#    "asvetliakov.vscode-neovim",
   ]
 }
 
