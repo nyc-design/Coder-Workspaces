@@ -37,7 +37,7 @@ module "code-server" {
     "excalidraw.workspaceLibraryPath"           = "/home/coder/.excalidraw/library.excalidrawlib"
   }
 
-  machine-settings = {
+  machine_settings = {
     "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
   }
 
