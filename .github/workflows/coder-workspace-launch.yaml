@@ -53,7 +53,7 @@ jobs:
           # Always provide gcp_project_name (empty string allowed) to avoid interactive prompts
           gcp_project="${GCP_PROJECT:-}"
           params=(
-            --parameter worskpace_mode="$mode"
+            --parameter workspace_mode="$mode"
             --parameter is_existing_project=existing
             --parameter repo_name="$REPO_NAME"
             --parameter gcp_project_name="$gcp_project"
