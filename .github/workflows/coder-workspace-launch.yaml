@@ -45,6 +45,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "Coder identity:"
+          coder whoami || true
+          echo "Checking github-auth external auth for this token..."
+          if ! coder external-auth access-token github-auth >/dev/null 2>&1; then
+            echo "WARNING: github-auth is not configured for the user behind CODER_SESSION_TOKEN."
+            echo "Workspace creation may fail when template reads data.coder_external_auth.github."
+          else
+            echo "github-auth is configured."
+          fi
+
           mode="$(echo "${MODE:-self}" | tr '[:upper:]' '[:lower:]')"
 
           workspace_name="$REPO_NAME"
@@ -65,12 +75,17 @@ jobs:
             params+=(--parameter workspace_mode=agent)
           fi
 
+          echo "Mode: $mode"
+          echo "Workspace: $workspace_name"
+          echo "Template: $template"
+          echo "Parameters: ${params[*]}"
+
           existing_json="$(coder ls --output json || echo "[]")"
           exists="$(echo "$existing_json" | jq -e --arg NAME "$workspace_name" 'map(.name == $NAME) | any' >/dev/null 2>&1 && echo "true" || echo "false")"
 
           if [ "$exists" = "true" ]; then
             echo "Workspace '$workspace_name' already exists. Starting (if stopped)..."
-            coder start "$workspace_name" --yes || true
+            coder --verbose start "$workspace_name" --yes || true
           else
             echo "Creating workspace '$workspace_name' with template '$template'..."
             if [ -n "${preset:-}" ]; then
