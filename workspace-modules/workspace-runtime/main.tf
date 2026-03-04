@@ -116,12 +116,6 @@ resource "docker_container" "workspace" {
     volume_name    = docker_volume.dind_data.name
   }
 
-  volumes {
-    container_path = "/var/run/docker.sock"
-    host_path      = "/var/run/docker.sock"
-    read_only      = false
-  }
-
   dynamic "volumes" {
     for_each = concat(local.common_mounts, var.extra_mounts)
     content {

@@ -184,6 +184,8 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Init scripts run in non-interactive shell context during workspace creation
 - Shell configuration changes only affect future sessions, not current execution
 - Docker daemon requires specific permission fixes in `/run` and `/var/run`
+- Workspace Docker mode is isolated DinD via `sysbox-runc`; avoid mounting host `/var/run/docker.sock` in workspace containers
+- `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
 - Starship prompt changes won't be visible until new interactive shell starts
 
 ## GitHub Actions Workflow Details
