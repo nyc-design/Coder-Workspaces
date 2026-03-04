@@ -58,9 +58,23 @@ RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli @t
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
 # Install to /usr/local/bin for system-wide availability across all agents
 RUN ARCH=$(uname -m) \
- && if [ "$ARCH" = "x86_64" ]; then RTK_ARCH="x86_64"; else RTK_ARCH="aarch64"; fi \
- && curl -fsSL "https://github.com/rtk-ai/rtk/releases/latest/download/rtk-${RTK_ARCH}-unknown-linux-gnu.tar.gz" \
-    | tar xz -C /usr/local/bin/ \
+ && if [ "$ARCH" = "x86_64" ]; then \
+      RTK_ASSETS="rtk-x86_64-unknown-linux-musl.tar.gz rtk-x86_64-unknown-linux-gnu.tar.gz"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+      RTK_ASSETS="rtk-aarch64-unknown-linux-gnu.tar.gz rtk-aarch64-unknown-linux-musl.tar.gz"; \
+    else \
+      echo "Unsupported architecture for RTK: $ARCH" >&2; \
+      exit 1; \
+    fi \
+ && for asset in $RTK_ASSETS; do \
+      url="https://github.com/rtk-ai/rtk/releases/latest/download/${asset}"; \
+      if curl -fsI "$url" >/dev/null; then \
+        RTK_URL="$url"; \
+        break; \
+      fi; \
+    done \
+ && test -n "${RTK_URL:-}" \
+ && curl -fsSL "$RTK_URL" | tar xz -C /usr/local/bin/ \
  && chmod +x /usr/local/bin/rtk
 
 # just (command runner) + just-lsp (language server for VS Code)
