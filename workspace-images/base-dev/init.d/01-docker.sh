@@ -21,7 +21,7 @@ sudo chmod 755 /run || true
 sudo chmod 755 /var/run || true
 
 # Ensure docker group exists before socket ownership changes.
-sudo groupadd -f docker
+sudo groupadd -f docker || true
 sudo usermod -aG docker coder || true
 
 # If the docker socket path is a mount (host bind mount), unmount it so
