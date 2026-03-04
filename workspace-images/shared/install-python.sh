@@ -12,7 +12,7 @@ apt-get update -y && apt-get install -y --no-install-recommends \
 && rm -rf /var/lib/apt/lists/*
 
 # Essential development tools
-python3 -m pip install --no-cache-dir --break-system-packages \
+python3 -m pip install --no-cache-dir --break-system-packages --ignore-installed \
     pipenv virtualenv
 
 # Linters and formatters
