@@ -1,12 +1,25 @@
 #!/bin/sh
 set -eu
 INIT_DIR="${INIT_DIR:-/usr/local/share/workspace-init.d}"
+STATUS=0
 
 if [ -d "$INIT_DIR" ]; then
   for s in $(ls "$INIT_DIR"/*.sh 2>/dev/null | sort); do
     echo "[init-runner] RUN $(basename "$s")"
-    "$s"
+    if "$s"; then
+      echo "[init-runner] OK  $(basename "$s")"
+    else
+      rc=$?
+      echo "[init-runner] ERR $(basename "$s") (exit ${rc})"
+      STATUS=1
+    fi
   done
 fi
 
-echo "[init-runner] done."
+if [ "$STATUS" -ne 0 ]; then
+  echo "[init-runner] done (with errors)."
+else
+  echo "[init-runner] done."
+fi
+
+exit "$STATUS"

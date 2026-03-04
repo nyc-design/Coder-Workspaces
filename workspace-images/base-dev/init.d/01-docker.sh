@@ -10,7 +10,11 @@ is_path_mounted() {
   sudo awk -v p="$1" '$5 == p {found=1} END {exit found ? 0 : 1}' /proc/self/mountinfo
 }
 
-docker_ready() {
+docker_ready_root() {
+  sudo DOCKER_HOST="${DOCKER_HOST_LOCAL}" docker info >/dev/null 2>&1
+}
+
+docker_ready_user() {
   DOCKER_HOST="${DOCKER_HOST_LOCAL}" docker info >/dev/null 2>&1
 }
 
@@ -29,19 +33,18 @@ sudo usermod -aG docker coder || true
 if is_path_mounted "${SOCK_PATH}"; then
   log "${SOCK_PATH} is mounted; unmounting to enable isolated workspace docker"
   if ! sudo umount "${SOCK_PATH}"; then
-    log "failed to unmount ${SOCK_PATH}; cannot start isolated inner dockerd"
+    log "failed to unmount ${SOCK_PATH}; continuing (workspace may use mounted docker socket)"
     sudo awk -v p="${SOCK_PATH}" '$5 == p {print}' /proc/self/mountinfo || true
-    exit 1
   fi
 fi
 
 # Remove stale socket (not mounted and no responsive daemon).
-if sudo test -S "${SOCK_PATH}" && ! docker_ready; then
+if sudo test -S "${SOCK_PATH}" && ! docker_ready_root; then
   log "removing stale docker socket at ${SOCK_PATH}"
   sudo rm -f "${SOCK_PATH}" || true
 fi
 
-if docker_ready; then
+if docker_ready_root; then
   log "dockerd already available on ${DOCKER_HOST_LOCAL}"
 else
   # --- Start dockerd ---
@@ -55,13 +58,13 @@ fi
 
 # Wait for the socket to appear
 for i in $(seq 1 60); do
-  if docker_ready; then
+  if docker_ready_root; then
     break
   fi
   sleep 0.5
 done
 
-if ! docker_ready; then
+if ! docker_ready_root; then
   log "dockerd did not become ready on ${DOCKER_HOST_LOCAL}; tailing logs"
   sudo tail -n 200 /tmp/dockerd.log || true
   exit 1
@@ -69,13 +72,13 @@ fi
 
 # Set socket perms
 log "setting socket ownership & perms"
-sudo chown coder:docker "${SOCK_PATH}" || sudo chown coder:coder "${SOCK_PATH}" || true
+sudo chown coder:coder "${SOCK_PATH}" || true
 sudo chmod 660 "${SOCK_PATH}" || true
 [ -S /run/docker.sock ] || sudo ln -sf "${SOCK_PATH}" /run/docker.sock
 
-# Sanity check
-if ! docker_ready; then
-  log "docker info failed; tailing logs"
+# Sanity check as workspace user
+if ! docker_ready_user; then
+  log "docker info failed for workspace user; tailing logs"
   sudo tail -n 200 /tmp/dockerd.log || true
   exit 1
 fi
