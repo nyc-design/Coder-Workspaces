@@ -351,7 +351,6 @@ if ! grep -q "NODE_OPTIONS" /home/coder/.bashrc; then
     cat >> /home/coder/.bashrc <<'EOF'
 
 # --- Next.js development environment ---
-export NODE_ENV=development
 export NEXT_TELEMETRY_DISABLED=1
 export NODE_OPTIONS="--max-old-space-size=4096"
 export NPM_CONFIG_UPDATE_NOTIFIER=false

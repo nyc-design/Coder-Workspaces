@@ -185,6 +185,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Workspace Docker mode is isolated DinD via `sysbox-runc`; avoid mounting host `/var/run/docker.sock` in workspace containers
 - `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
 - npm global install prefix is `/usr/local/share/npm-global` (shared by image-time and runtime installs as user `coder`)
+- `nextjs-dev` does not force a global `NODE_ENV`; project commands should set their own runtime mode
 - Starship prompt changes won't be visible until new interactive shell starts
 
 ## GitHub Actions Workflow Details

@@ -43,8 +43,7 @@ RUN npm install -g \
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-nextjs-init.sh
 
-# Set Node.js environment variables
-ENV NODE_ENV=development
+# Set Node.js workspace defaults
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_FUND=false
