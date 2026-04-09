@@ -79,6 +79,37 @@ locals {
   }
 
   # ---------------------------------------------------------------------------
+  # GitNexus — repository code graph MCP (local stdio)
+  # ---------------------------------------------------------------------------
+  gitnexus_mcp_toml = <<-EOT
+    [mcp_servers.gitnexus]
+    command = "mcp-wrap"
+    args = ["npx", "-y", "gitnexus@latest", "mcp"]
+    type = "stdio"
+    startup_timeout_sec = 120
+  EOT
+
+  gitnexus_mcp_extensions_map = {
+    gitnexus = {
+      command     = "npx"
+      args        = ["-y", "gitnexus@latest", "mcp"]
+      type        = "stdio"
+      description = "GitNexus local code graph MCP (run gitnexus analyze per repo)"
+      enabled     = true
+      name        = "GitNexus"
+      timeout     = 3000
+    }
+  }
+
+  gitnexus_mcp_claude_map = {
+    gitnexus = {
+      command = "mcp-wrap"
+      args    = ["npx", "-y", "gitnexus@latest", "mcp"]
+      type    = "stdio"
+    }
+  }
+
+  # ---------------------------------------------------------------------------
   # Context7 — up-to-date library documentation (HTTP — no wrapping needed)
   # ---------------------------------------------------------------------------
   context7_mcp_toml_raw = <<-EOT
@@ -251,6 +282,7 @@ locals {
   additional_mcp_toml = trimspace(join("\n", compact([
     local.pencil_mcp_toml,
     local.playwright_mcp_toml,
+    local.gitnexus_mcp_toml,
     local.context7_mcp_toml,
     local.grep_mcp_toml,
     local.likec4_mcp_toml,
@@ -261,6 +293,7 @@ locals {
   additional_extensions_json = jsonencode(merge(
     local.pencil_mcp_extensions_map,
     local.playwright_mcp_extensions_map,
+    local.gitnexus_mcp_extensions_map,
     local.context7_mcp_extensions_map,
     local.grep_mcp_extensions_map,
     local.likec4_mcp_extensions_map,
@@ -272,6 +305,7 @@ locals {
     mcpServers = merge(
       local.pencil_mcp_claude_map,
       local.playwright_mcp_claude_map,
+      local.gitnexus_mcp_claude_map,
       local.context7_mcp_claude_map,
       local.grep_mcp_claude_map,
       local.likec4_mcp_claude_map,
