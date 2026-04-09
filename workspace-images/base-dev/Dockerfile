@@ -48,12 +48,16 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 # Node.js 20 + pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get update -y && apt-get install -y --no-install-recommends nodejs \
- && npm install -g pnpm \
  && rm -rf /var/lib/apt/lists/*
 
+# Shared global npm install location (single path for image + runtime installs)
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=/usr/local/share/npm-global/bin:$PATH
+RUN install -d -m 0775 -o coder -g coder /usr/local/share/npm-global
+
 # AI coding CLIs + architecture tooling + skills ecosystem
-RUN npm install -g @openai/codex @anthropic-ai/claude-code @google/gemini-cli @twsxtd/hapi likec4 skills tree-sitter-cli \
- && chmod -R a+w /usr/lib/node_modules/likec4/
+RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli @twsxtd/hapi likec4 skills tree-sitter-cli @pencil.dev/cli \
+ && chown -R coder:coder /usr/local/share/npm-global
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
 # Install to /usr/local/bin for system-wide availability across all agents

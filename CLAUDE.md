@@ -65,7 +65,6 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `04-gcp.sh` | GCP project setup, secrets discovery + loading |
 | `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
 | `06-code-server.sh` | Workspace trust pre-configuration |
-| `07-pencil.sh` | pencil-ready + pencil-close helpers |
 | `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
@@ -127,11 +126,10 @@ rtk gain                    # Check token savings
 - Eliminates duplication: both images COPY and RUN the same script
 
 ### Pencil MCP (Design Editor)
-- `pencil-ready [path]` — Opens a headless Chromium browser to code-server, activates the Pencil VS Code extension, and opens a `.pen` file. The browser session stays alive in the background to maintain the WebSocket connection that the Pencil MCP server needs. Must run before the coding agent's MCP client binds to the Pencil MCP server.
-- `pencil-close` — Terminates the headless browser session started by `pencil-ready`, releasing the Pencil WebSocket connection.
-- **Requires a frontend workspace image** (fullstack-dev or nextjs-dev) — these include Playwright + Chromium. The helper scripts are installed in all workspaces but will exit with an error in base-dev.
-- Workspace trust is pre-disabled in code-server settings to prevent trust dialogs from blocking headless extension activation.
-- PID file: `/tmp/pencil-browser.pid`, Log file: `/tmp/pencil-ready.log`
+- Pencil MCP is provided via the Pencil VS Code extension for editor-driven workflows.
+- Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
+- If Pencil MCP tool calls fail or return no response, switch to Pencil CLI headless mode (`pencil interactive -i input.pen -o output.pen`) and continue there.
+- No `pencil-ready` / `pencil-close` pre-step is required.
 - Playwright MCP uses its own `mcp-chromium-*` browser build (separate from standard `chromium-*`). Both are installed during workspace init in fullstack/nextjs images.
 
 ### Shell Configuration
@@ -149,7 +147,7 @@ rtk gain                    # Check token savings
 - Tagged with both `:latest` and `:sha-{commit}` for version control
 
 ### Modifying Init Scripts
-1. Edit the relevant script in `workspace-images/base-dev/init.d/` (01-10 for base concerns)
+1. Edit the relevant script in `workspace-images/base-dev/init.d/` (01-11 for base concerns)
 2. For language-specific init, edit `workspace-images/{image}/` init scripts
 3. Push changes to trigger automatic Docker build via GitHub Actions
 4. New images automatically available in the container registry
@@ -186,6 +184,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Docker daemon requires specific permission fixes in `/run` and `/var/run`
 - Workspace Docker mode is isolated DinD via `sysbox-runc`; avoid mounting host `/var/run/docker.sock` in workspace containers
 - `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
+- npm global install prefix is `/usr/local/share/npm-global` (shared by image-time and runtime installs as user `coder`)
 - Starship prompt changes won't be visible until new interactive shell starts
 
 ## GitHub Actions Workflow Details

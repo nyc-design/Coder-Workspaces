@@ -36,7 +36,8 @@ RUN npm install -g \
     # Code quality
     husky lint-staged \
     # Playwright browser automation for Claude agents
-    playwright @playwright/mcp @playwright/cli
+    playwright @playwright/mcp @playwright/cli \
+ && chown -R coder:coder /usr/local/share/npm-global
 
 # Create Next.js-specific init script
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
@@ -60,14 +61,9 @@ ENV MCP_SERVER_PLAYWRIGHT_HOST=localhost
 USER coder
 
 # Create Node.js directories and configure user environment
-RUN mkdir -p /home/coder/.npm-global \
- && mkdir -p /home/coder/.local/share/pnpm \
+RUN mkdir -p /home/coder/.local/share/pnpm \
  && mkdir -p /home/coder/.cache/yarn \
  && mkdir -p /home/coder/projects
-
-# Configure npm to use global directory in user space
-RUN npm config set prefix '/home/coder/.npm-global' \
- && echo 'export PATH=/home/coder/.npm-global/bin:$PATH' >> /home/coder/.bashrc
 
 # Set up yarn and pnpm for user
 RUN yarn config set cache-folder /home/coder/.cache/yarn \

@@ -9,3 +9,9 @@ variable "include_hapi" {
   type        = bool
   default     = false
 }
+
+variable "include_claude_code_oauth" {
+  description = "Whether to fetch CLAUDE_CODE_OAUTH_TOKEN"
+  type        = bool
+  default     = false
+}

@@ -40,8 +40,9 @@ data "coder_external_auth" "github" {
 }
 
 module "workspace_secrets" {
-  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
-  include_context7 = true
+  source                    = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+  include_context7          = true
+  include_claude_code_oauth = data.coder_parameter.coding_agent.value == "claude"
 }
 
 module "workspace_startup" {
@@ -63,8 +64,6 @@ locals{
   gh_project_name = local.gh_repo != "" ? (length(split("/", local.gh_repo)) > 1 ? element(split("/", local.gh_repo), 1) : local.gh_repo) : ""
   main_system_prompt = trimspace(file("${path.module}/system_prompt.txt"))
 
-  # OAuth token for Claude Code module
-  claude_oauth_token = "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"
 }
 
 data "coder_workspace_preset" "issue_automation" {
@@ -215,6 +214,7 @@ locals {
   coding_agent = data.coder_parameter.coding_agent.value
 
   ai_api_key = data.coder_parameter.ai_api_key.value
+  claude_oauth_token = module.workspace_secrets.claude_code_oauth_token
   context7_api_key = module.workspace_secrets.context7_api_key
   signoz_url = module.workspace_secrets.signoz_url
   signoz_api_key = module.workspace_secrets.signoz_api_key

@@ -35,3 +35,8 @@ data "google_secret_manager_secret_version" "hapi_cli_api_token" {
   count  = var.include_hapi ? 1 : 0
   secret = "HAPI_CLI_API_TOKEN"
 }
+
+data "google_secret_manager_secret_version" "claude_code_oauth_token" {
+  count  = var.include_claude_code_oauth ? 1 : 0
+  secret = "CLAUDE_CODE_OAUTH_TOKEN"
+}

@@ -31,3 +31,8 @@ output "hapi_cli_api_token" {
   value     = var.include_hapi ? data.google_secret_manager_secret_version.hapi_cli_api_token[0].secret_data : ""
   sensitive = true
 }
+
+output "claude_code_oauth_token" {
+  value     = var.include_claude_code_oauth ? data.google_secret_manager_secret_version.claude_code_oauth_token[0].secret_data : ""
+  sensitive = true
+}

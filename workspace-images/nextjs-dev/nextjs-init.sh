@@ -356,7 +356,6 @@ export NEXT_TELEMETRY_DISABLED=1
 export NODE_OPTIONS="--max-old-space-size=4096"
 export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_FUND=false
-export PATH="$HOME/.npm-global/bin:$PATH"
 export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 export PLAYWRIGHT_MCP_CONFIG="$HOME/.playwright/cli.config.json"
 export PLAYWRIGHT_MCP_OUTPUT_DIR="$HOME/.playwright-cli"
@@ -421,7 +420,7 @@ EOF
 fi
 
 # Ensure ownership of all created files
-chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache /home/coder/.npm-global 2>/dev/null || true
+chown -R coder:coder /home/coder/.bashrc /home/coder/.local /home/coder/.cache 2>/dev/null || true
 
 log "Next.js development environment setup complete"
 log "Use 'create-nextjs [project-name]' to create a new Next.js project"
