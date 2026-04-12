@@ -136,6 +136,7 @@ rtk gain                    # Check token savings
 - Uses Starship prompt with Lion theme
 - Configurations only apply to new shell sessions (not current init context)
 - Changes to `.bashrc` require `exec bash` or workspace restart to see effects
+- `justfile-template <filename>` downloads a selected shared Just template from `shared-assets/justfile-templates/` into the current directory
 - `excalidraw-template <filename>` manually syncs a selected shared Excalidraw library file from `shared-assets/excalidraw/` to `/home/coder/.excalidraw/library.excalidrawlib`
 - Workspace creation no longer force-syncs Excalidraw library content from this repo; users opt in by running `excalidraw-template`
 

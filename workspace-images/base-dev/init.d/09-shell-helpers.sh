@@ -99,6 +99,22 @@ pencil-template() {
   curl -fsSL "${REPO_URL}/${file}" -o "./${file}" && echo "Downloaded ${file} to $(pwd)/" || echo "Failed to download ${file}"
 }
 
+justfile-template() {
+  local REPO_URL="https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/justfile-templates"
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: justfile-template <filename>"
+    echo "Downloads a justfile template from the shared library into the current directory."
+    echo ""
+    echo "Available templates:"
+    curl -s "https://api.github.com/repos/nyc-design/Coder-Workspaces/contents/shared-assets/justfile-templates" \
+      | grep -Po '"name": "\K[^"]+' | grep -v '.gitkeep' || echo "  (none yet)"
+    return 0
+  fi
+  local file="$1"
+  echo "Downloading ${file}..."
+  curl -fsSL "${REPO_URL}/${file}" -o "./${file}" && echo "Downloaded ${file} to $(pwd)/" || echo "Failed to download ${file}"
+}
+
 excalidraw-template() {
   local REPO_URL="https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/excalidraw"
   local target_dir="/home/coder/.excalidraw"
