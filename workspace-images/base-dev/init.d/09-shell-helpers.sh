@@ -101,18 +101,23 @@ pencil-template() {
 
 excalidraw-template() {
   local REPO_URL="https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/excalidraw"
+  local target_dir="/home/coder/.excalidraw"
+  local target_file="${target_dir}/library.excalidrawlib"
   if [[ $# -eq 0 ]]; then
     echo "Usage: excalidraw-template <filename>"
-    echo "Downloads an Excalidraw template from the shared library into the current directory."
+    echo "Syncs an Excalidraw library file from the shared assets into ${target_file}."
     echo ""
-    echo "Available templates:"
+    echo "Available library sources:"
     curl -s "https://api.github.com/repos/nyc-design/Coder-Workspaces/contents/shared-assets/excalidraw" \
-      | grep -Po '"name": "\K[^"]+' | grep -v 'library.excalidrawlib' || echo "  (none yet)"
+      | grep -Po '"name": "\K[^"]+' || echo "  (none yet)"
     return 0
   fi
   local file="$1"
-  echo "Downloading ${file}..."
-  curl -fsSL "${REPO_URL}/${file}" -o "./${file}" && echo "Downloaded ${file} to $(pwd)/" || echo "Failed to download ${file}"
+  mkdir -p "${target_dir}"
+  echo "Syncing ${file} to ${target_file}..."
+  curl -fsSL "${REPO_URL}/${file}" -o "${target_file}" \
+    && echo "Synced ${file} to ${target_file}" \
+    || echo "Failed to sync ${file}"
 }
 # --- End Template Helper Functions ---
 
@@ -164,11 +169,3 @@ skill-add() {
 }
 # --- End Skills Helper ---
 EOF
-
-# --- Sync Excalidraw shared library from repo ---
-log "syncing excalidraw shared library"
-mkdir -p /home/coder/.excalidraw
-curl -fsSL "https://raw.githubusercontent.com/nyc-design/Coder-Workspaces/main/shared-assets/excalidraw/library.excalidrawlib" \
-  -o /home/coder/.excalidraw/library.excalidrawlib \
-  && log "excalidraw library synced" \
-  || log "failed to sync excalidraw library (non-fatal)"
