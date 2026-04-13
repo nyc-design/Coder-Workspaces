@@ -65,6 +65,7 @@ module "code-server" {
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
+    "jayblack388.md-checkboxes"
 #    "asvetliakov.vscode-neovim",
   ]
 }
@@ -113,6 +114,7 @@ module "vscode-web" {
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
+    "jayblack388.md-checkboxes"
 #    "asvetliakov.vscode-neovim",
   ]
 }
