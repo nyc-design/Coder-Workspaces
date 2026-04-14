@@ -65,6 +65,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `04-gcp.sh` | GCP project setup, secrets discovery + loading |
 | `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
 | `06-code-server.sh` | Workspace trust pre-configuration |
+| `07-vscode-themes.sh` | Installs baked `.vsix` themes from `shared-assets/vscode-themes/` into both code-server and VS Code Web |
 | `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
@@ -138,6 +139,7 @@ rtk gain                    # Check token savings
 - Changes to `.bashrc` require `exec bash` or workspace restart to see effects
 - `justfile-template <filename>` downloads a selected shared Just template from `shared-assets/justfile-templates/` into the current directory
 - `excalidraw-template <filename>` manually syncs a selected shared Excalidraw library file from `shared-assets/excalidraw/` to `/home/coder/.excalidraw/library.excalidrawlib`
+- `.vsix` files placed in `shared-assets/vscode-themes/` are baked into the `base-dev` image and installed on workspace startup for both code-server and VS Code Web
 - Workspace creation no longer force-syncs Excalidraw library content from this repo; users opt in by running `excalidraw-template`
 
 ## Working with This Repository

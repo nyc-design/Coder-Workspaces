@@ -1,0 +1,40 @@
+{
+  "name": "lunar-dark",
+  "displayName": "Lunar Dark",
+  "description": "A custom dark VS Code and code-server theme with vivid neon syntax and a moonlit teal accent.",
+  "version": "0.0.1",
+  "publisher": "nyc-design",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nyc-design/Coder-Workspaces.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "theme",
+    "color-theme",
+    "dark-theme",
+    "neon",
+    "teal",
+    "moon"
+  ],
+  "galleryBanner": {
+    "color": "#101526",
+    "theme": "dark"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "label": "Lunar Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lunar-dark-color-theme.json"
+      }
+    ]
+  }
+}
