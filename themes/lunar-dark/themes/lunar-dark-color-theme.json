@@ -1794,6 +1794,15 @@
       }
     },
     {
+      "name": "Python Docstrings",
+      "scope": [
+        "string.quoted.docstring.multi.python"
+      ],
+      "settings": {
+        "foreground": "#666666"
+      }
+    },
+    {
       "name": "[VSCODE-CUSTOM] Markdown Quote",
       "scope": "markup.quote.markdown",
       "settings": {
