@@ -1,0 +1,47 @@
+{
+  "name": "neils-themes",
+  "displayName": "Neil's Themes",
+  "description": "Neil's curated VS Code and code-server themes, featuring Lunar Dark and Solarized Moon.",
+  "version": "0.0.7",
+  "publisher": "nyc-design",
+  "license": "MIT",
+  "icon": "assets/image.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nyc-design/Coder-Workspaces.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "theme",
+    "color-theme",
+    "dark-theme",
+    "neil",
+    "neon",
+    "solarized",
+    "teal",
+    "moon"
+  ],
+  "galleryBanner": {
+    "color": "#101526",
+    "theme": "dark"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "label": "Lunar Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lunar-dark-color-theme.json"
+      },
+      {
+        "label": "Solarized Moon",
+        "uiTheme": "vs-dark",
+        "path": "./themes/solarized-moon-color-theme.json"
+      }
+    ]
+  }
+}
