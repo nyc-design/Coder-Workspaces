@@ -65,7 +65,8 @@ module "code-server" {
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
-    "jayblack388.md-checkboxes"
+    "jayblack388.md-checkboxes",
+    "jakobhoeg.vscode-pokemon"
 #    "asvetliakov.vscode-neovim",
   ]
 }
@@ -114,7 +115,8 @@ module "vscode-web" {
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
-    "jayblack388.md-checkboxes"
+    "jayblack388.md-checkboxes",
+    "jakobhoeg.vscode-pokemon"
 #    "asvetliakov.vscode-neovim",
   ]
 }
