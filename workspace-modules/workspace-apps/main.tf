@@ -66,7 +66,9 @@ module "code-server" {
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
     "jayblack388.md-checkboxes",
-    "jakobhoeg.vscode-pokemon"
+    "jakobhoeg.vscode-pokemon",
+    "d9once.pokechi",
+    "octohash.powermode-plus",
 #    "asvetliakov.vscode-neovim",
   ]
 }
@@ -116,7 +118,9 @@ module "vscode-web" {
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
     "jayblack388.md-checkboxes",
-    "jakobhoeg.vscode-pokemon"
+    "jakobhoeg.vscode-pokemon",
+    "d9once.pokechi",
+    "octohash.powermode-plus",
 #    "asvetliakov.vscode-neovim",
   ]
 }
