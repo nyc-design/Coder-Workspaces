@@ -55,8 +55,8 @@ ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=/usr/local/share/npm-global/bin:$PATH
 RUN install -d -m 0775 -o coder -g coder /usr/local/share/npm-global
 
-# AI coding CLIs + architecture tooling + skills ecosystem
-RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli @twsxtd/hapi likec4 skills tree-sitter-cli @pencil.dev/cli gitnexus @samuelfaj/distill\
+# AI coding CLIs + docs/tooling ecosystem
+RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli @twsxtd/hapi likec4 skills tree-sitter-cli @pencil.dev/cli gitnexus @samuelfaj/distill ctx7 \
  && chown -R coder:coder /usr/local/share/npm-global
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
