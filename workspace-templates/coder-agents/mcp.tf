@@ -202,7 +202,7 @@ locals {
   stitch_mcp_toml = <<-EOT
     [mcp_servers.stitch]
     command = "mcp-wrap"
-    args = ["npx", "-y", "@_davideast/stitch-mcp", "proxy"]
+    args = ["stitch-mcp", "proxy"]
     type = "stdio"
     startup_timeout_sec = 180
     [mcp_servers.stitch.env]
@@ -212,8 +212,8 @@ locals {
 
   stitch_mcp_extensions_map = {
     stitch = {
-      command     = "npx"
-      args        = ["@_davideast/stitch-mcp", "proxy"]
+      command     = "stitch-mcp"
+      args        = ["proxy"]
       type        = "stdio"
       env         = { STITCH_USE_SYSTEM_GCLOUD = "1", STITCH_PROJECT_ID = "coder-nt" }
       description = "Google Stitch AI design tools"
@@ -226,7 +226,7 @@ locals {
   stitch_mcp_claude_map = {
     stitch = {
       command = "mcp-wrap"
-      args    = ["npx", "-y", "@_davideast/stitch-mcp", "proxy"]
+      args    = ["stitch-mcp", "proxy"]
       type    = "stdio"
       env     = { STITCH_USE_SYSTEM_GCLOUD = "1", STITCH_PROJECT_ID = "coder-nt" }
     }

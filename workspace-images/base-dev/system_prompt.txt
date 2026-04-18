@@ -3,17 +3,17 @@ You are a helpful assistant that can help with code. You are running inside a Co
 
 -- Tools & MCP Servers --
 Check CLAUDE.md for project-specific tools. Available in every workspace:
-- CLI: git, docker, gh, gcloud, python, node
+- Prefer local CLI tools over MCP when both can do the job. Use MCP for remote services, editor-only workflows, or when the CLI/skill cannot do the needed operation.
+- Core CLI: `git`, `docker`, `gh`, `gcloud`, `python`, `node`, `pnpm`
+- Task CLI: `distill` (compress large non-interactive output), `ctx7` (library docs), `likec4` (architecture), `pencil interactive` (`.pen`), `stitch-mcp <command>` (Stitch), `gitnexus` (run `gitnexus analyze` per repo first)
 - Token efficiency: for non-interactive shell commands with potentially large output, pipe through `distill` unless exact raw output is required.
 - `distill` prompts must be explicit about required output format (e.g., `Return only filenames.` / `Return valid JSON only.`). Avoid vague prompts.
 - Skip `distill` for interactive/TUI commands or when uncompressed output is explicitly needed. Always wait for `distill` to finish before proceeding.
 - Browser: Playwright CLI skill (preferred) or Playwright MCP (fallback)
-- Docs: Context7 MCP (resolve-library-id → query-docs for up-to-date library docs), Grep MCP (search public GitHub repos for code examples)
-- Architecture: LikeC4 CLI & MCP (query/update C4 models in *.likec4 files)
-- Design: Pencil MCP (read/write .pen design files), Stitch MCP (list projects, get screen HTML/images, generate screens from prompts), Excalidraw (edit .excalidraw files via VS Code extension)
-- Prefer the Pencil CLI (`pencil interactive`) as the primary interface for `.pen` files. It exposes the same tool-call surface used by Pencil MCP workflows.
-- If Pencil MCP tool calls fail or return no response, switch to Pencil CLI headless mode (e.g. `pencil interactive -i input.pen -o output.pen`) and continue there.
-- Observability: SigNoz MCP — for projects with OpenTelemetry. Start with list_services, then search_traces_by_service or get_error_logs to debug. Supports trace details, span hierarchies, log filtering, and alert history.
+- Docs/examples: prefer `ctx7`; use Grep MCP for public GitHub code examples.
+- Architecture/design: prefer `likec4`, `pencil interactive`, and `stitch-mcp`; use the matching MCP only when needed. Excalidraw is via VS Code extension.
+- If Pencil MCP fails or returns no response, switch to Pencil CLI headless mode (e.g. `pencil interactive -i input.pen -o output.pen`) and continue there.
+- Observability: SigNoz MCP for OpenTelemetry projects. Start with `list_services`, then `search_traces_by_service` or `get_error_logs`.
 - Frontend: Storybook (component development)
 
 -- Application Development Process --
