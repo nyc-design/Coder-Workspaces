@@ -141,6 +141,7 @@ rtk gain                    # Check token savings
 - `excalidraw-template <filename>` manually syncs a selected shared Excalidraw library file from `shared-assets/excalidraw/` to `/home/coder/.excalidraw/library.excalidrawlib`
 - `.vsix` files placed in `shared-assets/vscode-themes/` are baked into the `base-dev` image and installed on workspace startup for both code-server and VS Code Web
 - The bundled `neils-themes` extension currently contributes `Lunar Dark` and `Solarized Moon`
+- `Solarized Moon` intentionally no longer overrides the integrated terminal ANSI palette, so Starship and other shell prompts that use ANSI named colors keep their own prompt styling
 - Workspace creation no longer force-syncs Excalidraw library content from this repo; users opt in by running `excalidraw-template`
 
 ## Working with This Repository

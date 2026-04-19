@@ -34,7 +34,7 @@ From the source folder:
 
 ```bash
 cd /workspaces/Coder-Workspaces/themes/neil-themes
-npx ovsx publish /workspaces/Coder-Workspaces/shared-assets/vscode-themes/neils-themes-0.0.7.vsix -p "$OVSX_PAT"
+npx ovsx publish /workspaces/Coder-Workspaces/shared-assets/vscode-themes/neils-themes-0.0.8.vsix -p "$OVSX_PAT"
 ```
 
 Or publish directly from source:

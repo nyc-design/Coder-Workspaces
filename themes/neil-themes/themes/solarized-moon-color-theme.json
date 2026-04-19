@@ -89,23 +89,7 @@
     "debugExceptionWidget.background": "#00212B",
     "debugExceptionWidget.border": "#AB395B",
     "pickerGroup.foreground": "#2AA19899",
-    "pickerGroup.border": "#2AA19899",
-    "terminal.ansiBlack": "#073642",
-    "terminal.ansiRed": "#dc322f",
-    "terminal.ansiGreen": "#859900",
-    "terminal.ansiYellow": "#b58900",
-    "terminal.ansiBlue": "#268bd2",
-    "terminal.ansiMagenta": "#d33682",
-    "terminal.ansiCyan": "#2aa198",
-    "terminal.ansiWhite": "#eee8d5",
-    "terminal.ansiBrightBlack": "#002b36",
-    "terminal.ansiBrightRed": "#cb4b16",
-    "terminal.ansiBrightGreen": "#586e75",
-    "terminal.ansiBrightYellow": "#657b83",
-    "terminal.ansiBrightBlue": "#839496",
-    "terminal.ansiBrightMagenta": "#6c71c4",
-    "terminal.ansiBrightCyan": "#93a1a1",
-    "terminal.ansiBrightWhite": "#fdf6e3"
+    "pickerGroup.border": "#2AA19899"
   },
   "tokenColors": [
     {

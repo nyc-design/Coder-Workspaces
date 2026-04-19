@@ -21,5 +21,5 @@ npx @vscode/vsce package
 Install the resulting `.vsix` with:
 
 ```bash
-code-server --install-extension shared-assets/vscode-themes/neils-themes-0.0.7.vsix
+code-server --install-extension shared-assets/vscode-themes/neils-themes-0.0.8.vsix
 ```
