@@ -6,7 +6,12 @@
       "Bash(rtk grep *)",
       "Bash(rtk curl *)",
       "Bash(rtk wc *)",
-      "Bash(rtk read *)"
+      "Bash(rtk read *)",
+      "Bash(rtk docker *)",
+      "Bash(docker run *)",
+      "Bash(python3 -c \"from PIL import Image; [print\\(f, Image.open\\(f\\).size, Image.open\\(f\\).mode\\) for f in ['/tmp/icon-512.png', '/tmp/icon-512-maskable.png']]\")",
+      "Bash(docker rmi *)",
+      "Bash(rm -f /tmp/icon-512.png /tmp/icon-512-maskable.png)"
     ]
   }
 }
