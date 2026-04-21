@@ -11,7 +11,14 @@
       "Bash(docker run *)",
       "Bash(python3 -c \"from PIL import Image; [print\\(f, Image.open\\(f\\).size, Image.open\\(f\\).mode\\) for f in ['/tmp/icon-512.png', '/tmp/icon-512-maskable.png']]\")",
       "Bash(docker rmi *)",
-      "Bash(rm -f /tmp/icon-512.png /tmp/icon-512-maskable.png)"
+      "Bash(rm -f /tmp/icon-512.png /tmp/icon-512-maskable.png)",
+      "Bash(curl -sS -D- -o /dev/null http://localhost:18080/install-pwa/sw.js)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}\\\\n' http://localhost:18080/pwa-shell/)",
+      "Bash(docker rm *)",
+      "Bash(curl -sSI http://localhost:18080/install-pwa/manifest.webmanifest)",
+      "Bash(curl -sS http://localhost:18080/install-pwa/manifest.webmanifest)",
+      "Bash(curl -sS http://localhost:18080/install-pwa/)",
+      "Bash(docker exec *)"
     ]
   }
 }

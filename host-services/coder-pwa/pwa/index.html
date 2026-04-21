@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Install Coder</title>
 
-<link rel="manifest" href="/pwa-shell/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/pwa-shell/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/pwa-shell/icons/icon-192.png">
+<link rel="manifest" href="/install-pwa/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/install-pwa/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/install-pwa/icons/icon-192.png">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -59,16 +59,17 @@
   #status { font-size: 13px; color: #A19CC8; text-align: center; margin-top: 12px; min-height: 1.2em; }
   a { color: #B8D7F5; }
   footer { margin-top: 24px; text-align: center; font-size: 13px; color: #A19CC8; }
+  .fine { color: #A19CC8; font-size: 13px; margin: 12px 0 0; }
 </style>
 </head>
 <body>
 <main>
-  <img class="icon" src="/pwa-shell/icons/icon-192.png" alt="">
+  <img class="icon" src="/install-pwa/icons/icon-192.png" alt="">
   <h1>Install Coder</h1>
   <p class="lede">Add Coder to your home screen so workspaces open in a full-screen app instead of a browser tab.</p>
 
-  <div id="android-panel" class="panel hidden">
-    <h2>Android &amp; Desktop Chrome</h2>
+  <div id="chromium-panel" class="panel hidden">
+    <h2>Chrome / Edge</h2>
     <button id="install-btn" disabled>Install</button>
     <div id="status">Checking install availability…</div>
   </div>
@@ -82,9 +83,19 @@
     </ol>
   </div>
 
-  <div id="generic-panel" class="panel hidden">
-    <h2>Other browsers</h2>
-    <p>Open this page in Chrome, Edge, or Safari on the device where you want the app installed. Look for an <strong>Install</strong> / <strong>Add to Home Screen</strong> option in the browser menu.</p>
+  <div id="mac-safari-panel" class="panel hidden">
+    <h2>macOS Safari</h2>
+    <ol>
+      <li>Open Safari's <strong>File</strong> menu.</li>
+      <li>Choose <strong>Add to Dock…</strong>.</li>
+      <li>Confirm — Coder appears in your Dock and Applications.</li>
+    </ol>
+    <p class="fine">Requires Safari 17+ (macOS 14 Sonoma or newer).</p>
+  </div>
+
+  <div id="already-installed-panel" class="panel hidden">
+    <h2>Already installed</h2>
+    <p>Launch Coder from your Dock, home screen, or apps list. If you uninstalled and want to reinstall, clear this site's data in your browser settings first and reload this page.</p>
   </div>
 
   <footer>
@@ -101,26 +112,64 @@
   }
 
   var ua = window.navigator.userAgent || '';
-  var isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
-  var isAndroid = /Android/.test(ua);
+  var isIOS        = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+  var isAndroid    = /Android/.test(ua);
+  var isMacSafari  = !isIOS && !isAndroid
+                     && /Macintosh/.test(ua)
+                     && /Safari/.test(ua)
+                     && !/Chrome|CriOS|Chromium|Edg|OPR|Firefox/.test(ua);
 
-  var iosPanel     = document.getElementById('ios-panel');
-  var androidPanel = document.getElementById('android-panel');
-  var genericPanel = document.getElementById('generic-panel');
+  var iosPanel       = document.getElementById('ios-panel');
+  var macSafariPanel = document.getElementById('mac-safari-panel');
+  var chromiumPanel  = document.getElementById('chromium-panel');
+  var installedPanel = document.getElementById('already-installed-panel');
 
-  if (isIOS) iosPanel.classList.remove('hidden');
-  else if (isAndroid) androidPanel.classList.remove('hidden');
-  else { androidPanel.classList.remove('hidden'); genericPanel.classList.remove('hidden'); }
+  if (isIOS)            iosPanel.classList.remove('hidden');
+  else if (isMacSafari) macSafariPanel.classList.remove('hidden');
+  else                  chromiumPanel.classList.remove('hidden');
 
   var deferredPrompt = null;
   var btn    = document.getElementById('install-btn');
   var status = document.getElementById('status');
+
+  function showAlreadyInstalled() {
+    chromiumPanel.classList.add('hidden');
+    iosPanel.classList.add('hidden');
+    macSafariPanel.classList.add('hidden');
+    installedPanel.classList.remove('hidden');
+  }
+
+  // Ask Chromium whether this PWA is already installed. Works when the
+  // manifest declares itself in related_applications.
+  if ('getInstalledRelatedApps' in navigator) {
+    navigator.getInstalledRelatedApps().then(function (apps) {
+      if (apps && apps.length > 0) showAlreadyInstalled();
+    }).catch(function () { /* non-fatal */ });
+  }
+
+  // Fallback: if beforeinstallprompt hasn't fired after 3s on a Chromium
+  // browser, explain the manual path. Chrome suppresses the event for a
+  // while after an install/uninstall cycle on the same origin.
+  var FALLBACK_MS = 3000;
+  var fallbackTimer = null;
+  if (!isIOS && !isMacSafari) {
+    fallbackTimer = setTimeout(function () {
+      if (deferredPrompt || btn.disabled === false) return;
+      status.innerHTML =
+        'Install prompt unavailable. Either Coder is already installed — ' +
+        'launch it from your Dock / apps — or your browser is suppressing ' +
+        'the prompt after a recent install. Try the install icon in the ' +
+        'address bar, or &#8942; menu &rarr; <strong>Install app…</strong>. ' +
+        'To reset: clear this site\'s data and reload.';
+    }, FALLBACK_MS);
+  }
 
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     deferredPrompt = e;
     btn.disabled = false;
     status.textContent = 'Ready to install.';
+    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
   });
 
   btn.addEventListener('click', async function () {
@@ -128,21 +177,21 @@
     btn.disabled = true;
     deferredPrompt.prompt();
     var choice = await deferredPrompt.userChoice;
-    status.textContent = choice.outcome === 'accepted' ? 'Installed. Launch Coder from your home screen.' : 'Install cancelled.';
+    status.textContent = choice.outcome === 'accepted'
+      ? 'Installed. Launch Coder from your Dock / apps.'
+      : 'Install cancelled.';
     deferredPrompt = null;
   });
 
   window.addEventListener('appinstalled', function () {
-    status.textContent = 'Installed. Launch Coder from your home screen.';
-    btn.disabled = true;
+    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    showAlreadyInstalled();
   });
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/pwa-shell/sw.js', { scope: '/' }).catch(function (err) {
+    navigator.serviceWorker.register('/install-pwa/sw.js', { scope: '/' }).catch(function (err) {
       console.warn('SW register failed:', err);
     });
-  } else if (!isIOS) {
-    status.textContent = 'This browser does not support service workers — install may be unavailable.';
   }
 })();
 </script>
