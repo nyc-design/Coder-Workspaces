@@ -23,6 +23,7 @@ module "code-server" {
 
   agent_id = var.agent_id
   order    = 1
+  open_in  = "tab"
 
   settings = {
     "workbench.colorTheme"                      = "Default Dark Modern",
@@ -83,6 +84,7 @@ module "vscode-web" {
   agent_id       = var.agent_id
   order          = 2
   accept_license = true
+  open_in        = "tab"
 
   settings = {
     "workbench.colorTheme"                      = "Default Dark Modern",
