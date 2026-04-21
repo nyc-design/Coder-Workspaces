@@ -1,0 +1,23 @@
+# Append this service to the host docker-compose on the Coder VM.
+# No other services need to change — this registers a second Traefik router on
+# coder.tapiavala.com at a higher priority, catching /pwa-shell/* before the
+# existing coder router sees it. Everything outside /pwa-shell/ still hits
+# Coder exactly as it does today.
+#
+# After deploying:
+#   1. docker compose pull coder-pwa && docker compose up -d coder-pwa
+#   2. On the tablet, visit https://coder.tapiavala.com/pwa-shell/install.html
+#   3. Add to Home Screen (iOS) or tap Install (Android/Chrome).
+services:
+  coder-pwa:
+    image: ghcr.io/nyc-design/host-services/coder-pwa:latest
+    container_name: coder-pwa
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.coder-pwa.rule=Host(`coder.tapiavala.com`) && PathPrefix(`/pwa-shell/`)"
+      - "traefik.http.routers.coder-pwa.priority=200"
+      - "traefik.http.routers.coder-pwa.entrypoints=websecure"
+      - "traefik.http.routers.coder-pwa.tls.certresolver=le"
+      - "traefik.http.services.coder-pwa.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"

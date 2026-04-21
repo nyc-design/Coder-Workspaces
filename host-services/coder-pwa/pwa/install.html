@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Install Coder</title>
+
+<link rel="manifest" href="/pwa-shell/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/pwa-shell/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/pwa-shell/icons/icon-192.png">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coder">
+<meta name="theme-color" content="#0F172A">
+
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #0F172A;
+    color: #E2E8F0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    line-height: 1.5;
+  }
+  main { max-width: 480px; width: 100%; }
+  .icon {
+    width: 96px; height: 96px; border-radius: 20px;
+    display: block; margin: 0 auto 24px;
+    background: #0F172A;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 10px 30px rgba(0,0,0,0.4);
+  }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; text-align: center; }
+  .lede { color: #94A3B8; text-align: center; margin: 0 0 32px; font-size: 15px; }
+  .panel {
+    background: #1E293B; border: 1px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: #F1F5F9; letter-spacing: 0.02em; text-transform: uppercase; }
+  .panel ol { margin: 0; padding-left: 20px; }
+  .panel li + li { margin-top: 8px; }
+  .panel kbd {
+    background: #0F172A; border: 1px solid #475569; border-radius: 4px;
+    padding: 1px 6px; font-family: inherit; font-size: 13px; color: #F1F5F9;
+  }
+  button {
+    width: 100%; padding: 14px 20px; font: inherit; font-weight: 600;
+    background: #6366F1; color: #fff; border: 0; border-radius: 10px;
+    cursor: pointer; font-size: 16px;
+  }
+  button:hover { background: #4F46E5; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .hidden { display: none !important; }
+  #status { font-size: 13px; color: #94A3B8; text-align: center; margin-top: 12px; min-height: 1.2em; }
+  a { color: #A5B4FC; }
+  footer { margin-top: 24px; text-align: center; font-size: 13px; color: #64748B; }
+</style>
+</head>
+<body>
+<main>
+  <img class="icon" src="/pwa-shell/icons/icon-192.png" alt="">
+  <h1>Install Coder</h1>
+  <p class="lede">Add Coder to your home screen so workspaces open in a full-screen app instead of a browser tab.</p>
+
+  <div id="android-panel" class="panel hidden">
+    <h2>Android &amp; Desktop Chrome</h2>
+    <button id="install-btn" disabled>Install</button>
+    <div id="status">Checking install availability…</div>
+  </div>
+
+  <div id="ios-panel" class="panel hidden">
+    <h2>iPad / iPhone Safari</h2>
+    <ol>
+      <li>Tap the <strong>Share</strong> button at the top of Safari.</li>
+      <li>Scroll and choose <strong>Add to Home Screen</strong>.</li>
+      <li>Tap <strong>Add</strong> — the Coder icon appears on your home screen.</li>
+    </ol>
+  </div>
+
+  <div id="generic-panel" class="panel hidden">
+    <h2>Other browsers</h2>
+    <p>Open this page in Chrome, Edge, or Safari on the device where you want the app installed. Look for an <strong>Install</strong> / <strong>Add to Home Screen</strong> option in the browser menu.</p>
+  </div>
+
+  <footer>
+    Once installed, launching the app goes straight to <a href="/">coder.tapiavala.com</a>.
+  </footer>
+</main>
+
+<script>
+(function () {
+  // If we've already been launched as the installed PWA, skip the install page.
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    window.location.replace('/');
+    return;
+  }
+
+  var ua = window.navigator.userAgent || '';
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+  var isAndroid = /Android/.test(ua);
+
+  var iosPanel     = document.getElementById('ios-panel');
+  var androidPanel = document.getElementById('android-panel');
+  var genericPanel = document.getElementById('generic-panel');
+
+  if (isIOS) iosPanel.classList.remove('hidden');
+  else if (isAndroid) androidPanel.classList.remove('hidden');
+  else { androidPanel.classList.remove('hidden'); genericPanel.classList.remove('hidden'); }
+
+  var deferredPrompt = null;
+  var btn    = document.getElementById('install-btn');
+  var status = document.getElementById('status');
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.disabled = false;
+    status.textContent = 'Ready to install.';
+  });
+
+  btn.addEventListener('click', async function () {
+    if (!deferredPrompt) return;
+    btn.disabled = true;
+    deferredPrompt.prompt();
+    var choice = await deferredPrompt.userChoice;
+    status.textContent = choice.outcome === 'accepted' ? 'Installed. Launch Coder from your home screen.' : 'Install cancelled.';
+    deferredPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', function () {
+    status.textContent = 'Installed. Launch Coder from your home screen.';
+    btn.disabled = true;
+  });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/pwa-shell/sw.js', { scope: '/' }).catch(function (err) {
+      console.warn('SW register failed:', err);
+    });
+  } else if (!isIOS) {
+    status.textContent = 'This browser does not support service workers — install may be unavailable.';
+  }
+})();
+</script>
+</body>
+</html>
