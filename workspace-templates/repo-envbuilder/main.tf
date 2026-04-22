@@ -42,6 +42,7 @@ module "workspace_secrets" {
   source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
   include_hapi     = local.is_agent_mode
   include_context7 = local.is_agent_mode
+  include_multica  = local.is_agent_mode
 }
 
 module "workspace_startup" {
@@ -260,7 +261,10 @@ module "workspace_runtime" {
       "HAPI_HUB_URL=http://host.docker.internal:3006",
       "HAPI_CLI_API_TOKEN=${module.workspace_secrets.hapi_cli_api_token}",
       "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
-      "HAPI_AGENT=claude"
+      "HAPI_AGENT=claude",
+      "MULTICA_SERVER_URL=${module.workspace_secrets.multica_server_url}",
+      "MULTICA_APP_URL=${module.workspace_secrets.multica_app_url}",
+      "MULTICA_TOKEN=${module.workspace_secrets.multica_token}",
     ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",

@@ -40,3 +40,18 @@ data "google_secret_manager_secret_version" "claude_code_oauth_token" {
   count  = var.include_claude_code_oauth ? 1 : 0
   secret = "CLAUDE_CODE_OAUTH_TOKEN"
 }
+
+data "google_secret_manager_secret_version" "multica_server_url" {
+  count  = var.include_multica ? 1 : 0
+  secret = "MULTICA_SERVER_URL"
+}
+
+data "google_secret_manager_secret_version" "multica_app_url" {
+  count  = var.include_multica ? 1 : 0
+  secret = "MULTICA_APP_URL"
+}
+
+data "google_secret_manager_secret_version" "multica_token" {
+  count  = var.include_multica ? 1 : 0
+  secret = "MULTICA_TOKEN"
+}

@@ -36,3 +36,18 @@ output "claude_code_oauth_token" {
   value     = var.include_claude_code_oauth ? data.google_secret_manager_secret_version.claude_code_oauth_token[0].secret_data : ""
   sensitive = true
 }
+
+output "multica_server_url" {
+  value     = var.include_multica ? data.google_secret_manager_secret_version.multica_server_url[0].secret_data : ""
+  sensitive = true
+}
+
+output "multica_app_url" {
+  value     = var.include_multica ? data.google_secret_manager_secret_version.multica_app_url[0].secret_data : ""
+  sensitive = true
+}
+
+output "multica_token" {
+  value     = var.include_multica ? data.google_secret_manager_secret_version.multica_token[0].secret_data : ""
+  sensitive = true
+}

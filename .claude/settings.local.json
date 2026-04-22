@@ -18,7 +18,8 @@
       "Bash(curl -sSI http://localhost:18080/install-pwa/manifest.webmanifest)",
       "Bash(curl -sS http://localhost:18080/install-pwa/manifest.webmanifest)",
       "Bash(curl -sS http://localhost:18080/install-pwa/)",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(rtk gh *)"
     ]
   }
 }

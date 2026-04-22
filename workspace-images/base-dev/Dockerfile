@@ -118,6 +118,17 @@ RUN LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/laz
  && install lazydocker -D -t /usr/local/bin/ \
  && rm lazydocker lazydocker.tar.gz
 
+# Multica CLI + daemon (managed-agents platform, replaces HAPI over time)
+# Release assets named multica-cli-<version>-linux-<arch>.tar.gz containing a `multica` binary.
+RUN MULTICA_VERSION=$(curl -fsSL -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/multica-ai/multica/releases/latest" \
+      | grep -Po '"tag_name":\s*"v\K[^"]*') \
+ && ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="amd64" || ARCH="arm64" \
+ && curl -Lo multica.tar.gz "https://github.com/multica-ai/multica/releases/download/v${MULTICA_VERSION}/multica-cli-${MULTICA_VERSION}-linux-${ARCH}.tar.gz" \
+ && tar xzf multica.tar.gz multica \
+ && install multica -D -t /usr/local/bin/ \
+ && rm -f multica multica.tar.gz
+
 # Minimal user onfig
 RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> /home/coder/.ssh/known_hosts \
