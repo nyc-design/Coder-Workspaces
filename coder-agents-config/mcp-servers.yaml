@@ -12,10 +12,15 @@
 #   Server URL                     url
 #   Transport                      transport (streamable_http | sse)
 #   Description                    description
-#   Authentication method          auth_type (none | api_key | custom_headers | oauth2)
-#     API Key                      api_key (when auth_type=api_key)
+#   Authentication method          auth_type (none | api_key | custom_headers | oauth2 | user_oidc)
+#     API Key                      api_key_header + api_key_value (when auth_type=api_key)
 #     Custom Headers               custom_headers (map, when auth_type=custom_headers)
 #     OAuth2                       oauth2_* fields (when auth_type=oauth2)
+#   Enabled                        enabled (BOOL — must be true on POST or server is created disabled
+#                                  and won't be reachable; PATCH treats absence as no-change)
+#   Availability                   availability (force_on | default_on | default_off)
+#                                  separate from enabled — controls whether the tool is ON for new
+#                                  chats by default; enabled controls whether the server exists at all.
 
 mcp_servers:
   - slug: context7
@@ -26,6 +31,7 @@ mcp_servers:
     auth_type: custom_headers
     custom_headers:
       CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}
+    enabled: true
     availability: default_on
 
   - slug: grep
@@ -34,6 +40,7 @@ mcp_servers:
     transport: streamable_http
     url: https://mcp.grep.app
     auth_type: none
+    enabled: true
     availability: default_on
 
   - slug: github
@@ -43,5 +50,6 @@ mcp_servers:
     url: https://api.githubcopilot.com/mcp/
     auth_type: custom_headers
     custom_headers:
-      Authorization: Bearer ${GITHUB_PAT}
+      Authorization: Bearer ${GH_PAT_FOR_MCP}
+    enabled: true
     availability: default_on

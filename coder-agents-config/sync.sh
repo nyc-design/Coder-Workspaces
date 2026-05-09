@@ -158,18 +158,38 @@ push_mcp_servers() {
 }
 
 # ───────── SYSTEM PROMPT (PUT singleton) ────────────────────────────────────
+# system-prompt.txt may begin with optional YAML frontmatter (between two
+# `---` delimiters) carrying toggle fields like include_default_system_prompt.
+# When present, frontmatter is stripped from the body and merged into the
+# PUT JSON. Default include_default_system_prompt=true if absent — without
+# explicitly sending it the Coder admin toggle gets flipped off.
 push_system_prompt() {
   local file="$CONFIG_DIR/system-prompt.txt"
   [ -f "$file" ] || { echo "no system-prompt.txt, skipping"; return; }
 
   echo "==> syncing system prompt from $file"
-  local body
-  body="$(jq -n --rawfile p "$file" '{system_prompt: $p}')"
+
+  local frontmatter body include_default
+  if [ "$(head -n1 "$file")" = "---" ]; then
+    frontmatter="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {fm=2; next} fm==1' "$file")"
+    body="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {fm=2; next} fm==2' "$file")"
+    include_default="$(printf '%s' "$frontmatter" | yq -r '.include_default_system_prompt // true')"
+  else
+    body="$(cat "$file")"
+    include_default="true"
+  fi
+
+  local req_body
+  req_body="$(jq -n \
+    --arg p "$body" \
+    --argjson i "$include_default" \
+    '{system_prompt: $p, include_default_system_prompt: $i}')"
+
   curl -sS --fail-with-body -X PUT \
     -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
-    -d "$body" \
+    -d "$req_body" \
     "${CODER_URL}/api/experimental/chats/config/system-prompt" >/dev/null
-  echo "    PUT system prompt ($(wc -c < "$file") bytes)"
+  echo "    PUT system prompt ($(printf '%s' "$body" | wc -c) bytes, include_default_system_prompt=$include_default)"
 }
 
 # ───────── PLAN MODE INSTRUCTIONS (PUT singleton) ───────────────────────────
