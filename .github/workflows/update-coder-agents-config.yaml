@@ -1,0 +1,55 @@
+name: Update Coder Agents central config
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "coder-agents-config/**"
+      - ".github/workflows/update-coder-agents-config.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-system-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PUT system prompt to Coder
+        env:
+          CODER_URL: ${{ secrets.CODER_URL }}
+          CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PROMPT_FILE="coder-agents-config/system-prompt.txt"
+          if [ ! -f "$PROMPT_FILE" ]; then
+            echo "$PROMPT_FILE does not exist, nothing to push."
+            exit 0
+          fi
+
+          # Build JSON body. jq's --rawfile reads the file verbatim and slurps
+          # newlines as-is, which is what the API expects for a multiline prompt.
+          BODY=$(jq -n --rawfile prompt "$PROMPT_FILE" '{system_prompt: $prompt}')
+
+          # Endpoint is experimental in coderd today — if it graduates to /api/v2,
+          # update both URLs (the spec endpoint /config and the GET below).
+          PUT_URL="$CODER_URL/api/experimental/chats/config/system-prompt"
+
+          echo "PUT $PUT_URL"
+          echo "Body length: $(printf '%s' "$BODY" | wc -c) bytes"
+
+          curl -fsSL -X PUT \
+            -H "Coder-Session-Token: $CODER_SESSION_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "$PUT_URL" \
+            | jq
+
+          echo "Verifying via GET:"
+          curl -fsSL -H "Coder-Session-Token: $CODER_SESSION_TOKEN" \
+            "$CODER_URL/api/experimental/chats/config/system-prompt" \
+            | jq '{system_prompt_length: (.system_prompt | length)}'

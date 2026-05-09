@@ -16,8 +16,3 @@ variable "include_claude_code_oauth" {
   default     = false
 }
 
-variable "include_multica" {
-  description = "Whether to fetch MULTICA_SERVER_URL, MULTICA_APP_URL, and MULTICA_TOKEN for the self-hosted Multica daemon"
-  type        = bool
-  default     = false
-}
