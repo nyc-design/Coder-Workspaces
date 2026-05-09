@@ -45,3 +45,15 @@ variable "enable_filebrowser" {
   type        = bool
   default     = true
 }
+
+variable "enable_claude_usage" {
+  description = "Whether to create the Claude usage link app"
+  type        = bool
+  default     = true
+}
+
+variable "enable_codex_usage" {
+  description = "Whether to create the Codex usage link app"
+  type        = bool
+  default     = true
+}

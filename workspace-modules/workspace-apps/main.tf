@@ -149,3 +149,27 @@ module "filebrowser" {
   database_path = "/tmp/filebrowser.db"
   order         = 4
 }
+
+
+resource "coder_app" "claude_usage" {
+  count        = var.enable_apps && var.enable_claude_usage ? 1 : 0
+  agent_id     = var.agent_id
+  slug         = "claude-usage"
+  display_name = "Claude Usage"
+  icon         = "https://claude.ai/favicon.ico"
+  url          = "https://claude.ai/settings/usage"
+  external     = true
+  order        = 11
+}
+
+
+resource "coder_app" "codex_usage" {
+  count        = var.enable_apps && var.enable_codex_usage ? 1 : 0
+  agent_id     = var.agent_id
+  slug         = "codex-usage"
+  display_name = "Codex Usage"
+  icon         = "https://chatgpt.com/favicon.ico"
+  url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
+  external     = true
+  order        = 12
+}
