@@ -1,0 +1,25 @@
+#!/command/with-contenv bash
+# CLIProxyAPI serving BOTH Codex (ChatGPT Plus/Pro OAuth) and Gemini (personal
+# Google OAuth). Single Go binary, single process — Headroom dispatches by path:
+#   /v1/responses                    → Codex
+#   /v1beta/models/{model}:...       → Gemini (native)
+#   /v1internal:streamGenerateContent → Gemini (Cloud Code Assist)
+set -euo pipefail
+
+CONFIG_TEMPLATE=/etc/coder-agents-sidecars/cli-proxy.yaml
+CONFIG_RUNTIME=/run/coder-agents-sidecars/cli-proxy.yaml
+mkdir -p "$(dirname "${CONFIG_RUNTIME}")" /data/auth/cliproxy
+
+# Substitute the shared API key into the runtime config. Done at startup so
+# the key can be rotated without rebuilding the image.
+KEY="${SIDECAR_SHARED_API_KEY:-changeme}"
+sed "s|__SIDECAR_SHARED_API_KEY__|${KEY}|g" "${CONFIG_TEMPLATE}" > "${CONFIG_RUNTIME}"
+
+if [ -z "$(ls -A /data/auth/cliproxy 2>/dev/null)" ]; then
+  echo "[cliproxy-sidecar] no credential files in /data/auth/cliproxy" >&2
+  echo "[cliproxy-sidecar] bootstrap with one or both of:" >&2
+  echo "  docker exec -it <container> cli-proxy-api --auth-dir /data/auth/cliproxy --login codex" >&2
+  echo "  docker exec -it <container> cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini" >&2
+fi
+
+exec cli-proxy-api --config "${CONFIG_RUNTIME}"

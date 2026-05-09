@@ -1,37 +1,76 @@
 # Append this service to the host docker-compose on the Coder VM.
-# Coder Agents talks to it on http://coder-agents-sidecars:8787 (compose DNS)
-# or http://localhost:8787 if on the same network.
+#
+# Routing (via Traefik on llm.tapiavala.com):
+#   https://llm.tapiavala.com/claude/  → strip prefix → Headroom /v1/messages         → claude-sidecar
+#   https://llm.tapiavala.com/codex/   → strip prefix → Headroom /v1/responses        → cliproxy-sidecar (Codex)
+#   https://llm.tapiavala.com/gemini/  → strip prefix → Headroom /v1beta/...          → cliproxy-sidecar (Gemini)
+#
+# Use the same three URLs in Coder admin AND in any laptop/workspace CLI that takes
+# a custom base URL (Claude Code's ANTHROPIC_BASE_URL, Codex's OPENAI_BASE_URL, etc.).
+# All bear `Authorization: Bearer ${SIDECAR_SHARED_API_KEY}` (or `x-api-key:` /
+# `x-goog-api-key:` for the respective provider conventions).
 #
 # After deploying:
 #   1. Set CLAUDE_CODE_OAUTH_TOKEN and SIDECAR_SHARED_API_KEY in the host .env
 #      (generate with `openssl rand -hex 32` and `claude setup-token`).
-#   2. docker compose pull coder-agents-sidecars && docker compose up -d coder-agents-sidecars
-#   3. One-time browser logins (writes credentials into the mounted volume):
-#        docker exec -it coder-agents-sidecars codex login
-#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/gemini --login gemini
-#   4. docker restart coder-agents-sidecars
-#   5. In Coder admin → AI Providers, set base URL to http://coder-agents-sidecars:8787
-#      for Anthropic, OpenAI, and Google. API key = SIDECAR_SHARED_API_KEY.
+#   2. Point llm.tapiavala.com DNS at this host. Let's Encrypt (le) issues automatically.
+#   3. docker compose pull coder-agents-sidecars && docker compose up -d coder-agents-sidecars
+#   4. One-time browser logins (creds land in the named volume):
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+#   5. docker restart coder-agents-sidecars
+#   6. In Coder admin → AI Providers, paste these as base URLs (API key = SIDECAR_SHARED_API_KEY):
+#        Anthropic → https://llm.tapiavala.com/claude
+#        OpenAI    → https://llm.tapiavala.com/codex
+#        Google    → https://llm.tapiavala.com/gemini
 services:
   coder-agents-sidecars:
     image: ghcr.io/nyc-design/host-services/coder-agents-sidecars:latest
     container_name: coder-agents-sidecars
     restart: unless-stopped
     environment:
-      # Required: shared key Headroom forwards to each upstream sidecar; same value
-      # goes in Coder admin's API-key field for all three providers.
       SIDECAR_SHARED_API_KEY: ${SIDECAR_SHARED_API_KEY:?set in .env}
-      # Required for Claude (token-only auth path). Generate on a host with claude
-      # CLI installed: `claude setup-token`. ~1-year lifetime.
       CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}
     volumes:
-      # Codex + Gemini OAuth state. Bootstrap via `docker exec` (see comment above).
       - coder-agents-sidecars-auth:/data/auth
-    # Expose only Headroom. The internal sidecars bind to 127.0.0.1 inside the
-    # container and are not reachable from outside without a port-forward.
-    ports:
-      - "8787:8787"
+    # Direct host port left commented out — Traefik handles ingress. Uncomment
+    # if you also want loopback access on the host VM for debugging:
+    # ports:
+    #   - "127.0.0.1:8787:8787"
     labels:
+      - "traefik.enable=true"
+
+      # Single backend service definition (port the container listens on).
+      - "traefik.http.services.coder-agents-sidecars.loadbalancer.server.port=8787"
+
+      # Three routers, one per provider subpath. All three forward to the same
+      # backend; the stripPrefix middleware removes the /claude /codex /gemini
+      # prefix so Headroom sees the native API path it expects.
+      #
+      # /claude/* → Anthropic Messages API path
+      - "traefik.http.routers.cas-claude.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/claude/`)"
+      - "traefik.http.routers.cas-claude.entrypoints=websecure"
+      - "traefik.http.routers.cas-claude.tls.certresolver=le"
+      - "traefik.http.routers.cas-claude.service=coder-agents-sidecars"
+      - "traefik.http.routers.cas-claude.middlewares=cas-claude-strip"
+      - "traefik.http.middlewares.cas-claude-strip.stripprefix.prefixes=/claude"
+
+      # /codex/* → OpenAI Responses API path
+      - "traefik.http.routers.cas-codex.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/codex/`)"
+      - "traefik.http.routers.cas-codex.entrypoints=websecure"
+      - "traefik.http.routers.cas-codex.tls.certresolver=le"
+      - "traefik.http.routers.cas-codex.service=coder-agents-sidecars"
+      - "traefik.http.routers.cas-codex.middlewares=cas-codex-strip"
+      - "traefik.http.middlewares.cas-codex-strip.stripprefix.prefixes=/codex"
+
+      # /gemini/* → Google generativelanguage v1beta path
+      - "traefik.http.routers.cas-gemini.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/gemini/`)"
+      - "traefik.http.routers.cas-gemini.entrypoints=websecure"
+      - "traefik.http.routers.cas-gemini.tls.certresolver=le"
+      - "traefik.http.routers.cas-gemini.service=coder-agents-sidecars"
+      - "traefik.http.routers.cas-gemini.middlewares=cas-gemini-strip"
+      - "traefik.http.middlewares.cas-gemini-strip.stripprefix.prefixes=/gemini"
+
       # Watchtower auto-update opt-in (matches the coder-pwa pattern).
       - "com.centurylinklabs.watchtower.enable=true"
 

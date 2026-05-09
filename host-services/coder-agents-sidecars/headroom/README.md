@@ -1,31 +1,38 @@
 # headroom
 
 Single Headroom instance ([chopratejas/headroom](https://github.com/chopratejas/headroom))
-sitting in front of all three sidecars. Compresses prompts, tool outputs, and
+sitting in front of the two sidecars. Compresses prompts, tool outputs, and
 conversation history before forwarding upstream — fully local (rule-based + ONNX
-`Kompress-base`), no LLM API key required.
+`Kompress-base`, plus the bundled [RTK](https://github.com/rtk-ai/rtk) for
+recognized shell-output rewriting). No LLM API key required.
 
 ## Routing
 
-Headroom dispatches per request path to the matching upstream:
+Headroom dispatches per request path to the matching upstream (loopback inside
+the container — only Headroom's `:8787` is exposed):
 
-| Incoming path | Upstream env var | Container | Default upstream |
-|---|---|---|---|
-| `POST /v1/messages` | `ANTHROPIC_TARGET_API_URL` | claude-sidecar | `http://claude-sidecar:3456` |
-| `POST /v1/responses` | `OPENAI_TARGET_API_URL` | codex-sidecar | `http://codex-sidecar:8080` |
-| `POST /v1beta/models/{model}:generateContent` | `GEMINI_TARGET_API_URL` | gemini-sidecar | `http://gemini-sidecar:8317` |
-| `POST /v1internal:streamGenerateContent` | `CLOUDCODE_TARGET_API_URL` | gemini-sidecar | `http://gemini-sidecar:8317` |
+| Incoming path | Upstream env var | Resolves to (loopback) |
+|---|---|---|
+| `POST /v1/messages` | `ANTHROPIC_TARGET_API_URL` | `http://127.0.0.1:3456` (claude-sidecar) |
+| `POST /v1/responses` | `OPENAI_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Codex) |
+| `POST /v1beta/models/{model}:generateContent` | `GEMINI_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Gemini) |
+| `POST /v1internal:streamGenerateContent` | `CLOUDCODE_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Cloud Code Assist) |
 
-Coder Agents admin UI sets one base URL per provider, all pointing at this one
-Headroom (`http://headroom:8787`). Path routing happens automatically.
+Traefik in front of this image strips `/claude/`, `/codex/`, `/gemini/` prefixes
+before forwarding so Headroom only ever sees the native API paths above. Coder
+Agents (and any other client) configures distinct subpath URLs on
+`https://llm.tapiavala.com/{claude,codex,gemini}` while Headroom stays
+prefix-naive — clean separation between transport routing and protocol routing.
 
 ## Compression knobs
 
-Defaults in `docker-compose.yml`:
+Defaults baked into the image:
 
 - `HEADROOM_MODE=token` — token-budget-aware compression
-- LLMLingua-2 disabled (set `HEADROOM_LLMLINGUA=1` to enable; pulls a torch model)
+- LLMLingua-2 disabled (image installs `headroom-ai[proxy]`, not `[ml]`).
+  Rebuild with `[proxy,ml]` and set `--llmlingua` to enable it (~700MB extra)
 - `HEADROOM_STATELESS=true` — no fs writes, safe for ephemeral containers
+- RTK shell-output rewriting always-on (bundled in Headroom by default)
 
 To tune: see [Headroom proxy docs](https://github.com/chopratejas/headroom/blob/main/docs/content/docs/proxy.mdx).
 
