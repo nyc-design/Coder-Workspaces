@@ -292,7 +292,7 @@ pull_all() {
 
   echo "  mcp-servers.yaml"
   coder_get '/api/experimental/mcp/servers' | \
-    jq '{mcp_servers: [.[] | {slug, display_name, description, transport, url,
+    jq '{mcp_servers: [.[] | {slug, display_name, description, icon_url, transport, url,
                               auth_type, availability,
                               custom_headers: (if .has_custom_headers
                                                then {Authorization: "${...}"} else null end)}

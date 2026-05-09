@@ -26,6 +26,7 @@ mcp_servers:
   - slug: context7
     display_name: Context7
     description: Up-to-date library / framework / SDK / CLI documentation and code examples.
+    icon_url: /icon/code.svg
     transport: streamable_http
     url: https://mcp.context7.com/mcp
     auth_type: custom_headers
@@ -37,6 +38,7 @@ mcp_servers:
   - slug: grep
     display_name: Grep
     description: Search public GitHub repositories for code examples by keyword/path/language.
+    icon_url: /icon/sourcegraph-amp.svg
     transport: streamable_http
     url: https://mcp.grep.app
     auth_type: none
@@ -46,6 +48,7 @@ mcp_servers:
   - slug: github
     display_name: GitHub
     description: 'GitHub: list/search repos, read files, manage issues + PRs, run Actions. Use to find the matching repo when the user describes a project before creating a workspace.'
+    icon_url: /icon/github.svg
     transport: streamable_http
     url: https://api.githubcopilot.com/mcp/
     auth_type: custom_headers
