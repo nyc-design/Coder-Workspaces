@@ -7,8 +7,8 @@
 #      (generate with `openssl rand -hex 32` and `claude setup-token`).
 #   2. docker compose pull coder-agents-sidecars && docker compose up -d coder-agents-sidecars
 #   3. One-time browser logins (writes credentials into the mounted volume):
-#        docker exec -it coder-agents-sidecars codex login
-#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/gemini --login gemini
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
 #   4. docker restart coder-agents-sidecars
 #   5. In Coder admin → AI Providers, set base URL to http://coder-agents-sidecars:8787
 #      for Anthropic, OpenAI, and Google. API key = SIDECAR_SHARED_API_KEY.
