@@ -22,3 +22,72 @@ node -e "
   s['security.workspace.trust.enabled'] = false;
   fs.writeFileSync(f, JSON.stringify(s, null, 2) + '\n');
 "
+
+# --- Server-side GitHub auth for code-server web clients ---
+# The upstream VS Code web server can inject an initial GitHub authentication
+# session into browser clients from --github-auth, but code-server's released
+# bundle currently keeps that behind VS Code's development-build guard:
+#   !environmentService.isBuilt && args["github-auth"]
+# The Coder Terraform code-server module starts the app for us, so patch the
+# installed server bundle at workspace startup instead of trying to replace the
+# module's launcher. GITHUB_TOKEN/GITHUB_PAT are still supplied by Terraform.
+#
+# This enables the central VS Code GitHub auth provider for new browser devices,
+# which is what the GitHub Actions extension and Accounts panel use. The GitHub
+# Pull Requests extension additionally supports GITHUB_OAUTH_TOKEN directly.
+patch_code_server_github_auth() {
+  if ! command -v code-server >/dev/null 2>&1; then
+    log "code-server binary not found; skipping GitHub auth patch"
+    return 0
+  fi
+
+  local bin real_bin install_root server_main
+  bin="$(command -v code-server)"
+  real_bin="$(readlink -f "$bin" 2>/dev/null || printf '%s' "$bin")"
+  install_root="$(cd "$(dirname "$real_bin")/.." && pwd -P)"
+  server_main="$install_root/lib/vscode/out/server-main.js"
+
+  if [ ! -f "$server_main" ]; then
+    log "server-main.js not found at $server_main; skipping GitHub auth patch"
+    return 0
+  fi
+
+  SERVER_MAIN="$server_main" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.SERVER_MAIN;
+let source = fs.readFileSync(file, 'utf8');
+const original = source;
+
+const guardPattern = /!this\._environmentService\.isBuilt&&this\._environmentService\.args\["github-auth"\]/g;
+const guardReplacement = 'this._environmentService.args["github-auth"]';
+if (guardPattern.test(source)) {
+  source = source.replace(guardPattern, guardReplacement);
+} else if (!source.includes(guardReplacement)) {
+  console.error(`Could not find expected code-server GitHub auth guard in ${file}`);
+  process.exit(1);
+}
+
+const defaultScopes = 'scopes:[["user:email"],["repo"]]';
+const expandedScopes = 'scopes:[["user:email"],["repo"],["repo","workflow"],["read:user","user:email","repo"],["read:user","user:email","repo","workflow"]]';
+if (source.includes(defaultScopes)) {
+  source = source.replace(defaultScopes, expandedScopes);
+} else if (!source.includes(expandedScopes)) {
+  console.error(`Could not find expected code-server GitHub auth scopes in ${file}`);
+  process.exit(1);
+}
+
+if (source === original) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+if (!fs.existsSync(`${file}.github-auth-patch.bak`)) {
+  fs.copyFileSync(file, `${file}.github-auth-patch.bak`);
+}
+fs.writeFileSync(file, source);
+console.log('patched');
+NODE
+}
+
+patch_code_server_github_auth || log "warning: failed to patch code-server GitHub auth injection"
