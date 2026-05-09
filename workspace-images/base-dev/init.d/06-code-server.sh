@@ -125,5 +125,58 @@ console.log('patched');
 NODE
 }
 
+# --- Pencil extension session fallback to CLI session file ---
+# code-server stores extension globalState in browser IndexedDB rather than on
+# disk, so the Pencil extension's session is per-browser. Pencil's CLI keeps a
+# server-side session at ~/.pencil/session-cli.json with the same shape the
+# extension's getSession() returns. Patch the extension's getSession() so it
+# falls back to that file only when both globalState entries are empty. All
+# other extension paths (setSession, signOut, lastOnlineAt, etc.) are
+# unaffected. "pencil logout" remains the way to globally sign out.
+patch_code_server_pencil_session_fallback() {
+  local extension_dir bundle_js
+  extension_dir="$(ls -1d /home/coder/.local/share/code-server/extensions/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
+    log "Pencil extension not installed; skipping session fallback patch"
+    return 0
+  fi
+
+  bundle_js="$(ls -1 "$extension_dir"/out/main-*.js 2>/dev/null | grep -v '\.map$' | head -1 || true)"
+  if [ -z "$bundle_js" ] || [ ! -f "$bundle_js" ]; then
+    log "Pencil extension main bundle not found under $extension_dir/out; skipping patch"
+    return 0
+  fi
+
+  BUNDLE_JS="$bundle_js" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.BUNDLE_JS;
+let source = fs.readFileSync(file, 'utf8');
+
+const originalGetSession = 'getSession(){const e=this.context.globalState.get(this.sessionKey);if(e!=null&&e.email&&(e!=null&&e.token))return{email:e.email,token:e.token};const r=this.context.globalState.get(this.legacySessionKey);if(r!=null&&r.email&&(r!=null&&r.licenseToken))return{email:r.email,token:r.licenseToken}}';
+
+const patchedGetSession = 'getSession(){const e=this.context.globalState.get(this.sessionKey);if(e!=null&&e.email&&(e!=null&&e.token))return{email:e.email,token:e.token};const r=this.context.globalState.get(this.legacySessionKey);if(r!=null&&r.email&&(r!=null&&r.licenseToken))return{email:r.email,token:r.licenseToken};try{const _p=require("path"),_o=require("os"),_f=require("fs");const _s=JSON.parse(_f.readFileSync(_p.join(_o.homedir(),".pencil","session-cli.json"),"utf8"));if(_s&&_s.email&&_s.token)return{email:_s.email,token:_s.token}}catch{}}';
+
+if (source.includes(patchedGetSession)) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+if (!source.includes(originalGetSession)) {
+  console.error(`Could not find expected Pencil getSession() implementation in ${file}`);
+  process.exit(1);
+}
+
+source = source.replace(originalGetSession, patchedGetSession);
+
+if (!fs.existsSync(`${file}.cli-session-fallback.bak`)) {
+  fs.copyFileSync(file, `${file}.cli-session-fallback.bak`);
+}
+fs.writeFileSync(file, source);
+console.log('patched');
+NODE
+}
+
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
 patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
+patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
