@@ -184,6 +184,50 @@ console.log('patched');
 NODE
 }
 
+# --- Patch browser workbench bundles for GitHub auth trust ---
+# The trustedExtensionAuthAccess array is baked into the browser-side workbench
+# bundles at build time. Patching product.json only affects the server-side
+# IProductService; the browser IProductService (where isAccessAllowed() runs)
+# reads from the hardcoded bundle value. We do a literal string append in the
+# two browser-served bundles so the grant-access dialog never shows for
+# GitHub Actions and GitLens.
+patch_code_server_workbench_bundle_auth_trust() {
+  local install_root
+  if ! install_root="$(code_server_install_root)"; then
+    log "code-server binary not found; skipping workbench bundle auth trust patch"
+    return 0
+  fi
+
+  local anchor='"github.copilot","github.copilot-chat"]'
+  local patched='"github.copilot","github.copilot-chat","github.vscode-github-actions","eamodio.gitlens"]'
+
+  local bundles=(
+    "$install_root/lib/vscode/out/vs/code/browser/workbench/workbench.js"
+    "$install_root/lib/vscode/out/vs/workbench/workbench.web.main.internal.js"
+  )
+
+  local patched_any=0
+  for bundle in "${bundles[@]}"; do
+    [ -f "$bundle" ] || continue
+    if grep -qF "$patched" "$bundle"; then
+      log "$(basename "$bundle") already patched; skipping"
+      continue
+    fi
+    if ! grep -qF "$anchor" "$bundle"; then
+      log "warning: expected trustedExtensionAuthAccess anchor not found in $(basename "$bundle"); skipping"
+      continue
+    fi
+    if [ ! -f "${bundle}.trusted-auth-patch.bak" ]; then
+      cp "$bundle" "${bundle}.trusted-auth-patch.bak"
+    fi
+    sed -i 's|"github\.copilot","github\.copilot-chat"\]|"github.copilot","github.copilot-chat","github.vscode-github-actions","eamodio.gitlens"]|g' "$bundle"
+    log "patched $(basename "$bundle") trustedExtensionAuthAccess"
+    patched_any=1
+  done
+  [ "$patched_any" -eq 1 ] || log "no workbench bundles needed patching"
+}
+
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
 patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
+patch_code_server_workbench_bundle_auth_trust || log "warning: failed to patch workbench bundle auth trust"
 patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
