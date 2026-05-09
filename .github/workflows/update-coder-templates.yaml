@@ -186,21 +186,42 @@ jobs:
             exit 0
           fi
 
+          # Coder template column limits (verified against
+          # coderd/database/dump.sql):
+          #   display_name  VARCHAR(64)
+          #   description   VARCHAR(128)
+          #   icon          VARCHAR(256)
+          # We truncate to those limits with a warning, so an over-long file
+          # produces a partial value with a visible log line rather than a
+          # 500 from the server when Postgres rejects the insert.
+          truncate_field() {
+            # truncate_field <field-name> <max-bytes> <raw-value>
+            local name="$1" max="$2" raw="$3"
+            local len="${#raw}"
+            if [ "$len" -gt "$max" ]; then
+              echo "WARN: $name is $len bytes; Coder's column is VARCHAR($max). Truncating." >&2
+              printf '%s' "$raw" | head -c "$max"
+            else
+              printf '%s' "$raw"
+            fi
+          }
+
           # Build PATCH body. Only include fields whose source file exists, so
           # missing display_name.txt doesn't blank out the existing display name.
           BODY='{}'
           if [ -f "$DISPLAY_NAME_FILE" ]; then
-            VAL="$(cat "$DISPLAY_NAME_FILE" | sed -e 's/[[:space:]]*$//' | head -c 64)"
+            RAW="$(cat "$DISPLAY_NAME_FILE" | sed -e 's/[[:space:]]*$//')"
+            VAL="$(truncate_field display_name 64 "$RAW")"
             BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {display_name: $v}')
           fi
           if [ -f "$DESCRIPTION_FILE" ]; then
-            # Coder caps description at ~128 chars in some places; we store the
-            # long-form here. If the API rejects, truncate. Remove trailing nl.
-            VAL="$(cat "$DESCRIPTION_FILE" | sed -e 's/[[:space:]]*$//')"
+            RAW="$(cat "$DESCRIPTION_FILE" | sed -e 's/[[:space:]]*$//')"
+            VAL="$(truncate_field description 128 "$RAW")"
             BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {description: $v}')
           fi
           if [ -f "$ICON_FILE" ]; then
-            VAL="$(cat "$ICON_FILE" | tr -d '[:space:]')"
+            RAW="$(cat "$ICON_FILE" | tr -d '[:space:]')"
+            VAL="$(truncate_field icon 256 "$RAW")"
             BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {icon: $v}')
           fi
 

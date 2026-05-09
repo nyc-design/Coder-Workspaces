@@ -1,9 +1,1 @@
-Default workspace for any GitHub repository or new project. Provisions a Docker dev container with all standard tooling (git, gh, gcloud, Node, Python, Docker-in-Docker, code-server) and the AI CLIs (claude, codex, gemini, hapi). Use this template for normal coding work across language stacks: Python (Poetry/FastAPI), Next.js/TypeScript (App Router + Tailwind + Storybook), C++ (CMake + vcpkg), or fullstack (FastAPI backend + Next.js frontend). Picks the matching workspace image automatically based on the project type.
-
-Two creation paths:
-1. Existing GitHub repo — set is_existing_project="existing" and repo_name="<your-repo>". Clones from your authenticated GitHub account. Optional gcp_project_name auto-loads secrets from GCP Secret Manager.
-2. New project — set is_existing_project="new", new_project_type to one of base/python/nextjs/cpp/fullstack, and project_name. Scaffolds a fresh project from the matching template in nyc-design/Project-Scaffolds.
-
-Set workspace_mode="agent" for an AI-agent-managed workspace (HAPI runner, self-hosted Multica daemon, AI CLI tooling pre-wired). Default workspace_mode="self" gives you a personal IDE workspace without the agent runners.
-
-Suggested workspace name format for agent-created workspaces: {Project-Name}-Agents (e.g., WatchParty-Agents).
+Default workspace for any GitHub repo or new project. Tooling + AI CLIs preinstalled. Set workspace_mode=agent for AI use.
