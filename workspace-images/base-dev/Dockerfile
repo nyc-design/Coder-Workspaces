@@ -4,10 +4,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 USER root
 
 # Core deps + Python + build tools
+# bubblewrap + uidmap are required by Codex's sandboxed exec (newuidmap/newgidmap).
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
     tree ripgrep fd-find \
+    bubblewrap uidmap \
  && rm -rf /var/lib/apt/lists/*
 
 # Neovim (0.10+ from GitHub — apt only has 0.9.x on Ubuntu 24.04)
@@ -95,9 +97,10 @@ RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/lat
  && rm just-lsp just-lsp.tar.gz
 
 # signoz-mcp-server (observability MCP for traces, logs, metrics)
-RUN SIGNOZ_VERSION=$(curl -s "https://api.github.com/repos/SigNoz/signoz-mcp-server/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') \
+# Version pinned to avoid anonymous GitHub API rate limits on CI runners — bump manually.
+RUN SIGNOZ_VERSION=0.2.1 \
  && ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="amd64" || ARCH="arm64" \
- && curl -Lo signoz-mcp.tar.gz "https://github.com/SigNoz/signoz-mcp-server/releases/download/v${SIGNOZ_VERSION}/signoz-mcp-server_linux_${ARCH}.tar.gz" \
+ && curl -fLo signoz-mcp.tar.gz "https://github.com/SigNoz/signoz-mcp-server/releases/download/v${SIGNOZ_VERSION}/signoz-mcp-server_linux_${ARCH}.tar.gz" \
  && tar xf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" \
  && install "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" -D -t /usr/local/bin/ \
  && rm -rf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}"
