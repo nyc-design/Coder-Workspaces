@@ -18,5 +18,9 @@ jobs:
     permissions:
       contents: read
       id-token: write   # propagate to the called workflow for GCP WIF auth
+    # Pass through GCP_PROJECT from this repo's GH Actions secrets if the
+    # calling repo uses GCP integration. Optional — secrets: inherit forwards
+    # all of the caller's secrets, of which only GCP_PROJECT is consumed.
+    secrets: inherit
     with:
       mode: ${{ inputs.mode }}
