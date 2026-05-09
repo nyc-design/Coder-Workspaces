@@ -156,7 +156,7 @@ resource "coder_app" "claude_usage" {
   agent_id     = var.agent_id
   slug         = "claude-usage"
   display_name = "Claude Usage"
-  icon         = "https://claude.ai/favicon.ico"
+  icon         = "/icon/claude.svg"
   url          = "https://claude.ai/settings/usage"
   external     = true
   order        = 11
@@ -168,7 +168,7 @@ resource "coder_app" "codex_usage" {
   agent_id     = var.agent_id
   slug         = "codex-usage"
   display_name = "Codex Usage"
-  icon         = "https://chatgpt.com/favicon.ico"
+  icon         = "/icon/openai.svg"
   url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
   external     = true
   order        = 12
