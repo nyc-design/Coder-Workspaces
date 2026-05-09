@@ -3,15 +3,6 @@ set -eu
 
 log() { printf '[shell-helpers] %s\n' "$*"; }
 
-# --- LazyVim setup (first start only) ---
-if [ ! -d "$HOME/.config/nvim" ] && [ -d /opt/lazyvim-starter/config ]; then
-  log "copying LazyVim starter config from image"
-  mkdir -p "$HOME/.config"
-  cp -r /opt/lazyvim-starter/config "$HOME/.config/nvim"
-  log "installing LazyVim plugins in background"
-  nvim --headless "+Lazy! sync" +qa > /tmp/lazyvim-sync.log 2>&1 &
-fi
-
 # --- Git Helper Function ---
 log "adding gitquick helper function"
 
