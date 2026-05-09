@@ -172,6 +172,39 @@ push_system_prompt() {
   echo "    PUT system prompt ($(wc -c < "$file") bytes)"
 }
 
+# ───────── TEMPLATE ALLOWLIST (PUT singleton) ───────────────────────────────
+# Coder Agents stores the allowlist as template UUIDs. We track template slugs
+# in YAML for readability — resolve slug → UUID at sync time via the v2
+# templates endpoint (slugs match the `name` field).
+push_template_allowlist() {
+  local file="$CONFIG_DIR/template-allowlist.yaml"
+  [ -f "$file" ] || { echo "no template-allowlist.yaml, skipping"; return; }
+
+  echo "==> syncing template allowlist from $file"
+  local desired_slugs templates ids body slug
+  desired_slugs="$(yq -o=json '.allowed_templates // []' "$file")"
+  templates="$(coder_get '/api/v2/templates')"
+
+  ids='[]'
+  for slug in $(echo "$desired_slugs" | jq -r '.[]'); do
+    local id
+    id="$(jq -r --arg n "$slug" '.[] | select(.name == $n) | .id' <<< "$templates" | head -n1)"
+    if [ -z "$id" ] || [ "$id" = "null" ]; then
+      echo "    WARN  template slug '$slug' not found in deployment; skipping" >&2
+      continue
+    fi
+    echo "    resolve $slug → $id"
+    ids="$(echo "$ids" | jq --arg id "$id" '. + [$id]')"
+  done
+
+  body="$(jq -n --argjson ids "$ids" '{template_ids: $ids}')"
+  curl -sS --fail-with-body -X PUT \
+    -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+    -d "$body" \
+    "${CODER_URL}/api/experimental/chats/config/template-allowlist" >/dev/null
+  echo "    PUT template-allowlist ($(echo "$ids" | jq 'length') templates)"
+}
+
 # ───────── PULL MODE ────────────────────────────────────────────────────────
 # Dumps current Coder admin state to the YAML files. Useful for bootstrapping
 # from existing UI configs or refreshing after manual edits in the admin UI.
@@ -236,12 +269,23 @@ pull_all() {
   coder_get '/api/experimental/chats/config/system-prompt' | \
     jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
 
+  # Template allowlist — convert UUIDs back to slugs via v2 templates list
+  # for readability (matching how the file is committed).
+  echo "  template-allowlist.yaml"
+  local allowlist templates slugs
+  allowlist="$(coder_get '/api/experimental/chats/config/template-allowlist')"
+  templates="$(coder_get '/api/v2/templates')"
+  slugs="$(jq -n --argjson a "$allowlist" --argjson t "$templates" \
+    '{allowed_templates: ($a.template_ids // []) | map(. as $id | ($t[] | select(.id == $id) | .name)) | sort}')"
+  echo "$slugs" | yq -o=yaml -P '.' > "$CONFIG_DIR/template-allowlist.yaml.new"
+
   echo
   echo "Wrote *.new files alongside existing YAML. Diff and rename:"
-  echo "  diff $CONFIG_DIR/providers.yaml{,.new} && mv $CONFIG_DIR/providers.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/models.yaml{,.new}    && mv $CONFIG_DIR/models.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new} && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new} && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo "  diff $CONFIG_DIR/providers.yaml{,.new}          && mv $CONFIG_DIR/providers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/models.yaml{,.new}             && mv $CONFIG_DIR/models.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}        && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new} && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}       && mv $CONFIG_DIR/system-prompt.txt{.new,}"
   echo
   echo "Heads up: secret fields come back as opaque placeholders. Restore"
   echo "your \${VAR} references in api_key / custom_headers before committing."
@@ -255,6 +299,7 @@ case "$MODE" in
     push_models
     push_mcp_servers
     push_system_prompt
+    push_template_allowlist
     echo "==> push done"
     ;;
   pull)

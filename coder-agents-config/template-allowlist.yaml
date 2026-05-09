@@ -1,0 +1,17 @@
+# Templates the Coder Agents central loop is allowed to create workspaces from.
+# Synced to PUT /api/experimental/chats/config/template-allowlist by sync.sh.
+#
+# Stored slugs are resolved to template UUIDs at sync time via the templates
+# list endpoint (slugs match the `name` field on coder_template).
+#
+# Semantics:
+#   - Empty list (or missing file) = all templates allowed (Coder default).
+#   - Non-empty list = ONLY these templates are agent-creatable. Coder Agents
+#     will not create workspaces from any template not listed here.
+#
+# This is enforced server-side at the chat-tool layer — the model literally
+# can't list/use other templates via create_workspace, regardless of what
+# the agent's system prompt says.
+
+allowed_templates:
+  - project-workspace
