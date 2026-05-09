@@ -16,22 +16,20 @@ which would force a translation layer.
 
 ## Auth bootstrap
 
-Gemini CLI OAuth uses Google's standard 3-legged flow. Bootstrap on the host once,
-then mount the credentials.
-
-### One-time login
-
-On the host, install `cli-proxy-api` (or run via Docker):
+Gemini CLI OAuth uses Google's standard 3-legged flow. The image bakes the
+`cli-proxy-api` binary so the login can run inside the container with
+credentials landing in the persisted volume:
 
 ```bash
-docker run --rm -it -v "${PWD}/auth:/data/auth" eceasy/cli-proxy-api:latest \
-  --auth-dir /data/auth --login gemini
-# → prints a URL, open it in browser, paste the redirect code back
+docker exec -it coder-agents-sidecars cli-proxy-api \
+  --auth-dir /data/auth/gemini --login gemini
+# → prints a URL, open in browser, paste the redirect code back
+docker restart coder-agents-sidecars
 ```
 
-This writes one or more `gemini-*.json` files into `./auth/` (or whatever you
-mounted). The compose stack mounts `${GEMINI_SIDECAR_AUTH_DIR}` (default
-`./gemini-sidecar/auth`) into `/data/auth`.
+This writes one or more `gemini-*.json` files into `/data/auth/gemini/` on the
+`coder-agents-sidecars-auth` named volume — credentials survive container
+restarts and image upgrades.
 
 ### Refresh
 
@@ -50,12 +48,14 @@ when the file goes stale.
 ## Local API key
 
 CLIProxyAPI requires a local API key on every request (so the sidecar isn't an
-open relay if someone else ends up on the network). Set `CLIPROXY_API_KEY` in
-`.env` — the value is also used by Headroom and Coder Agents when configuring the
-Google provider's API key field. Anything you supply works; Google never sees it.
+open relay if someone else ends up on the network). The image substitutes
+`SIDECAR_SHARED_API_KEY` into the baked config at startup — same value Coder
+Agents sends in the Google provider's API key field. Anything you supply works;
+Google never sees it.
 
 ## Multi-account
 
-Drop multiple `gemini-*.json` credential files into `auth-dir` and CLIProxyAPI will
-round-robin between them. Useful for hitting higher aggregate rate limits without
-violating any single account's ToS.
+Drop multiple `gemini-*.json` credential files into `/data/auth/gemini/`
+(re-run `--login gemini` from a different Google account) and CLIProxyAPI will
+round-robin between them. Useful for hitting higher aggregate rate limits
+without violating any single account's ToS.

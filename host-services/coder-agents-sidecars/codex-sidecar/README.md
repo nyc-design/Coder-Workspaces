@@ -11,26 +11,23 @@ provider, so the protocol matches.
 
 ## Auth bootstrap
 
-There is no `setup-token` equivalent for Codex — you must run an interactive login
-on the host once, then mount the resulting credentials.
-
-On the host (with `codex` CLI installed):
+There is no `setup-token` equivalent for Codex — you must run an interactive
+login. The image bakes the official `@openai/codex` CLI so the login can run
+inside the container, with credentials landing in the persisted volume:
 
 ```bash
-codex login
-# → opens browser, OAuth dance, writes ~/.codex/auth.json
+docker exec -it coder-agents-sidecars codex login
+# → prints a URL, opens browser, paste code back; writes /data/auth/codex/auth.json
+docker restart coder-agents-sidecars
 ```
 
-Then in `coder-agents-sidecars/.env`:
+`CODEX_HOME` is preset to `/data/auth/codex` and that path is on the
+`coder-agents-sidecars-auth` named volume — credentials survive container
+restarts and image upgrades.
 
-```
-CODEX_HOME=/path/to/your/.codex   # default: ~/.codex on the host
-```
-
-The compose file mounts `${CODEX_HOME}` into the container at `/home/sidecar/.codex`.
-codex-bridge reads `auth.json`, checks JWT expiry on each request, and refreshes
-against `auth.openai.com/oauth/token` using the Codex client_id, writing the new
-token back to the file. Volume must be writable by container UID 1000.
+codex-bridge reads `auth.json` on each request, checks JWT expiry, and refreshes
+against `auth.openai.com/oauth/token` using the Codex `client_id`, writing the
+new token back into the file.
 
 ### Refresh failure mode
 

@@ -1,0 +1,5 @@
+#!/command/with-contenv bash
+# Headroom local-compression proxy. Routes per request path to claude/codex/
+# gemini sidecars on loopback. Only externally-exposed listener in this image.
+set -euo pipefail
+exec /opt/headroom-venv/bin/headroom proxy

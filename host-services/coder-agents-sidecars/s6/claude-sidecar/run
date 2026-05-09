@@ -1,0 +1,18 @@
+#!/command/with-contenv bash
+# Meridian + Claude Code SDK. Translates Anthropic Messages API to subscription
+# OAuth via the official SDK so requests fingerprint as Claude Code.
+set -euo pipefail
+
+# If MERIDIAN_PROFILES wasn't pre-supplied but a token env var was, build a
+# single-profile JSON inline. Tokens are alphanumeric+dash so JSON-safe.
+if [ -z "${MERIDIAN_PROFILES:-}" ] && [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+  export MERIDIAN_PROFILES="$(printf '[{"id":"default","oauthToken":"%s"}]' "${CLAUDE_CODE_OAUTH_TOKEN}")"
+  export MERIDIAN_DEFAULT_PROFILE="${MERIDIAN_DEFAULT_PROFILE:-default}"
+fi
+
+if [ -z "${MERIDIAN_PROFILES:-}" ]; then
+  echo "[claude-sidecar] no CLAUDE_CODE_OAUTH_TOKEN or MERIDIAN_PROFILES set" >&2
+  echo "[claude-sidecar] requests will fail until creds are provided" >&2
+fi
+
+exec meridian

@@ -11,7 +11,7 @@ Coder Agents' Anthropic provider points at this sidecar (via Headroom) instead o
 
 Two supported flows. Pick one, do **not** combine them.
 
-### Option A — long-lived OAuth token (recommended for sidecars)
+### Option A — long-lived OAuth token (default in this image)
 
 On any host with `claude` CLI installed and logged in:
 
@@ -20,30 +20,34 @@ claude setup-token
 # → prints a long-lived token (sk-ant-oat01-...)
 ```
 
-Put the token in `coder-agents-sidecars/.env`:
+Put the token in the host's `.env`:
 
 ```
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 ```
 
-The compose file passes it into a `MERIDIAN_PROFILES` JSON block. No volume mount
-needed — Meridian uses an isolated `CLAUDE_CONFIG_DIR` and never writes to disk.
-Token rotation: re-run `claude setup-token` and update `.env`. ~1-year lifetime.
+The s6 run script wraps it into a `MERIDIAN_PROFILES` JSON block at startup.
+Meridian uses an isolated `CLAUDE_CONFIG_DIR=/data/auth/claude` and never falls
+back to a `~/.claude` lookup. Token rotation: re-run `claude setup-token`,
+update `.env`, `docker restart coder-agents-sidecars`. ~1-year lifetime.
 
-### Option B — full credentials directory (mount `~/.claude`)
+### Option B — full credentials directory (8h refresh cycles)
 
-If you want token *refresh* (8h cycles instead of manual rotation), mount the host's
-`~/.claude/` directory. Run `claude login` on the host first to seed credentials,
-then enable the volume in `docker-compose.yml`:
+If you want auto-refresh instead of manual rotation, complete an interactive
+login inside the container so credentials land in the persisted volume:
 
-```yaml
-volumes:
-  - ${CLAUDE_HOME:-~/.claude}:/home/sidecar/.claude
+```bash
+docker exec -it coder-agents-sidecars claude login
+# (browser-based; follow the printed URL)
 ```
 
-Container UID is `1000` — match the host owner of `.credentials.json` or refresh
-writes will fail silently. If your host user is not UID 1000, either chown the
-mount or rebuild with `--build-arg UID=<your uid>`.
+The container's `CLAUDE_CONFIG_DIR` is `/data/auth/claude`, mapped to the
+`coder-agents-sidecars-auth` named volume. Meridian will pick the credentials
+up on the next request and refresh them in-place every ~8h.
+
+If you set both `CLAUDE_CODE_OAUTH_TOKEN` and run `claude login`, the token
+wins (the run script preferentially constructs `MERIDIAN_PROFILES` from the env
+var). Unset the env var if you want the credentials-dir flow.
 
 ## Endpoints
 
