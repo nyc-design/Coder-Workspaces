@@ -293,11 +293,13 @@ module "workspace_runtime" {
 }
 
 module "workspace_apps" {
-  count        = data.coder_workspace.me.start_count
-  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
-  agent_id     = coder_agent.main.id
-  project_name = local.project_name
-  enable_apps  = true
+  count              = data.coder_workspace.me.start_count
+  source             = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
+  agent_id           = coder_agent.main.id
+  project_name       = local.project_name
+  enable_apps        = true
+  enable_vscode_web  = false
+  enable_neovim      = false
 }
 
 # HAPI dashboard link — only in agent mode
