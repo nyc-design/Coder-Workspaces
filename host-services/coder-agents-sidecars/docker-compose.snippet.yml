@@ -1,0 +1,39 @@
+# Append this service to the host docker-compose on the Coder VM.
+# Coder Agents talks to it on http://coder-agents-sidecars:8787 (compose DNS)
+# or http://localhost:8787 if on the same network.
+#
+# After deploying:
+#   1. Set CLAUDE_CODE_OAUTH_TOKEN and SIDECAR_SHARED_API_KEY in the host .env
+#      (generate with `openssl rand -hex 32` and `claude setup-token`).
+#   2. docker compose pull coder-agents-sidecars && docker compose up -d coder-agents-sidecars
+#   3. One-time browser logins (writes credentials into the mounted volume):
+#        docker exec -it coder-agents-sidecars codex login
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/gemini --login gemini
+#   4. docker restart coder-agents-sidecars
+#   5. In Coder admin → AI Providers, set base URL to http://coder-agents-sidecars:8787
+#      for Anthropic, OpenAI, and Google. API key = SIDECAR_SHARED_API_KEY.
+services:
+  coder-agents-sidecars:
+    image: ghcr.io/nyc-design/host-services/coder-agents-sidecars:latest
+    container_name: coder-agents-sidecars
+    restart: unless-stopped
+    environment:
+      # Required: shared key Headroom forwards to each upstream sidecar; same value
+      # goes in Coder admin's API-key field for all three providers.
+      SIDECAR_SHARED_API_KEY: ${SIDECAR_SHARED_API_KEY:?set in .env}
+      # Required for Claude (token-only auth path). Generate on a host with claude
+      # CLI installed: `claude setup-token`. ~1-year lifetime.
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}
+    volumes:
+      # Codex + Gemini OAuth state. Bootstrap via `docker exec` (see comment above).
+      - coder-agents-sidecars-auth:/data/auth
+    # Expose only Headroom. The internal sidecars bind to 127.0.0.1 inside the
+    # container and are not reachable from outside without a port-forward.
+    ports:
+      - "8787:8787"
+    labels:
+      # Watchtower auto-update opt-in (matches the coder-pwa pattern).
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  coder-agents-sidecars-auth:
