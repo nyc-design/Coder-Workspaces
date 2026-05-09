@@ -104,8 +104,12 @@ http://127.0.0.1:3456/v1/messages → claude-sidecar (Meridian + Claude SDK)
 api.anthropic.com (your subscription)
 ```
 
-The OpenAI provider already calls `WithUseResponsesAPI()` by default in chatd,
-so it correctly hits `/v1/responses` (not `/v1/chat/completions`). To
+The OpenAI provider already calls `WithUseResponsesAPI()` by default in chatd.
+Traefik rewrites `/codex/*` requests to `/codex/v1/*` before stripping the
+`/codex` prefix, so the public base URL can stay
+`https://llm.tapiavala.com/codex` even though Headroom speaks the usual `/v1/*`
+shape internally. Requests that already use `/codex/v1/*` bypass the rewrite.
+To
 temporarily fall back to raw API billing for any provider, change its base URL
 back to the vendor's URL in the admin UI — no container restart needed.
 

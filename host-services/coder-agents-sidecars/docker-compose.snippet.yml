@@ -55,12 +55,26 @@ services:
       - "traefik.http.routers.cas-claude.middlewares=cas-claude-strip"
       - "traefik.http.middlewares.cas-claude-strip.stripprefix.prefixes=/claude"
 
-      # /codex/* → OpenAI Responses API path
+      # /codex/* → OpenAI API root compatibility:
+      # Coder/fantasy appends /responses directly to the configured base URL,
+      # while Headroom expects /v1/responses. So:
+      #   /codex/responses   -> rewrite -> /codex/v1/responses -> strip /codex
+      # Requests that already include /codex/v1/* bypass the rewrite router.
+      - "traefik.http.routers.cas-codex-v1.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/codex/v1/`)"
+      - "traefik.http.routers.cas-codex-v1.priority=200"
+      - "traefik.http.routers.cas-codex-v1.entrypoints=websecure"
+      - "traefik.http.routers.cas-codex-v1.tls.certresolver=le"
+      - "traefik.http.routers.cas-codex-v1.service=coder-agents-sidecars"
+      - "traefik.http.routers.cas-codex-v1.middlewares=cas-codex-strip"
+
       - "traefik.http.routers.cas-codex.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/codex/`)"
+      - "traefik.http.routers.cas-codex.priority=100"
       - "traefik.http.routers.cas-codex.entrypoints=websecure"
       - "traefik.http.routers.cas-codex.tls.certresolver=le"
       - "traefik.http.routers.cas-codex.service=coder-agents-sidecars"
-      - "traefik.http.routers.cas-codex.middlewares=cas-codex-strip"
+      - "traefik.http.routers.cas-codex.middlewares=cas-codex-add-v1,cas-codex-strip"
+      - "traefik.http.middlewares.cas-codex-add-v1.replacepathregex.regex=^/codex/(.*)"
+      - "traefik.http.middlewares.cas-codex-add-v1.replacepathregex.replacement=/codex/v1/$$1"
       - "traefik.http.middlewares.cas-codex-strip.stripprefix.prefixes=/codex"
 
       # /gemini/* → Google generativelanguage v1beta path

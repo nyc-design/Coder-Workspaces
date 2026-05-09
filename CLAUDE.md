@@ -200,6 +200,13 @@ The central system prompt is intentionally minimal (workspace-creation policy
 only) and stacks on top of (a) Coder's built-in default prompt and (b) the
 per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
+**OpenAI sidecar base URL gotcha:** Coder's OpenAI provider path handling comes
+from `fantasy/providers/openai`, which treats a custom base URL as the full API
+root and appends `/responses` directly. We keep the public provider base URL at
+`https://llm.tapiavala.com/codex` by having Traefik rewrite `/codex/*` to
+`/codex/v1/*` before stripping the `/codex` prefix, so the underlying Codex
+sidecar still receives the `/v1/*` paths it expects.
+
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
 - Eliminates duplication: both images COPY and RUN the same script
