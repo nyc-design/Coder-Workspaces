@@ -11,7 +11,7 @@
 
 providers:
   - provider: anthropic
-    display_name: Anthropic (Pro/Max via sidecar)
+    display_name: Anthropic (Pro/Max via Sidecar)
     base_url: https://llm.tapiavala.com/claude
     api_key: ${SIDECAR_SHARED_API_KEY}
     enabled: true
@@ -20,7 +20,7 @@ providers:
     allow_central_api_key_fallback: false
 
   - provider: openai
-    display_name: OpenAI Codex (ChatGPT Plus via sidecar)
+    display_name: OpenAI Codex (ChatGPT Plus via Sidecar)
     base_url: https://llm.tapiavala.com/codex
     api_key: ${SIDECAR_SHARED_API_KEY}
     enabled: true
@@ -29,10 +29,10 @@ providers:
     allow_central_api_key_fallback: false
 
   - provider: google
-    display_name: Google Gemini (subscription via sidecar)
+    display_name: Google Gemini (Subscription via Sidecar)
     base_url: https://llm.tapiavala.com/gemini
     api_key: ${SIDECAR_SHARED_API_KEY}
-    enabled: true
+    enabled: false
     central_api_key_enabled: true
     allow_user_api_key: false
     allow_central_api_key_fallback: false
