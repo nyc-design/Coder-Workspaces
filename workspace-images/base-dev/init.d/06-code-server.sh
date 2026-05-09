@@ -85,31 +85,38 @@ patch_code_server_trusted_github_extensions() {
 const fs = require('fs');
 
 const file = process.env.PRODUCT_JSON;
-const trustedIds = [
-  'github.vscode-github-actions',
-  'eamodio.gitlens',
-];
+const trustedIdsByProvider = {
+  github: [
+    'github.vscode-github-actions',
+    'eamodio.gitlens',
+  ],
+};
 const product = JSON.parse(fs.readFileSync(file, 'utf8'));
 const original = JSON.stringify(product);
 
-function addMissing(list) {
-  for (const id of trustedIds) {
-    if (!list.includes(id)) {
+function addMissing(list, ids) {
+  for (const id of ids) {
+    const normalizedId = id.toLowerCase();
+    if (!list.some((existing) => String(existing).toLowerCase() === normalizedId)) {
       list.push(id);
     }
   }
 }
 
-if (Array.isArray(product.trustedExtensionAuthAccess)) {
-  addMissing(product.trustedExtensionAuthAccess);
-} else if (product.trustedExtensionAuthAccess && typeof product.trustedExtensionAuthAccess === 'object') {
-  const githubTrusted = Array.isArray(product.trustedExtensionAuthAccess.github)
-    ? product.trustedExtensionAuthAccess.github
+if (!product.trustedExtensionAuthAccess || Array.isArray(product.trustedExtensionAuthAccess)) {
+  product.trustedExtensionAuthAccess = {
+    github: Array.isArray(product.trustedExtensionAuthAccess)
+      ? product.trustedExtensionAuthAccess
+      : [],
+  };
+}
+
+for (const [providerId, trustedIds] of Object.entries(trustedIdsByProvider)) {
+  const providerTrusted = Array.isArray(product.trustedExtensionAuthAccess[providerId])
+    ? product.trustedExtensionAuthAccess[providerId]
     : [];
-  addMissing(githubTrusted);
-  product.trustedExtensionAuthAccess.github = githubTrusted;
-} else {
-  product.trustedExtensionAuthAccess = [...trustedIds];
+  addMissing(providerTrusted, trustedIds);
+  product.trustedExtensionAuthAccess[providerId] = providerTrusted;
 }
 
 if (JSON.stringify(product) === original) {
