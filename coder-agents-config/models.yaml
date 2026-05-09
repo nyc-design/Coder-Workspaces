@@ -15,7 +15,9 @@
 #     presence_penalty, frequency_penalty, cost{}, provider_options{}
 #   - Inside cost: input_price_per_million_tokens, output_price_per_million_tokens,
 #     cache_read_price_per_million_tokens, cache_write_price_per_million_tokens
-#     (USD per million tokens, floats)
+#     (USD per million tokens — quoted strings to preserve precision; the API
+#     uses *decimal.Decimal which round-trips as JSON strings on GET, so
+#     quoting here keeps push and pull symmetric).
 #   - Inside provider_options: one of anthropic{} / openai{} / google{} / etc.
 #
 # Cost values below are vendor public-pricing snapshots (May 2026). Update
@@ -31,10 +33,10 @@ models:
     is_default: true
     model_config:
       cost:
-        input_price_per_million_tokens: 3.00
-        output_price_per_million_tokens: 15.00
-        cache_read_price_per_million_tokens: 0.30
-        cache_write_price_per_million_tokens: 3.75
+        input_price_per_million_tokens: "3.00"
+        output_price_per_million_tokens: "15.00"
+        cache_read_price_per_million_tokens: "0.30"
+        cache_write_price_per_million_tokens: "3.75"
 
   - provider: anthropic
     model: claude-opus-4-7
@@ -42,10 +44,10 @@ models:
     context_limit: 200000
     model_config:
       cost:
-        input_price_per_million_tokens: 15.00
-        output_price_per_million_tokens: 75.00
-        cache_read_price_per_million_tokens: 1.50
-        cache_write_price_per_million_tokens: 18.75
+        input_price_per_million_tokens: "15.00"
+        output_price_per_million_tokens: "75.00"
+        cache_read_price_per_million_tokens: "1.50"
+        cache_write_price_per_million_tokens: "18.75"
       provider_options:
         anthropic:
           send_reasoning: true
@@ -59,10 +61,10 @@ models:
     context_limit: 200000
     model_config:
       cost:
-        input_price_per_million_tokens: 1.00
-        output_price_per_million_tokens: 5.00
-        cache_read_price_per_million_tokens: 0.10
-        cache_write_price_per_million_tokens: 1.25
+        input_price_per_million_tokens: "1.00"
+        output_price_per_million_tokens: "5.00"
+        cache_read_price_per_million_tokens: "0.10"
+        cache_write_price_per_million_tokens: "1.25"
 
   # ─── OpenAI / Codex (ChatGPT Plus subscription via sidecar) ──────────────
   - provider: openai
@@ -71,9 +73,9 @@ models:
     context_limit: 272000
     model_config:
       cost:
-        input_price_per_million_tokens: 1.25
-        output_price_per_million_tokens: 10.00
-        cache_read_price_per_million_tokens: 0.125
+        input_price_per_million_tokens: "1.25"
+        output_price_per_million_tokens: "10.00"
+        cache_read_price_per_million_tokens: "0.125"
       provider_options:
         openai:
           reasoning_effort: high
@@ -85,8 +87,8 @@ models:
     context_limit: 1000000
     model_config:
       cost:
-        input_price_per_million_tokens: 1.25
-        output_price_per_million_tokens: 5.00
+        input_price_per_million_tokens: "1.25"
+        output_price_per_million_tokens: "5.00"
 
   - provider: google
     model: gemini-2.5-flash
@@ -94,5 +96,5 @@ models:
     context_limit: 1000000
     model_config:
       cost:
-        input_price_per_million_tokens: 0.075
-        output_price_per_million_tokens: 0.30
+        input_price_per_million_tokens: "0.075"
+        output_price_per_million_tokens: "0.30"

@@ -187,6 +187,18 @@ push_system_prompt() {
 # when the GET response signals presence; if you want a clean dump, delete
 # the YAML files first and re-run pull. Then re-add `${VAR}` references for
 # secrets manually.
+# prettify_yaml — yq's default emit packs list items with no separator
+# between them. For the human-edited yaml files we want a blank line before
+# each top-level list item (`^  - `) so blocks are easy to scan. The awk
+# rule skips the first item and any item whose previous line is already
+# blank or the parent map key (e.g. "models:").
+prettify_yaml() {
+  awk '
+    /^  - / && NR > 1 && prev != "" && prev !~ /^[A-Za-z_]+:$/ { print "" }
+    { print; prev = $0 }
+  ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
 pull_all() {
   echo "==> pulling current admin state into $CONFIG_DIR/"
 
@@ -200,6 +212,7 @@ pull_all() {
                        allow_central_api_key_fallback}
                     | with_entries(select(.value != null))]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/providers.yaml.new"
+  prettify_yaml "$CONFIG_DIR/providers.yaml.new"
 
   echo "  models.yaml"
   coder_get '/api/experimental/chats/model-configs' | \
@@ -207,6 +220,7 @@ pull_all() {
                          context_limit, compression_threshold, model_config}
                   | with_entries(select(.value != null))]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/models.yaml.new"
+  prettify_yaml "$CONFIG_DIR/models.yaml.new"
 
   echo "  mcp-servers.yaml"
   coder_get '/api/experimental/mcp/servers' | \
@@ -216,6 +230,7 @@ pull_all() {
                                                then {Authorization: "${...}"} else null end)}
                        | with_entries(select(.value != null))]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/mcp-servers.yaml.new"
+  prettify_yaml "$CONFIG_DIR/mcp-servers.yaml.new"
 
   echo "  system-prompt.txt"
   coder_get '/api/experimental/chats/config/system-prompt' | \
