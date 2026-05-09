@@ -18,8 +18,11 @@ the container — only Headroom's `:8787` is exposed):
 | `POST /v1beta/models/{model}:generateContent` | `GEMINI_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Gemini) |
 | `POST /v1internal:streamGenerateContent` | `CLOUDCODE_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Cloud Code Assist) |
 
-Coder Agents admin UI sets one base URL per provider, all pointing at this one
-Headroom (`http://coder-agents-sidecars:8787`). Path routing happens automatically.
+Traefik in front of this image strips `/claude/`, `/codex/`, `/gemini/` prefixes
+before forwarding so Headroom only ever sees the native API paths above. Coder
+Agents (and any other client) configures distinct subpath URLs on
+`https://llm.tapiavala.com/{claude,codex,gemini}` while Headroom stays
+prefix-naive — clean separation between transport routing and protocol routing.
 
 ## Compression knobs
 

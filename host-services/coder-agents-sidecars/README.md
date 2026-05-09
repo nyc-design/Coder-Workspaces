@@ -35,8 +35,9 @@ Three processes supervised by [s6-overlay v3](https://github.com/just-containers
 | Google | cliproxy-sidecar | [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (Gemini mode) | Gemini Advanced |
 
 CLIProxyAPI handles both Codex and Gemini OAuth from one process, dispatched by
-path. Headroom routes per request path so Coder Agents only ever configures one
-URL per provider — `http://coder-agents-sidecars:8787` — and Headroom forwards.
+path. Headroom routes per request path. Traefik (configured by the bundled
+compose snippet) fronts the whole thing on `https://llm.tapiavala.com` with
+three subpaths so each provider has a clean dedicated URL.
 Compression is fully local (rule-based + ONNX `Kompress-base`, plus the bundled
 [RTK](https://github.com/rtk-ai/rtk) for shell-output rewriting); no extra LLM
 key required.
@@ -44,7 +45,8 @@ key required.
 ## Deploy
 
 Append `docker-compose.snippet.yml` to whatever compose file already runs
-`coder` on your host VM. Then:
+`coder` on your host VM. Point `llm.tapiavala.com` DNS at the host so Let's
+Encrypt can issue. Then:
 
 ```bash
 # 1. Set required env in the host .env
@@ -64,8 +66,10 @@ docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/clipro
 # 4. Pick up the new credentials
 docker restart coder-agents-sidecars
 
-# 5. Smoke-test
-curl -fsS http://localhost:8787/readyz   # 200 from Headroom = all three healthy
+# 5. Smoke-test (Traefik should be serving by now)
+curl -fsS -o /dev/null -w '%{http_code}\n' \
+     -H "Authorization: Bearer $SIDECAR_SHARED_API_KEY" \
+     https://llm.tapiavala.com/claude/v1/models   # expect 200
 ```
 
 Credentials persist in the named volume `coder-agents-sidecars-auth` (mounted at
@@ -74,26 +78,72 @@ Credentials persist in the named volume `coder-agents-sidecars-auth` (mounted at
 ## Wire into Coder Agents
 
 In **Coder admin → Deployment → AI → Providers**, override base URL on each
-provider you want to back with a subscription. **All three use the same URL +
-key** — Headroom dispatches by request path automatically:
+provider:
 
-| Provider | Base URL (Coder admin) | API key (Coder admin) | Path Headroom dispatches on | Routed to |
-|---|---|---|---|---|
-| Anthropic | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1/messages` | claude-sidecar |
-| OpenAI | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1/responses` | cliproxy-sidecar |
-| Google | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1beta/models/{model}:generateContent` | cliproxy-sidecar |
+| Provider | Base URL (Coder admin) | API key (Coder admin) |
+|---|---|---|
+| Anthropic | `https://llm.tapiavala.com/claude` | `SIDECAR_SHARED_API_KEY` |
+| OpenAI    | `https://llm.tapiavala.com/codex`  | `SIDECAR_SHARED_API_KEY` |
+| Google    | `https://llm.tapiavala.com/gemini` | `SIDECAR_SHARED_API_KEY` |
 
-The path column is informational — fantasy's provider libraries (which chatd
-uses) automatically pre-pend the right path when given a base URL, so you don't
-configure paths yourself. Each provider library is hard-wired to its own API
-shape; the path divergence is what disambiguates routing.
+End-to-end path layering for one Anthropic request:
 
-Substitute `localhost` for `coder-agents-sidecars` if coderd isn't on the same
-docker network. The OpenAI provider already calls `WithUseResponsesAPI()` by
-default in chatd, so it correctly hits `/v1/responses` (not `/v1/chat/completions`).
+```
+Coder Agents (fantasy provider auto-appends /v1/messages)
+       │
+https://llm.tapiavala.com/claude/v1/messages
+       │
+Traefik (matches /claude/, stripPrefix removes it)
+       │
+http://coder-agents-sidecars:8787/v1/messages
+       │
+Headroom (compresses, routes by path)
+       │
+http://127.0.0.1:3456/v1/messages → claude-sidecar (Meridian + Claude SDK)
+       │
+api.anthropic.com (your subscription)
+```
 
-To temporarily fall back to raw API billing for any provider, change its base
-URL back to the vendor's URL in the admin UI — no container restart needed.
+The OpenAI provider already calls `WithUseResponsesAPI()` by default in chatd,
+so it correctly hits `/v1/responses` (not `/v1/chat/completions`). To
+temporarily fall back to raw API billing for any provider, change its base URL
+back to the vendor's URL in the admin UI — no container restart needed.
+
+## Use from anywhere (laptop, workspace, automation)
+
+The same three URLs work for **any tool that takes a custom base URL**. Point
+your local CLIs at the sidecar to inherit centralized OAuth, free Headroom +
+RTK compression, single-key revocation, and subscription-quota draw across
+every machine. No need to install Headroom on each box.
+
+```bash
+# Claude Code
+export ANTHROPIC_BASE_URL=https://llm.tapiavala.com/claude
+export ANTHROPIC_API_KEY=$SIDECAR_SHARED_API_KEY
+unset CLAUDE_CODE_OAUTH_TOKEN          # don't fall back to laptop's own OAuth
+claude
+
+# Codex CLI
+export OPENAI_BASE_URL=https://llm.tapiavala.com/codex
+export OPENAI_API_KEY=$SIDECAR_SHARED_API_KEY
+codex
+
+# Gemini CLI / Google SDKs
+export GEMINI_API_BASE=https://llm.tapiavala.com/gemini   # name varies by client
+export GOOGLE_API_KEY=$SIDECAR_SHARED_API_KEY
+
+# Aider, Open WebUI, custom scripts — anything OpenAI-compat / Anthropic-compat.
+# Use whichever subpath URL matches the protocol shape the tool speaks.
+```
+
+Works from Coder workspaces too. Latency overhead from a workspace on the same
+host (TLS handshake + Traefik + hairpin NAT) is **~10-120ms warm**, ~50-200ms
+cold — negligible vs the 1-5s LLM call itself, and Headroom usually nets
+positive by reducing tokens sent upstream.
+
+Security posture: TLS in transit (Let's Encrypt), bearer-token auth (the shared
+key, validated at each sidecar). Treat `SIDECAR_SHARED_API_KEY` like a
+long-lived OAuth token — rotate periodically, revoke on leak.
 
 ## Auth bootstrap details
 
