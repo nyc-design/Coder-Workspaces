@@ -29,11 +29,16 @@ jobs:
   create-workspace:
     runs-on: ubuntu-latest
     steps:
+      # WIF identifiers are hardcoded so external nyc-design repos can call
+      # this workflow with zero GCP/Variable setup of their own — they just
+      # need `permissions: id-token: write` on the calling job. These values
+      # aren't secrets; they identify the auth path. Only OIDC tokens with
+      # repository_owner=='nyc-design' satisfy the binding.
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+          service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
 
       - name: Fetch Coder secrets from GCP Secret Manager
         uses: google-github-actions/get-secretmanager-secrets@v2

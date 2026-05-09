@@ -7,12 +7,20 @@ account keys in GitHub.
 
 ## What's where
 
-### GitHub repo Variables (NOT secrets — public-ish config)
+### Nothing in GitHub Actions
 
-| Name | Value |
-|---|---|
-| `GCP_WIF_PROVIDER` | Full WIF provider resource name (see setup below) |
-| `GCP_WIF_SERVICE_ACCOUNT` | Email of the GCP service account workflows impersonate |
+The WIF provider URI and service account email are hardcoded directly in the
+workflow YAMLs (they're identifiers, not secrets). External nyc-design repos
+that call `coder-workspace-launch.yaml` need only `permissions: id-token: write`
+on the calling job — no Variables, no GCP setup of their own.
+
+Current hardcoded values (verify match your `gcloud` setup output if you
+re-run setup):
+
+```
+workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
+```
 
 ### GCP Secret Manager (project: `coder-nt`)
 
@@ -86,30 +94,52 @@ PROVIDER_ID=$(gcloud iam workload-identity-pools providers describe $PROVIDER_NA
   --project=$GCP_PROJECT \
   --format="value(name)")
 
-# 4. Bind the SA to the WIF pool, scoped to this specific repo ─────────────
+# 4. Bind the SA to ALL nyc-design repos (broad principalSet) ───────────
+# This is broader than just Coder-Workspaces because the externally-callable
+# coder-workspace-launch.yaml workflow needs to work when invoked by reusable-
+# workflow callers from other nyc-design repos. The OIDC token GitHub mints
+# carries the *caller's* repo claim, not Coder-Workspaces, so the binding
+# must accept any nyc-design repo. The attribute-condition on the OIDC
+# provider (step 3) already filters to repository_owner=='nyc-design', so
+# only your own repos can mint matching tokens.
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
   --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/${GITHUB_REPO}" \
+  --member="principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository_owner/nyc-design" \
   --project=$GCP_PROJECT
 
-# 5. Output values for GitHub repo Variables ──────────────────────────────
+# 5. Output the values that need to be hardcoded into the workflow YAMLs ──
 echo
-echo "Set these as repo Variables (Settings → Secrets and variables → Actions → Variables):"
-echo "  GCP_WIF_PROVIDER=${PROVIDER_ID}"
-echo "  GCP_WIF_SERVICE_ACCOUNT=${SA_EMAIL}"
+echo "Hardcoded values to verify in workflow YAMLs:"
+echo "  workload_identity_provider: ${PROVIDER_ID}"
+echo "  service_account: ${SA_EMAIL}"
 ```
 
-After running:
+These are already filled in — current values in the workflow YAMLs:
 
-1. Go to GitHub → Settings → Secrets and variables → Actions → **Variables** tab.
-2. Add `GCP_WIF_PROVIDER` and `GCP_WIF_SERVICE_ACCOUNT` from the script's output.
-3. Make sure the GCP secrets in the table above all exist in `coder-nt`. Add
-   any missing ones (`SIDECAR_SHARED_API_KEY`, `GH_PAT_FOR_MCP`, `GCP_PROJECT`)
-   manually:
-   ```bash
-   echo -n "<value>" | gcloud secrets create SIDECAR_SHARED_API_KEY \
-     --data-file=- --project=coder-nt
-   ```
+```
+workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
+```
+
+If you re-run the setup script and get different values (e.g. you delete and
+recreate the pool), update the four workflow YAMLs to match:
+- `.github/workflows/update-coder-templates.yaml`
+- `.github/workflows/update-coder-agents-config.yaml`
+- `.github/workflows/coder-workspace-launch.yaml`
+
+After WIF setup, make sure the GCP secrets in the table above all exist in
+`coder-nt`. Add any missing ones manually:
+
+```bash
+# Add a new secret + first version
+echo -n "<value>" | gcloud secrets create SIDECAR_SHARED_API_KEY \
+  --replication-policy=automatic \
+  --data-file=- --project=coder-nt
+
+# Update an existing secret to a new version
+echo -n "<new-value>" | gcloud secrets versions add SIDECAR_SHARED_API_KEY \
+  --data-file=- --project=coder-nt
+```
 
 ## After migration: remove old GitHub Actions secrets
 
@@ -128,16 +158,54 @@ which is auto-provided by GitHub — no migration needed there.
 
 ## External callers of `coder-workspace-launch.yaml`
 
-The previous version of `coder-workspace-launch.yaml` accepted `secrets:
-inherit` from external repos that called it via `workflow_call`. After this
-migration, the called workflow auths to GCP itself instead. External callers
-need to:
+External nyc-design repos can invoke this reusable workflow with **zero GCP
+or secret setup on their end**. The wrapper YAML (`coder-workspace-launch-wrapper.yaml`)
+already does this — drop a copy of it into any nyc-design repo:
 
-1. Set up their own WIF pool/provider in their repo OR add their repo to the
-   existing pool's principalSet (step 4 above, with `GITHUB_REPO=other-org/repo`).
-2. Add the same `GCP_WIF_PROVIDER` + `GCP_WIF_SERVICE_ACCOUNT` Variables in
-   their repo.
-3. Pass `permissions: id-token: write` through to the called workflow (the
-   `coder-workspace-launch-wrapper.yaml` shows the pattern).
+```yaml
+name: Launch Coder Workspace
 
-If you don't have external callers, this is moot.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Who is the workspace for?"
+        type: choice
+        options: [self, agent]
+        default: agent
+
+permissions:
+  contents: read
+  id-token: write   # required so GitHub mints the OIDC token for WIF
+
+jobs:
+  launch:
+    permissions:
+      contents: read
+      id-token: write
+    uses: nyc-design/Coder-Workspaces/.github/workflows/coder-workspace-launch.yaml@main
+    with:
+      mode: ${{ inputs.mode }}
+```
+
+That's it. No secrets, no Variables, no gcloud anywhere on the calling repo.
+Run "Launch Coder Workspace" from the Actions tab and it'll create
+`{REPO_NAME}-Agents` from the `project-workspace` template.
+
+How it works under the hood: the called workflow has the WIF provider + SA email
+hardcoded (non-secret identifiers), and the WIF binding allows any nyc-design repo.
+The caller's OIDC token includes its own repo claim, the binding accepts it, GCP
+returns short-lived access tokens for the SA, Secret Manager fetches happen,
+workflow runs.
+
+Why this works:
+- The WIF binding is to `attribute.repository_owner=nyc-design` — any of your
+  repos satisfies it.
+- The attribute-condition on the OIDC provider also filters to
+  `repository_owner=='nyc-design'` — non-nyc-design repos can't mint tokens
+  that satisfy it.
+- The workflow YAML has WIF identifiers literal-coded (provider URI + SA
+  email), so it doesn't rely on the caller having any Variables set.
+
+Non-nyc-design external callers (if you ever have them) would need their own
+WIF binding added — narrow that case via a per-repo principalSet binding.
