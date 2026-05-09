@@ -14,42 +14,6 @@ code_server_install_root() {
   cd "$(dirname "$real_bin")/.." && pwd -P
 }
 
-# --- Restore default code-server workspace trust behavior ---
-# This setting was originally forced off so agents could drive the Pencil VS Code
-# extension in headless browser sessions. Agent workflows now use the Pencil CLI,
-# so leave Workspace Trust at VS Code/code-server defaults instead of globally
-# disabling it for every interactive user session.
-restore_code_server_workspace_trust_default() {
-  local settings_dir settings_file
-  settings_dir="/home/coder/.local/share/code-server/User"
-  settings_file="$settings_dir/settings.json"
-
-  if [ ! -f "$settings_file" ]; then
-    return 0
-  fi
-
-  SETTINGS_FILE="$settings_file" node <<'NODE'
-const fs = require('fs');
-
-const file = process.env.SETTINGS_FILE;
-let settings;
-try {
-  settings = JSON.parse(fs.readFileSync(file, 'utf8'));
-} catch (error) {
-  console.error(`Could not parse ${file}: ${error.message}`);
-  process.exit(1);
-}
-
-if (Object.prototype.hasOwnProperty.call(settings, 'security.workspace.trust.enabled')) {
-  delete settings['security.workspace.trust.enabled'];
-  fs.writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`);
-  console.log('removed security.workspace.trust.enabled override');
-} else {
-  console.log('workspace trust override not present');
-}
-NODE
-}
-
 # --- Server-side GitHub auth for VS Code's GitHub authentication provider ---
 # Keep GitHub auth out of code-server's core web bootstrap. Instead, patch only
 # the built-in GitHub Authentication extension so its normal SecretStorage-backed
@@ -161,6 +125,5 @@ console.log('patched');
 NODE
 }
 
-restore_code_server_workspace_trust_default || log "warning: failed to restore code-server workspace trust default"
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
 patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
