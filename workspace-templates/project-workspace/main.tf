@@ -311,3 +311,27 @@ resource "coder_app" "hapi" {
   external     = true
   order        = 10
 }
+
+# Vendor usage dashboards — Anthropic / OpenAI publish authoritative quota
+# state (5h-window, weekly cap) only in their own UIs; no public API exists.
+# These tiles open the vendor pages in a new tab, glanceable next to the
+# Coder Agents workspace apps panel.
+resource "coder_app" "claude_usage" {
+  agent_id     = coder_agent.main.id
+  slug         = "claude-usage"
+  display_name = "Claude Usage"
+  icon         = "https://claude.ai/favicon.ico"
+  url          = "https://claude.ai/settings/usage"
+  external     = true
+  order        = 11
+}
+
+resource "coder_app" "codex_usage" {
+  agent_id     = coder_agent.main.id
+  slug         = "codex-usage"
+  display_name = "Codex Usage"
+  icon         = "https://chatgpt.com/favicon.ico"
+  url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
+  external     = true
+  order        = 12
+}
