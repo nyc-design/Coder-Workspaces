@@ -39,10 +39,8 @@ data "coder_external_auth" "github" {
 }
 
 module "workspace_secrets" {
-  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
-  include_hapi     = local.is_agent_mode
-  include_context7 = local.is_agent_mode
-  include_multica  = local.is_agent_mode
+  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+  include_hapi = local.is_agent_mode
 }
 
 module "workspace_startup" {
@@ -59,15 +57,15 @@ data "coder_parameter" "workspace_mode" {
   display_name = "Workspace Mode"
   type         = "string"
   default      = "self"
-  description  = "Self: personal development workspace. Agent: HAPI-managed AI agent workspace."
+  description  = "self = personal IDE workspace. agent = AI-agent-managed workspace (starts the in-workspace HAPI runner and pre-wires AI CLIs). Coder Agents creating a workspace on behalf of a user should set this to 'agent'."
   order        = -1
 
   option {
-    name  = "Personal"
+    name  = "Personal IDE"
     value = "self"
   }
   option {
-    name  = "AI Agent (HAPI)"
+    name  = "AI Agent"
     value = "agent"
   }
 }
@@ -77,7 +75,7 @@ data "coder_parameter" "is_existing_project" {
   display_name = "Project Type"
   type         = "string"
   default      = "existing"
-  description  = "Use an existing GitHub repository or create a new project?"
+  description  = "existing = clone a GitHub repository owned by the workspace user. new = scaffold a fresh project from nyc-design/Project-Scaffolds."
   order        = 0
 
   option {
@@ -94,7 +92,7 @@ data "coder_parameter" "repo_name" {
   count        = data.coder_parameter.is_existing_project.value == "existing" ? 1 : 0
   name         = "repo_name"
   display_name = "GitHub Repository"
-  description  = "Enter just the repo name (e.g., shadowscout, stellarscout, etc)."
+  description  = "Just the repo name, no owner (e.g. 'shadowscout', not 'nyc-design/shadowscout'). Resolves to https://github.com/<workspace-owner>/<repo_name>.git."
   type         = "string"
   form_type    = "input"
   order        = 1
@@ -105,7 +103,7 @@ data "coder_parameter" "gcp_project_name" {
   name         = "gcp_project_name"
   display_name = "GCP Project (Optional)"
   default      = ""
-  description  = "Enter a GCP Project to automatically configure secrets and credentials"
+  description  = "GCP project ID. When set, secrets in that project's Secret Manager are auto-loaded as env vars in the workspace. Leave empty for projects that don't use GCP."
   type         = "string"
   form_type    = "input"
   order        = 2
@@ -117,26 +115,27 @@ data "coder_parameter" "new_project_type" {
   display_name = "New Project Type"
   type         = "string"
   default      = "base"
+  description  = "Project scaffold: base = minimal git repo, python = Poetry+pytest, nextjs = TypeScript+Tailwind+Storybook, cpp = CMake+vcpkg+GoogleTest, fullstack = FastAPI backend + Next.js frontend monorepo."
   order        = 1
 
   option {
-    name  = "Base Project"
+    name  = "Base"
     value = "base"
   }
   option {
-    name  = "Python Project"
+    name  = "Python (Poetry, pytest, FastAPI-ready)"
     value = "python"
   }
   option {
-    name  = "Next.js Project"
+    name  = "Next.js (TypeScript, Tailwind, Storybook)"
     value = "nextjs"
   }
   option {
-    name  = "C++ Project"
+    name  = "C++ (CMake, vcpkg, GoogleTest)"
     value = "cpp"
   }
   option {
-    name  = "Fullstack Project"
+    name  = "Fullstack (FastAPI + Next.js)"
     value = "fullstack"
   }
 }
@@ -147,6 +146,7 @@ data "coder_parameter" "new_project_name" {
   display_name = "Project Name"
   type         = "string"
   default      = "my-new-project"
+  description  = "Used as the workspace dir under /workspaces/, the GitHub repo name if create_github_repo is true, and the Coder workspace name. kebab-case recommended."
   order        = 2
 }
 
@@ -262,9 +262,6 @@ module "workspace_runtime" {
       "HAPI_CLI_API_TOKEN=${module.workspace_secrets.hapi_cli_api_token}",
       "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
       "HAPI_AGENT=claude",
-      "MULTICA_SERVER_URL=${module.workspace_secrets.multica_server_url}",
-      "MULTICA_APP_URL=${module.workspace_secrets.multica_app_url}",
-      "MULTICA_TOKEN=${module.workspace_secrets.multica_token}",
     ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",

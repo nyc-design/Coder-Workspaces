@@ -1,0 +1,47 @@
+# MCP server configs for Coder Agents (chatd).
+# Synced to /api/experimental/mcp/servers by update-coder-agents-config.yaml.
+#
+# Stable identity: `slug` (must be unique within the deployment).
+# Additive: manually-added MCP servers in admin UI are not deleted by sync.
+#
+# `${VAR}` placeholders are substituted at sync time from workflow env.
+#
+# Coder Agents form fields → YAML mapping:
+#   Display name                   display_name
+#   Slug                           slug
+#   Server URL                     url
+#   Transport                      transport (streamable_http | sse)
+#   Description                    description
+#   Authentication method          auth_type (none | api_key | custom_headers | oauth2)
+#     API Key                      api_key (when auth_type=api_key)
+#     Custom Headers               custom_headers (map, when auth_type=custom_headers)
+#     OAuth2                       oauth2_* fields (when auth_type=oauth2)
+
+mcp_servers:
+  - slug: context7
+    display_name: Context7
+    description: Up-to-date library / framework / SDK / CLI documentation and code examples.
+    transport: streamable_http
+    url: https://mcp.context7.com/mcp
+    auth_type: custom_headers
+    custom_headers:
+      CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}
+    availability: default_on
+
+  - slug: grep
+    display_name: Grep
+    description: Search public GitHub repositories for code examples by keyword/path/language.
+    transport: streamable_http
+    url: https://mcp.grep.app
+    auth_type: none
+    availability: default_on
+
+  - slug: github
+    display_name: GitHub
+    description: 'GitHub: list/search repos, read files, manage issues + PRs, run Actions. Use to find the matching repo when the user describes a project before creating a workspace.'
+    transport: streamable_http
+    url: https://api.githubcopilot.com/mcp/
+    auth_type: custom_headers
+    custom_headers:
+      Authorization: Bearer ${GITHUB_PAT}
+    availability: default_on

@@ -1,0 +1,5 @@
+-- Frontend / Next.js --
+- Browser automation: Playwright CLI skill (preferred) or Playwright MCP (fallback).
+- Component development: Storybook — co-locate stories with components.
+- Frontend Implementation — Build pages and features by composing from the Storybook design system and calling contracted API endpoints. Types are generated from the backend's OpenAPI spec via openapi-typescript — do not hand-write API response types.
+- Design System Foundation — Component library selection, design tokens (colors, spacing, typography), and a small set of core UI components built in Storybook. Establishes the visual vocabulary used throughout frontend implementation.

@@ -26,6 +26,10 @@ RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
 COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/30-fullstack-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/30-fullstack-init.sh
 
+# Fullstack-specific system prompt extension. Stacks on top of the inherited
+# nextjs-dev prompt extension (already at 20-nextjs.txt from the parent image).
+COPY workspace-images/fullstack-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/30-fullstack.txt
+
 USER coder
 
 # User-level Python tools (same as python-dev)

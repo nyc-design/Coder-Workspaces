@@ -1,6 +1,8 @@
-# Repository Dev Container Template
+# Project Workspaces
 
-This Coder workspace template creates development environments with project scaffolding and GitHub integration.
+Default workspace template for any GitHub repository or scaffolded new project. Slug: `project-workspace`. The display name shown in the Coder dashboard is set from `display_name.txt`, the description from `description.txt`, and the icon from `icon.txt` — all pushed by the `update-coder-templates.yaml` workflow on each commit that touches this directory.
+
+Replaces the older `repo-envbuilder` template. The previous Coder Agents-specific template (`coder-agents`) was removed in favor of this template's `workspace_mode=agent` parameter, which produces an equivalent agent-managed workspace.
 
 ## Features
 

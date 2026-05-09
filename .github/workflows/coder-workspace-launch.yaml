@@ -16,31 +16,54 @@ on:
         type: string
         default: "agent"
     secrets:
-      CODER_URL:
-        required: true
-      CODER_SESSION_TOKEN:
-        required: true
+      # GCP_PROJECT stays per-repo because each repo may live in a different
+      # GCP project (or none). Optional — leave unset for repos that don't
+      # use GCP integration. CODER_URL and CODER_SESSION_TOKEN are pulled
+      # from GCP Secret Manager via WIF, no per-repo setup needed for those.
       GCP_PROJECT:
         required: false
 
 permissions:
   contents: read
+  id-token: write   # required for GCP Workload Identity Federation
 
 jobs:
   create-workspace:
     runs-on: ubuntu-latest
     steps:
+      # WIF identifiers are hardcoded so external nyc-design repos can call
+      # this workflow with zero GCP/Variable setup of their own — they just
+      # need `permissions: id-token: write` on the calling job. These values
+      # aren't secrets; they identify the auth path. Only OIDC tokens with
+      # repository_owner=='nyc-design' satisfy the binding.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+          service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
+
+      - name: Fetch Coder secrets from GCP Secret Manager
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          export_to_environment: true
+          secrets: |-
+            CODER_URL:coder-nt/CODER_URL
+            CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
+
       - name: Setup Coder CLI
         uses: coder/setup-action@v1
         with:
-          access_url: ${{ secrets.CODER_URL }}
-          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+          access_url: ${{ env.CODER_URL }}
+          coder_session_token: ${{ env.CODER_SESSION_TOKEN }}
 
       - name: Create or start workspace
         env:
           MODE: ${{ inputs.mode }}
           REPO_NAME: ${{ github.event.repository.name }}
-          CODER_URL: ${{ secrets.CODER_URL }}
+          # GCP_PROJECT is per-repo (each repo may target a different GCP
+          # project, or none). Pulled from the calling repo's GH Actions
+          # secrets via the workflow_call secrets block. Empty if unset —
+          # the workspace template handles empty as "no GCP integration".
           GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
         run: |
           set -euo pipefail
@@ -48,7 +71,7 @@ jobs:
           mode="$(echo "${MODE:-self}" | tr '[:upper:]' '[:lower:]')"
 
           workspace_name="$REPO_NAME"
-          template="repo-envbuilder"
+          template="project-workspace"
 
           # Always provide gcp_project_name (empty string allowed) to avoid interactive prompts
           gcp_project="${GCP_PROJECT:-}"
@@ -102,8 +125,8 @@ jobs:
           MODE: ${{ env.MODE }}
         run: |
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
-          Workspace: $WORKSPACE_NAME  
-          Template: repo-envbuilder$([[ "$MODE" == "agent" ]] && echo " (agent mode)" || echo "")
-          Status: $WORKSPACE_STATUS  
+          Workspace: $WORKSPACE_NAME
+          Template: project-workspace$([[ "$MODE" == "agent" ]] && echo " (agent mode)" || echo "")
+          Status: $WORKSPACE_STATUS
           Link: $WORKSPACE_URL
           EOF

@@ -26,15 +26,25 @@ workspace-images/          # Docker images for different development stacks
 workspace-templates/       # Coder workspace template definitions
 ├── windows-server-gcp/    # Windows VM on GCP with browser-based RDP access
 ├── vm-ssh-gateway/        # Container workspace template with code-server + SSH/SSHFS gateway to bare VMs
-├── repo-devcontainer/    # Repository-based devcontainer template
-└── repo-envbuilder-agent/ # Repository template with AI agent selection
+└── project-workspace/     # Default GitHub-repo / new-project workspace (self mode + agent mode)
 
 workspace-modules/         # Reusable Terraform modules for workspace templates
-├── gemini/               # Google Gemini CLI module
-└── codex/                # OpenAI Codex module
+├── workspace-apps/        # coder_app metadata
+├── workspace-envbuilder/  # envbuilder + container provisioning
+├── workspace-runtime/     # runtime container/env wiring
+├── workspace-secrets/     # GCP Secret Manager fetches
+└── workspace-startup/     # startup script aggregation
 
-scripts/                   # Utility scripts
-└── deploy-issue-automation.sh  # Deploy GitHub issue automation to repos
+host-services/             # docker-compose snippets that run on the host VM
+├── coder-pwa/             # Traefik-fronted PWA installer page
+└── coder-agents-sidecars/ # subscription-auth sidecars + Headroom for Coder Agents
+
+coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
+├── providers.yaml         # chat providers (anthropic / openai / google)
+├── models.yaml            # chat model configs (provider + model + ctx limit)
+├── mcp-servers.yaml       # MCP servers (context7 / grep / github)
+├── system-prompt.txt      # central system prompt
+└── sync.sh                # called by update-coder-agents-config.yaml workflow
 ```
 
 ## Key Architecture Concepts
@@ -56,7 +66,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 - Language-specific scripts placed in `/usr/local/share/workspace-init.d/` by child Dockerfiles
 - Auto-executed by Coder agent on workspace startup
 
-#### Base-dev Init Scripts (01-12)
+#### Base-dev Init Scripts (01-11)
 | Script | Purpose |
 |--------|---------|
 | `01-docker.sh` | Docker daemon startup, socket permissions |
@@ -69,8 +79,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
-| `11-agent-prompts.sh` | Write system prompt to all agent config home dirs |
-| `12-multica.sh` | Multica CLI config + local agent daemon startup (self-hosted) |
+| `11-agent-prompts.sh` | Assemble per-image system prompt → write to `~/.coder/AGENTS.md`; symlink `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` to it; symlink `~/.coder/skills` to `~/.claude/skills` |
 
 ### MCP Server Lifecycle Management
 Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
@@ -123,28 +132,56 @@ rtk gain                    # Check token savings
 - Claude Code: restart required after first init
 - Codex/Gemini/HAPI: active immediately in new shell sessions
 
-### Multica (Managed-Agents Daemon)
-Multica is a managed-agents platform (similar to HAPI) that runs side-by-side with HAPI in agent-mode workspaces and will eventually replace it. The self-hosted server is ours — the daemon in each Coder workspace connects to it and executes tasks dispatched from the server.
+### Agent System Prompts (per-workspace)
 
-**Install:** The `multica` binary is baked into `base-dev` from the official `multica-cli-<version>-linux-<arch>.tar.gz` GitHub release asset, installed to `/usr/local/bin/multica`.
+System prompts are assembled from per-image text fragments and wired into every
+agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
+(Claude Code, Codex, Gemini) all see the same content.
 
-**Startup flow:** [`12-multica.sh`](workspace-images/base-dev/init.d/12-multica.sh)
-1. Writes `server_url` and `app_url` via `multica config set` (persists to `~/.multica/config.json`).
-2. If `MULTICA_TOKEN` is set, pipes it through `multica login --token` (bounded by `timeout 30`). That single call validates the token against `/api/me`, saves it to CLI config, and auto-discovers + watches every workspace the account belongs to — without this the daemon starts with no watched workspaces.
-3. Launches `multica daemon start --daemon-id <workspace-name> --device-name <workspace-name>`. The daemon forks itself into the background, auto-detects installed AI CLIs (claude, codex, gemini, etc.), and registers a runtime per detected CLI per watched workspace.
+- `workspace-images/base-dev/system_prompt.txt` is copied into the image at
+  `/usr/local/share/workspace-prompts/00-base.txt` (universal content).
+- Each child image (`nextjs-dev`, `fullstack-dev`, `playwright-dev`, etc.) can
+  contribute a `system_prompt_extension.txt` that's copied to
+  `/usr/local/share/workspace-prompts/20-<image>.txt`. fullstack-dev adds its
+  own at `30-fullstack.txt` so it stacks on top of the inherited nextjs prompt.
+- [`11-agent-prompts.sh`](workspace-images/base-dev/init.d/11-agent-prompts.sh)
+  concatenates `*.txt` in sorted order into `~/.coder/AGENTS.md` (the path
+  Coder Agents reads by default — see chatd's `agent/agentcontextconfig/api.go`
+  `DefaultInstructionsFile`). It then symlinks `~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md`, and `~/.gemini/GEMINI.md` to that canonical file so
+  there's a single source of truth with zero content duplication.
+- `~/.coder/skills` is symlinked to `~/.claude/skills` so Coder Agents and
+  Claude Code share one skill catalog. Both follow the
+  [agentskills.io](https://agentskills.io) `SKILL.md` format.
+- Existing user-edited regular files are NOT overwritten — the symlink helper
+  only replaces broken/missing links.
 
-**Env vars (wired via `repo-envbuilder` template + `workspace-secrets` module, all GCP-secret-backed):**
-- `MULTICA_SERVER_URL` — backend API URL for the self-hosted server (required; init script no-ops if unset)
-- `MULTICA_APP_URL` — frontend URL (used by `multica login` for OAuth callbacks and by the CLI for browser-based flows); falls back to `MULTICA_SERVER_URL` if unset
-- `MULTICA_TOKEN` — pre-provisioned Multica personal access token (prefix `mul_`) for headless login. Also read at runtime by every `multica` invocation, so CLI calls from inside the workspace are auto-authenticated.
+### Coder Agents Central Config
 
-**Required GCP secrets** (fetched when `include_multica = true` in `workspace-secrets`): `MULTICA_SERVER_URL`, `MULTICA_APP_URL`, `MULTICA_TOKEN`.
+Git-tracked admin config for Coder Agents (chatd) lives in
+`coder-agents-config/`. The `update-coder-agents-config.yaml` workflow runs
+`coder-agents-config/sync.sh` on every commit that touches that directory and
+applies four resources idempotently:
 
-**Per-task execution dirs:** The daemon creates a fresh empty workdir per task at `${MULTICA_WORKSPACES_ROOT:-~/multica_workspaces}/<workspace-id>/<short-task-id>/workdir`. It does **not** reuse the Coder-cloned repo — agents clone on demand via Multica's own `multica repo checkout <url>` (backed by the daemon's `repocache`). Override `MULTICA_WORKSPACES_ROOT` only if you need these dirs on a different volume.
+| File | Synced to | Stable identity |
+|---|---|---|
+| `providers.yaml` | `/api/experimental/chats/providers` | `provider` |
+| `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` |
+| `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` |
+| `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton) |
 
-**Logs:** `~/.multica/daemon.log` (primary, CLI-managed) + `/tmp/multica-daemon.log` and `/tmp/multica-login.log` (init-script stdout/stderr).
+`${VAR}` placeholders in YAML are substituted from the workflow's env at sync
+time — secrets live in GitHub Actions secrets (`CODER_URL`,
+`CODER_SESSION_TOKEN`, `SIDECAR_SHARED_API_KEY`, `CONTEXT7_API_KEY`,
+`GH_PAT_FOR_MCP`).
 
-**Manual fallback:** If `MULTICA_TOKEN` isn't set or the login times out (e.g. zero workspaces on the server), run `multica login` (or `multica login --token`) inside the workspace to complete setup, then `multica daemon restart`.
+Sync is **additive** — items only present in Coder admin (manually added
+in the UI) are not removed. To remove an item, delete it manually. See
+`coder-agents-config/README.md` for full semantics + caveats.
+
+The central system prompt is intentionally minimal (workspace-creation policy
+only) and stacks on top of (a) Coder's built-in default prompt and (b) the
+per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

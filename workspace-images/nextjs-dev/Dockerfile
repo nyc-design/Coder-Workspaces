@@ -43,6 +43,10 @@ RUN npm install -g \
 COPY workspace-images/nextjs-dev/nextjs-init.sh /usr/local/share/workspace-init.d/20-nextjs-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-nextjs-init.sh
 
+# Frontend-specific system prompt extension. Concatenated into ~/.coder/AGENTS.md
+# by 11-agent-prompts.sh alongside the base prompt.
+COPY workspace-images/nextjs-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/20-nextjs.txt
+
 # Set Node.js workspace defaults
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false

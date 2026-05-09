@@ -92,6 +92,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.changed_templates != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for GCP Workload Identity Federation
     strategy:
       matrix:
         template: ${{ fromJson(needs.detect-changes.outputs.changed_templates) }}
@@ -99,6 +102,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # WIF identifiers are hardcoded for consistency with coder-workspace-launch.yaml.
+      # See .github/SECRETS.md for what these are and how to regenerate if needed.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+          service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
+
+      - name: Fetch Coder secrets from GCP Secret Manager
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          export_to_environment: true
+          secrets: |-
+            CODER_URL:coder-nt/CODER_URL
+            CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
 
       - name: Get latest commit hash
         id: latest_commit
@@ -119,14 +138,78 @@ jobs:
             echo "Template directory workspace-templates/${{ matrix.template }} does not exist (might be deleted)"
           fi
 
-      - name: Update Coder Template
+      - name: Update Coder Template (push new version)
         if: steps.check_dir.outputs.exists == 'true'
         uses: matifali/update-coder-template@v3
         with:
           id: ${{ matrix.template }}
           dir: workspace-templates/${{ matrix.template }}
-          url: ${{ secrets.CODER_URL }}
+          url: ${{ env.CODER_URL }}
           name: ${{ steps.latest_commit.outputs.hash }}
           message: ${{ steps.commit_title.outputs.title }}
           activate: true
-          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+          coder_session_token: ${{ env.CODER_SESSION_TOKEN }}
+
+      # Template-level metadata (display name, description, icon) is independent
+      # of versioned Terraform pushes. Coder Agents picks templates by these
+      # fields, so they're worth keeping in sync. Each is set from a sibling
+      # txt file in the template directory; missing files are silently skipped.
+      - name: Update template metadata (display_name / description / icon)
+        if: steps.check_dir.outputs.exists == 'true'
+        env:
+          TEMPLATE_DIR: workspace-templates/${{ matrix.template }}
+          TEMPLATE_SLUG: ${{ matrix.template }}
+        run: |
+          set -euo pipefail
+
+          DISPLAY_NAME_FILE="$TEMPLATE_DIR/display_name.txt"
+          DESCRIPTION_FILE="$TEMPLATE_DIR/description.txt"
+          ICON_FILE="$TEMPLATE_DIR/icon.txt"
+
+          if [ ! -f "$DISPLAY_NAME_FILE" ] && [ ! -f "$DESCRIPTION_FILE" ] && [ ! -f "$ICON_FILE" ]; then
+            echo "No metadata files in $TEMPLATE_DIR, skipping metadata update."
+            exit 0
+          fi
+
+          AUTH_HEADER="Coder-Session-Token: $CODER_SESSION_TOKEN"
+
+          # Resolve template UUID by slug. Coder's PATCH endpoint requires the
+          # template ID, not its name. The list endpoint returns all templates
+          # the session can see; we filter by name (slug) here.
+          TEMPLATE_ID=$(
+            curl -fsSL -H "$AUTH_HEADER" "$CODER_URL/api/v2/templates" \
+              | jq -r --arg name "$TEMPLATE_SLUG" '.[] | select(.name == $name) | .id' \
+              | head -n1
+          )
+          if [ -z "$TEMPLATE_ID" ] || [ "$TEMPLATE_ID" = "null" ]; then
+            echo "Could not resolve template UUID for slug '$TEMPLATE_SLUG'. Skipping metadata update." >&2
+            exit 0
+          fi
+
+          # Build PATCH body. Only include fields whose source file exists, so
+          # missing display_name.txt doesn't blank out the existing display name.
+          BODY='{}'
+          if [ -f "$DISPLAY_NAME_FILE" ]; then
+            VAL="$(cat "$DISPLAY_NAME_FILE" | sed -e 's/[[:space:]]*$//' | head -c 64)"
+            BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {display_name: $v}')
+          fi
+          if [ -f "$DESCRIPTION_FILE" ]; then
+            # Coder caps description at ~128 chars in some places; we store the
+            # long-form here. If the API rejects, truncate. Remove trailing nl.
+            VAL="$(cat "$DESCRIPTION_FILE" | sed -e 's/[[:space:]]*$//')"
+            BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {description: $v}')
+          fi
+          if [ -f "$ICON_FILE" ]; then
+            VAL="$(cat "$ICON_FILE" | tr -d '[:space:]')"
+            BODY=$(echo "$BODY" | jq --arg v "$VAL" '. + {icon: $v}')
+          fi
+
+          echo "PATCH body for $TEMPLATE_SLUG ($TEMPLATE_ID):"
+          echo "$BODY" | jq
+
+          curl -fsSL -X PATCH \
+            -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "$CODER_URL/api/v2/templates/$TEMPLATE_ID" \
+            | jq '{name, display_name, description, icon}'

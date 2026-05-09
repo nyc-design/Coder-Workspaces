@@ -1,0 +1,54 @@
+name: Update Coder Agents central config
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "coder-agents-config/**"
+      - ".github/workflows/update-coder-agents-config.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for GCP Workload Identity Federation
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # github-hosted runners ship jq + yq + envsubst by default; verify so a
+      # missing tool is loud rather than silent.
+      - name: Verify tooling
+        run: |
+          command -v curl >/dev/null
+          command -v jq >/dev/null
+          command -v yq >/dev/null
+          command -v envsubst >/dev/null
+
+      # WIF identifiers are hardcoded for consistency with coder-workspace-launch.yaml.
+      # See .github/SECRETS.md for what these are and how to regenerate if needed.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/547043252101/locations/global/workloadIdentityPools/github/providers/this-repo
+          service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
+
+      - name: Fetch secrets from GCP Secret Manager
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          export_to_environment: true
+          # GITHUB_PAT in env maps to ${GITHUB_PAT} in mcp-servers.yaml. The
+          # GCP secret is named GH_PAT_FOR_MCP to distinguish from the generic
+          # GH_PAT used for git auth in workspaces.
+          secrets: |-
+            CODER_URL:coder-nt/CODER_URL
+            CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
+            SIDECAR_SHARED_API_KEY:coder-nt/SIDECAR_SHARED_API_KEY
+            CONTEXT7_API_KEY:coder-nt/CONTEXT7_API_KEY
+            GITHUB_PAT:coder-nt/GH_PAT_FOR_MCP
+
+      - name: Sync providers / models / MCP servers / system prompt / template-allowlist
+        run: ./coder-agents-config/sync.sh coder-agents-config

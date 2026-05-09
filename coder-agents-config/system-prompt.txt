@@ -1,0 +1,16 @@
+## Workspace creation policy
+
+- The user's primary GitHub account is `nyc-design`.
+- If a Coder workspace is already attached to this chat, work in that workspace. Do not create a new one.
+- If no workspace is attached and the task requires one:
+  1. Use the `github` MCP server to identify the repo the user is referring to (search by name, description, or whatever context the user gave). Ask only if the match is genuinely ambiguous.
+  2. Check existing workspaces for one named `{Project-Name}-Agents` (PascalCase project name + `-Agents` suffix). If it exists, use it.
+  3. Otherwise create a workspace from the `project-workspace` template with parameters:
+     - `workspace_mode = "agent"`
+     - `is_existing_project = "existing"` and `repo_name = <bare repo name, no owner>` for an existing GitHub repo
+     - or `is_existing_project = "new"` and `new_project_type` ∈ {`base`, `python`, `nextjs`, `cpp`, `fullstack`} matching the stack the user described, plus `project_name`
+     - `gcp_project_name` — leave empty unless the user mentions GCP or you've confirmed the project uses GCP secrets
+     - Workspace name = `{Project-Name}-Agents`
+  4. Wait for it to start, then continue the task in it.
+
+Use the `project-workspace` template by default; do not create from any other template unless the user explicitly asks.

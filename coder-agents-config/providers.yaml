@@ -1,0 +1,38 @@
+# Chat provider configs for Coder Agents (chatd).
+# Synced to /api/experimental/chats/providers by update-coder-agents-config.yaml.
+#
+# Stable identity: `provider` field (anthropic / openai / google / azure /
+# bedrock / openaicompat / openrouter / vercel — see fantasy.SupportedProviders).
+# This file is additive: providers in here get created/updated; manually-added
+# providers in the Coder UI are NOT removed by sync.
+#
+# `${VAR}` placeholders are substituted at sync time from env (set in the
+# workflow from GitHub repo secrets / GCP Secret Manager).
+
+providers:
+  - provider: anthropic
+    display_name: Anthropic (Pro/Max via sidecar)
+    base_url: https://llm.tapiavala.com/claude
+    api_key: ${SIDECAR_SHARED_API_KEY}
+    enabled: true
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false
+
+  - provider: openai
+    display_name: OpenAI Codex (ChatGPT Plus via sidecar)
+    base_url: https://llm.tapiavala.com/codex
+    api_key: ${SIDECAR_SHARED_API_KEY}
+    enabled: true
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false
+
+  - provider: google
+    display_name: Google Gemini (subscription via sidecar)
+    base_url: https://llm.tapiavala.com/gemini
+    api_key: ${SIDECAR_SHARED_API_KEY}
+    enabled: true
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false

@@ -118,17 +118,6 @@ RUN LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/laz
  && install lazydocker -D -t /usr/local/bin/ \
  && rm lazydocker lazydocker.tar.gz
 
-# Multica CLI + daemon (managed-agents platform, replaces HAPI over time)
-# Release assets named multica-cli-<version>-linux-<arch>.tar.gz containing a `multica` binary.
-RUN MULTICA_VERSION=$(curl -fsSL -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/multica-ai/multica/releases/latest" \
-      | grep -Po '"tag_name":\s*"v\K[^"]*') \
- && ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="amd64" || ARCH="arm64" \
- && curl -Lo multica.tar.gz "https://github.com/multica-ai/multica/releases/download/v${MULTICA_VERSION}/multica-cli-${MULTICA_VERSION}-linux-${ARCH}.tar.gz" \
- && tar xzf multica.tar.gz multica \
- && install multica -D -t /usr/local/bin/ \
- && rm -f multica multica.tar.gz
-
 # Minimal user onfig
 RUN install -d -o coder -g coder -m 700 /home/coder/.ssh \
  && ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> /home/coder/.ssh/known_hosts \
@@ -152,7 +141,7 @@ RUN git clone --depth 1 https://github.com/LazyVim/starter /opt/lazyvim-starter/
       > /opt/lazyvim-starter/config/lazyvim.json
 
 USER root
-RUN install -d -m 0755 /usr/local/share/workspace-init.d
+RUN install -d -m 0755 /usr/local/share/workspace-init.d /usr/local/share/workspace-prompts
 
 # MCP server lifecycle utilities:
 #   mcp-wrap    — exec wrapper that sets PR_SET_PDEATHSIG so MCP servers
@@ -162,7 +151,11 @@ COPY workspace-images/base-dev/bin/mcp-wrap /usr/local/bin/mcp-wrap
 COPY workspace-images/base-dev/bin/mcp-cleanup /usr/local/bin/mcp-cleanup
 RUN chmod +x /usr/local/bin/mcp-wrap /usr/local/bin/mcp-cleanup
 
-COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-init.d/system_prompt.txt
+# Base workspace system prompt. Child images add their own extensions to
+# /usr/local/share/workspace-prompts/ — 11-agent-prompts.sh concatenates
+# them in sorted order and writes the result to ~/.coder/AGENTS.md (with
+# symlinks for Claude/Codex/Gemini provider-specific files).
+COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-prompts/00-base.txt
 COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
