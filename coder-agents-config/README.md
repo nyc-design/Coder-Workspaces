@@ -17,20 +17,47 @@ GitHub Actions workflow on every commit that touches this directory.
 
 ## Sync semantics
 
-- **Idempotent**: items in YAML are POSTed if missing (matched by stable
-  identity), PATCHed by UUID if already present.
-- **Additive**: items only present in Coder admin (manually added in the UI)
-  are NOT removed by sync. Repo defines a *required minimum*, not the
-  exhaustive set.
-- **Order**: providers → models → MCP servers → system prompt. Required
-  because Coder rejects model creation if its provider isn't already
-  configured.
+Per resource type:
+
+| Resource | Mode | Behavior |
+|---|---|---|
+| Providers | **Additive** | POST if missing, PATCH if exists; never delete. Manual UI additions are preserved. |
+| **Models** | **Declarative** | POST/PATCH desired; **DELETE any model in Coder not listed in `models.yaml`**. The YAML is source of truth. |
+| MCP Servers | **Additive** | Same as providers. |
+| System prompt | PUT singleton | Always overwritten. |
+
+Why models are declarative: cost tracking, context limits, and reasoning
+budgets are easy to drift between repo and admin if you only add. Forcing
+parity catches accidental UI edits. Providers and MCPs stay additive because
+losing a manually-added Bedrock provider or a workspace-scoped MCP to a git
+deploy would be far more disruptive than a stale model entry.
+
+Other notes:
+
+- **Idempotent**: re-running sync produces the same admin state. Safe to spam.
+- **Order**: providers → models (POST/PATCH) → models (delete unmatched) → MCP
+  servers → system prompt. Coder rejects model creation if the provider isn't
+  already configured. Model deletes happen last so a new default is in place
+  before the old default gets removed.
 - **Secrets**: YAML values may contain `${VAR}` placeholders, which `envsubst`
   expands at sync time from the workflow's env. The workflow pulls those env
-  values from GitHub repository secrets (or GCP Secret Manager via your
-  existing pattern, depending on which secret).
-- **Failure mode**: any HTTP 4xx/5xx fails the workflow loudly with the error
-  body. Stable until that's fixed.
+  values from GitHub repository secrets.
+- **Failure mode**: any HTTP 4xx/5xx fails sync loudly with the error body.
+
+## Modes
+
+`sync.sh` supports two modes:
+
+```bash
+./sync.sh push    # default — apply YAML → Coder
+./sync.sh pull    # inverse — dump Coder admin state → *.new files for diff/commit
+```
+
+**Pull** is for bootstrapping: run it once locally with admin creds to dump
+your existing admin state into `*.new` files alongside the YAML, then `diff`
+and rename. After pulling, manually restore any `${VAR}` placeholders for
+secrets — the API only returns `has_api_key: true|false`, never the value,
+so secrets come out as opaque placeholders.
 
 ## Workflow secrets
 

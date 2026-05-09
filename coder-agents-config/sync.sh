@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 # sync.sh — apply this directory's YAML files against a running Coder
-# deployment via the experimental Coder Agents config API. Idempotent: items
-# in YAML are POSTed if missing (matched by stable key) or PATCHed by UUID if
-# already present. Items only present in Coder (not in YAML) are left alone.
+# deployment via the experimental Coder Agents config API.
+#
+# Modes:
+#   push (default)  Apply YAML → Coder. See per-resource semantics below.
+#   pull            Inverse: dump current Coder admin state → YAML files
+#                   in the config dir. Useful for bootstrapping or refreshing
+#                   from values you've tuned in the UI.
+#
+# Per-resource sync semantics on push:
+#   providers       additive   (POST if missing, PATCH if exists; never delete)
+#   models          declarative (POST/PATCH desired; DELETE any model not in YAML)
+#   mcp servers     additive   (POST if missing, PATCH if exists; never delete)
+#   system prompt   PUT singleton
 #
 # Required env:
 #   CODER_URL              base URL of the Coder deployment
 #   CODER_SESSION_TOKEN    admin session token (Owner role)
-#   SIDECAR_SHARED_API_KEY shared secret for the host-services sidecars
-#   CONTEXT7_API_KEY       Context7 API key
-#   GITHUB_PAT             GitHub PAT for the github MCP server
+#   SIDECAR_SHARED_API_KEY shared secret for the host-services sidecars (push only)
+#   CONTEXT7_API_KEY       Context7 API key (push only)
+#   GITHUB_PAT             GitHub PAT for the github MCP server (push only)
 #
-# Tooling: requires bash, curl, jq, yq (mikefarah/yq v4+), envsubst.
+# Tooling: bash, curl, jq, yq (mikefarah/yq v4+), envsubst.
 # All four are available on github-hosted runners by default.
 #
 # Stable keys per resource:
@@ -21,27 +31,31 @@
 
 set -euo pipefail
 
-CONFIG_DIR="${1:-coder-agents-config}"
+MODE="push"
+CONFIG_DIR="coder-agents-config"
+
+# Accept either ordering: `sync.sh <dir>`, `sync.sh <mode>`, or
+# `sync.sh <mode> <dir>`. Bare arg is treated as dir for backwards compat.
+case "${1:-}" in
+  push|pull) MODE="$1"; CONFIG_DIR="${2:-$CONFIG_DIR}" ;;
+  "")        : ;;
+  *)         CONFIG_DIR="$1" ;;
+esac
+
 : "${CODER_URL:?CODER_URL must be set}"
 : "${CODER_SESSION_TOKEN:?CODER_SESSION_TOKEN must be set}"
 
 AUTH_HEADER="Coder-Session-Token: ${CODER_SESSION_TOKEN}"
 
-# expand_yaml — substitute ${VAR} placeholders, then convert YAML to JSON.
-# We only expand vars that are in env to avoid eating literal `${...}`.
-expand_yaml() {
-  envsubst < "$1" | yq -o=json '.'
-}
+expand_yaml() { envsubst < "$1" | yq -o=json '.'; }
 
-# coder_get / coder_post / coder_patch — thin curl wrappers with the auth
-# header pre-set. All return the response body on stdout, fail-fast on HTTP
-# error (curl --fail-with-body so we still see error JSON).
-coder_get()   { curl -sS --fail-with-body -H "$AUTH_HEADER" "${CODER_URL}$1"; }
-coder_post()  { curl -sS --fail-with-body -X POST  -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
-coder_patch() { curl -sS --fail-with-body -X PATCH -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
+coder_get()    { curl -sS --fail-with-body -H "$AUTH_HEADER" "${CODER_URL}$1"; }
+coder_post()   { curl -sS --fail-with-body -X POST   -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
+coder_patch()  { curl -sS --fail-with-body -X PATCH  -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
+coder_delete() { curl -sS --fail-with-body -X DELETE -H "$AUTH_HEADER"                                              "${CODER_URL}$1"; }
 
-# ───────── PROVIDERS ────────────────────────────────────────────────────────
-sync_providers() {
+# ───────── PROVIDERS (additive) ─────────────────────────────────────────────
+push_providers() {
   local file="$CONFIG_DIR/providers.yaml"
   [ -f "$file" ] || { echo "no providers.yaml, skipping"; return; }
 
@@ -53,8 +67,6 @@ sync_providers() {
   echo "$desired" | jq -c '.providers[]' | while read -r p; do
     local provider existing_id
     provider="$(jq -r '.provider' <<< "$p")"
-    # Only DB-backed entries have a non-Nil UUID — stub entries from
-    # SupportedProviders/EnvPreset have id="" or id="00000000-...". Filter.
     existing_id="$(jq -r --arg n "$provider" \
       '.[] | select(.provider == $n and .id != "" and .id != "00000000-0000-0000-0000-000000000000") | .id' \
       <<< "$current" | head -n1)"
@@ -69,16 +81,23 @@ sync_providers() {
   done
 }
 
-# ───────── MODELS ───────────────────────────────────────────────────────────
-sync_models() {
+# ───────── MODELS (declarative) ─────────────────────────────────────────────
+# Sync flow:
+#   1. POST/PATCH every model in YAML
+#   2. After step 1 succeeds, DELETE any model in Coder whose (provider, model)
+#      is NOT in YAML. Order matters — we need everything in YAML in place
+#      first, in case one of those needs to become the new default before we
+#      can delete the old one.
+push_models() {
   local file="$CONFIG_DIR/models.yaml"
   [ -f "$file" ] || { echo "no models.yaml, skipping"; return; }
 
-  echo "==> syncing model configs from $file"
+  echo "==> syncing model configs from $file (declarative)"
   local desired current
   desired="$(expand_yaml "$file")"
   current="$(coder_get '/api/experimental/chats/model-configs')"
 
+  # Phase 1: apply desired (POST or PATCH)
   echo "$desired" | jq -c '.models[]' | while read -r m; do
     local provider model existing_id
     provider="$(jq -r '.provider' <<< "$m")"
@@ -95,10 +114,26 @@ sync_models() {
       coder_post "/api/experimental/chats/model-configs" "$m" >/dev/null
     fi
   done
+
+  # Phase 2: delete anything in Coder but not in desired
+  current="$(coder_get '/api/experimental/chats/model-configs')"
+  echo "$current" | jq -c '.[]' | while read -r m; do
+    local provider model id in_desired
+    provider="$(jq -r '.provider' <<< "$m")"
+    model="$(jq -r '.model' <<< "$m")"
+    id="$(jq -r '.id' <<< "$m")"
+    in_desired="$(echo "$desired" | jq --arg p "$provider" --arg m "$model" \
+      'any(.models[]; .provider == $p and .model == $m)')"
+
+    if [ "$in_desired" = "false" ]; then
+      echo "    DELETE $provider/$model ($id) — not in YAML"
+      coder_delete "/api/experimental/chats/model-configs/$id" >/dev/null
+    fi
+  done
 }
 
-# ───────── MCP SERVERS ──────────────────────────────────────────────────────
-sync_mcp_servers() {
+# ───────── MCP SERVERS (additive) ───────────────────────────────────────────
+push_mcp_servers() {
   local file="$CONFIG_DIR/mcp-servers.yaml"
   [ -f "$file" ] || { echo "no mcp-servers.yaml, skipping"; return; }
 
@@ -110,9 +145,7 @@ sync_mcp_servers() {
   echo "$desired" | jq -c '.mcp_servers[]' | while read -r s; do
     local slug existing_id
     slug="$(jq -r '.slug' <<< "$s")"
-    existing_id="$(jq -r --arg s "$slug" \
-      '.[] | select(.slug == $s) | .id' \
-      <<< "$current" | head -n1)"
+    existing_id="$(jq -r --arg s "$slug" '.[] | select(.slug == $s) | .id' <<< "$current" | head -n1)"
 
     if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
       echo "    PATCH $slug ($existing_id)"
@@ -124,8 +157,8 @@ sync_mcp_servers() {
   done
 }
 
-# ───────── SYSTEM PROMPT ────────────────────────────────────────────────────
-sync_system_prompt() {
+# ───────── SYSTEM PROMPT (PUT singleton) ────────────────────────────────────
+push_system_prompt() {
   local file="$CONFIG_DIR/system-prompt.txt"
   [ -f "$file" ] || { echo "no system-prompt.txt, skipping"; return; }
 
@@ -139,9 +172,77 @@ sync_system_prompt() {
   echo "    PUT system prompt ($(wc -c < "$file") bytes)"
 }
 
-# Order matters: providers must exist before models reference them.
-sync_providers
-sync_models
-sync_mcp_servers
-sync_system_prompt
-echo "==> done"
+# ───────── PULL MODE ────────────────────────────────────────────────────────
+# Dumps current Coder admin state to the YAML files. Useful for bootstrapping
+# from existing UI configs or refreshing after manual edits in the admin UI.
+#
+# - providers.yaml: includes all DB-backed providers (skips stub entries)
+# - models.yaml: every model config
+# - mcp-servers.yaml: every MCP server
+# - system-prompt.txt: current prompt content
+#
+# Secret values (api_key, custom_headers values) come back as `has_*: true`
+# booleans only — actual values are never readable. Pull preserves any
+# `${VAR}` placeholders already in your YAML by NOT replacing those fields
+# when the GET response signals presence; if you want a clean dump, delete
+# the YAML files first and re-run pull. Then re-add `${VAR}` references for
+# secrets manually.
+pull_all() {
+  echo "==> pulling current admin state into $CONFIG_DIR/"
+
+  # Providers — strip stub entries (id == Nil UUID), keep all DB rows
+  echo "  providers.yaml"
+  coder_get '/api/experimental/chats/providers' | \
+    jq '{providers: [.[] | select(.id != "" and .id != "00000000-0000-0000-0000-000000000000")
+                    | {provider, display_name, base_url,
+                       api_key: (if .has_api_key then "${SIDECAR_SHARED_API_KEY}" else null end),
+                       enabled, central_api_key_enabled, allow_user_api_key,
+                       allow_central_api_key_fallback}
+                    | with_entries(select(.value != null))]}' | \
+    yq -o=yaml -P '.' > "$CONFIG_DIR/providers.yaml.new"
+
+  echo "  models.yaml"
+  coder_get '/api/experimental/chats/model-configs' | \
+    jq '{models: [.[] | {provider, model, display_name, enabled, is_default,
+                         context_limit, compression_threshold, model_config}
+                  | with_entries(select(.value != null))]}' | \
+    yq -o=yaml -P '.' > "$CONFIG_DIR/models.yaml.new"
+
+  echo "  mcp-servers.yaml"
+  coder_get '/api/experimental/mcp/servers' | \
+    jq '{mcp_servers: [.[] | {slug, display_name, description, transport, url,
+                              auth_type, availability,
+                              custom_headers: (if .has_custom_headers
+                                               then {Authorization: "${...}"} else null end)}
+                       | with_entries(select(.value != null))]}' | \
+    yq -o=yaml -P '.' > "$CONFIG_DIR/mcp-servers.yaml.new"
+
+  echo "  system-prompt.txt"
+  coder_get '/api/experimental/chats/config/system-prompt' | \
+    jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
+
+  echo
+  echo "Wrote *.new files alongside existing YAML. Diff and rename:"
+  echo "  diff $CONFIG_DIR/providers.yaml{,.new} && mv $CONFIG_DIR/providers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/models.yaml{,.new}    && mv $CONFIG_DIR/models.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new} && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new} && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo
+  echo "Heads up: secret fields come back as opaque placeholders. Restore"
+  echo "your \${VAR} references in api_key / custom_headers before committing."
+}
+
+case "$MODE" in
+  push)
+    # Order matters: providers → models (with delete pass) → MCPs → prompt.
+    # Coder rejects model creation if its provider isn't already configured.
+    push_providers
+    push_models
+    push_mcp_servers
+    push_system_prompt
+    echo "==> push done"
+    ;;
+  pull)
+    pull_all
+    ;;
+esac
