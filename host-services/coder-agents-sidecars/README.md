@@ -70,17 +70,23 @@ Credentials persist in the named volume `coder-agents-sidecars-auth` (mounted at
 ## Wire into Coder Agents
 
 In **Coder admin → Deployment → AI → Providers**, override base URL on each
-provider you want to back with a subscription:
+provider you want to back with a subscription. **All three use the same URL +
+key** — Headroom dispatches by request path automatically:
 
-| Provider | Base URL | API key field |
-|---|---|---|
-| Anthropic | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` |
-| OpenAI | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` |
-| Google | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` |
+| Provider | Base URL (Coder admin) | API key (Coder admin) | Path Headroom dispatches on | Routed to |
+|---|---|---|---|---|
+| Anthropic | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1/messages` | claude-sidecar |
+| OpenAI | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1/responses` | codex-sidecar |
+| Google | `http://coder-agents-sidecars:8787` | `SIDECAR_SHARED_API_KEY` | `/v1beta/models/{model}:generateContent` | gemini-sidecar |
+
+The path column is informational — fantasy's provider libraries (which chatd
+uses) automatically pre-pend the right path when given a base URL, so you don't
+configure paths yourself. Each provider library is hard-wired to its own API
+shape; the path divergence is what disambiguates routing.
 
 Substitute `localhost` for `coder-agents-sidecars` if coderd isn't on the same
 docker network. The OpenAI provider already calls `WithUseResponsesAPI()` by
-default in chatd, so no extra config needed there.
+default in chatd, so it correctly hits `/v1/responses` (not `/v1/chat/completions`).
 
 To temporarily fall back to raw API billing for any provider, change its base
 URL back to the vendor's URL in the admin UI — no container restart needed.

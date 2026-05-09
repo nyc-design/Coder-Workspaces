@@ -42,20 +42,24 @@ RUN python3 -m venv /opt/headroom-venv \
  && /opt/headroom-venv/bin/pip install --no-cache-dir 'headroom-ai[proxy]'
 
 # ── CLIProxyAPI binary (Gemini sidecar engine) ───────────────────────────────
+# Asset filename pattern (verified against v6.10.9):
+#   CLIProxyAPI_<version>_linux_<arch>.tar.gz
+# where <version> is without the leading 'v', and <arch> is amd64 or aarch64.
+# Tarball contains a `cli-proxy-api` (lowercase) binary at top level.
 ARG CLI_PROXY_API_VERSION=v6.10.9
 RUN set -eux; \
     case "$TARGETARCH" in \
       amd64) ARCH=amd64 ;; \
-      arm64) ARCH=arm64 ;; \
+      arm64) ARCH=aarch64 ;; \
       *) echo "unsupported arch: $TARGETARCH" && exit 1 ;; \
     esac; \
+    VERSION_NO_V="${CLI_PROXY_API_VERSION#v}"; \
     cd /tmp; \
-    # Try both common asset name patterns; CLIProxyAPI has switched between them.
-    (curl -fsSLo cli-proxy.tar.gz "https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLI_PROXY_API_VERSION}/CLIProxyAPI_${TARGETOS}_${ARCH}.tar.gz" \
-      || curl -fsSLo cli-proxy.tar.gz "https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLI_PROXY_API_VERSION}/CLIProxyAPI-${TARGETOS}-${ARCH}.tar.gz"); \
-    tar -xzf cli-proxy.tar.gz; \
-    install -m 0755 CLIProxyAPI /usr/local/bin/cli-proxy-api; \
-    rm -rf /tmp/cli-proxy.tar.gz /tmp/CLIProxyAPI
+    curl -fsSLo cli-proxy.tar.gz \
+      "https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLI_PROXY_API_VERSION}/CLIProxyAPI_${VERSION_NO_V}_linux_${ARCH}.tar.gz"; \
+    tar -xzf cli-proxy.tar.gz cli-proxy-api; \
+    install -m 0755 cli-proxy-api /usr/local/bin/cli-proxy-api; \
+    rm -f /tmp/cli-proxy.tar.gz /tmp/cli-proxy-api
 
 # ── Node tools: Meridian, Claude Code SDK, Codex CLI (for bootstrap) ─────────
 ARG MERIDIAN_VERSION=latest
