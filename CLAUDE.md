@@ -150,11 +150,28 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
   `DefaultInstructionsFile`). It then symlinks `~/.claude/CLAUDE.md`,
   `~/.codex/AGENTS.md`, and `~/.gemini/GEMINI.md` to that canonical file so
   there's a single source of truth with zero content duplication.
-- `~/.coder/skills` is symlinked to `~/.claude/skills` so Coder Agents and
-  Claude Code share one skill catalog. Both follow the
+- Skill catalogs are unified under one canonical at `~/.agents/skills` (where
+  the `skills` npm CLI installs natively — persistent across workspaces via
+  the host bind mount on `/home/ubuntu/secrets/.agents`). Each agent's
+  skills/ path is a folder-level symlink to the canonical:
+  `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills`, and
+  `~/.coder/skills` all resolve to the same directory. Coder Agents (chatd)
+  doesn't auto-discover `~/.agents/skills` — its built-in `SkillsDir`
+  default is `.agents/skills` resolved relative to the project dir. The
+  `coder_agent` env in `workspace-templates/project-workspace/main.tf`
+  sets `CODER_AGENT_EXP_SKILLS_DIRS=~/.agents/skills,.agents/skills` so
+  chatd reads both user-level and project-local catalogs. All follow the
   [agentskills.io](https://agentskills.io) `SKILL.md` format.
-- Existing user-edited regular files are NOT overwritten — the symlink helper
-  only replaces broken/missing links.
+- First-run migration in `11-agent-prompts.sh` converts each per-agent
+  skills/ real directory into a folder-level symlink: skills with
+  `SKILL.md` not already in the canonical are adopted; everything else
+  (loose `.md` files, duplicate skill dirs, agent-specific subfolders like
+  Codex's `.system/`) is moved under `~/.agents/skills-migration-backup/`
+  for manual reconciliation. Per-skill symlinks (CLI-managed) are simply
+  removed since the targets already live in the canonical.
+- Existing user-edited regular files outside the skills dirs (e.g.,
+  `~/.claude/CLAUDE.md`) are NOT overwritten — the symlink helper only
+  replaces broken/missing links.
 
 ### Coder Agents Central Config
 

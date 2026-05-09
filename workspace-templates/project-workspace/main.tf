@@ -225,6 +225,15 @@ resource "coder_agent" "main" {
     GIT_AUTHOR_EMAIL    = local.git_author_email
     GIT_COMMITTER_NAME  = local.git_author_name
     GIT_COMMITTER_EMAIL = local.git_author_email
+
+    # Coder Agents (chatd) defaults SkillsDirs to `.agents/skills` resolved
+    # relative to this agent's `dir` (the project) — so the user-level
+    # canonical catalog at ~/.agents/skills is invisible to it without an
+    # override. Comma-separated list lets us keep both: user-global skills
+    # (where the `skills` CLI installs and 11-agent-prompts.sh symlinks the
+    # other agents to) AND project-local skills (default Coder Agents
+    # convention, useful for repo-specific skills checked into git).
+    CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
 
   dynamic "metadata" {
