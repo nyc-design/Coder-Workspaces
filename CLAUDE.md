@@ -39,11 +39,12 @@ host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 └── coder-agents-sidecars/ # subscription-auth sidecars + Headroom for Coder Agents
 
-coder-agents-config/       # central system prompt for Coder Agents (chatd)
-└── system-prompt.txt      # pushed to /api/experimental/chats/config/system-prompt by GHA
-
-scripts/                   # Utility scripts
-└── deploy-issue-automation.sh  # Deploy GitHub issue automation to repos
+coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
+├── providers.yaml         # chat providers (anthropic / openai / google)
+├── models.yaml            # chat model configs (provider + model + ctx limit)
+├── mcp-servers.yaml       # MCP servers (context7 / grep / github)
+├── system-prompt.txt      # central system prompt
+└── sync.sh                # called by update-coder-agents-config.yaml workflow
 ```
 
 ## Key Architecture Concepts
@@ -157,12 +158,30 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
 
 ### Coder Agents Central Config
 
-The central system prompt (workspace-creation policy, naming convention, etc.)
-that applies to every Coder Agents chat — distinct from the per-workspace
-prompt above — lives at `coder-agents-config/system-prompt.txt` and is pushed
-to `/api/experimental/chats/config/system-prompt` by the
-`update-coder-agents-config.yaml` workflow on every commit that touches that
-directory.
+Git-tracked admin config for Coder Agents (chatd) lives in
+`coder-agents-config/`. The `update-coder-agents-config.yaml` workflow runs
+`coder-agents-config/sync.sh` on every commit that touches that directory and
+applies four resources idempotently:
+
+| File | Synced to | Stable identity |
+|---|---|---|
+| `providers.yaml` | `/api/experimental/chats/providers` | `provider` |
+| `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` |
+| `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` |
+| `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton) |
+
+`${VAR}` placeholders in YAML are substituted from the workflow's env at sync
+time — secrets live in GitHub Actions secrets (`CODER_URL`,
+`CODER_SESSION_TOKEN`, `SIDECAR_SHARED_API_KEY`, `CONTEXT7_API_KEY`,
+`GH_PAT_FOR_MCP`).
+
+Sync is **additive** — items only present in Coder admin (manually added
+in the UI) are not removed. To remove an item, delete it manually. See
+`coder-agents-config/README.md` for full semantics + caveats.
+
+The central system prompt is intentionally minimal (workspace-creation policy
+only) and stacks on top of (a) Coder's built-in default prompt and (b) the
+per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

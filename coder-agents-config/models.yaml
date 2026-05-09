@@ -1,0 +1,44 @@
+# Chat model configs for Coder Agents (chatd).
+# Synced to /api/experimental/chats/model-configs by update-coder-agents-config.yaml.
+#
+# Stable identity: (provider, model) tuple.
+# Additive: existing manual entries in admin UI are not deleted by sync.
+#
+# Each provider must already exist in providers.yaml (or be configured manually
+# in admin) before its models can be created — Coder rejects model creates if
+# the provider isn't configured.
+
+models:
+  # ─── Anthropic (Claude Pro/Max) ──────────────────────────────────────────
+  - provider: anthropic
+    model: claude-sonnet-4-6
+    display_name: Sonnet 4.6
+    context_limit: 200000
+    is_default: true
+
+  - provider: anthropic
+    model: claude-opus-4-7
+    display_name: Opus 4.7
+    context_limit: 200000
+
+  - provider: anthropic
+    model: claude-haiku-4-5-20251001
+    display_name: Haiku 4.5
+    context_limit: 200000
+
+  # ─── OpenAI / Codex (ChatGPT Plus subscription) ──────────────────────────
+  - provider: openai
+    model: gpt-5-codex
+    display_name: GPT-5 Codex
+    context_limit: 272000
+
+  # ─── Google Gemini ───────────────────────────────────────────────────────
+  - provider: google
+    model: gemini-2.5-pro
+    display_name: Gemini 2.5 Pro
+    context_limit: 1000000
+
+  - provider: google
+    model: gemini-2.5-flash
+    display_name: Gemini 2.5 Flash
+    context_limit: 1000000

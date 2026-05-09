@@ -39,9 +39,8 @@ data "coder_external_auth" "github" {
 }
 
 module "workspace_secrets" {
-  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
-  include_hapi     = local.is_agent_mode
-  include_context7 = local.is_agent_mode
+  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+  include_hapi = local.is_agent_mode
 }
 
 module "workspace_startup" {
