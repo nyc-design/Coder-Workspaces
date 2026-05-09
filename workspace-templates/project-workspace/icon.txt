@@ -1,1 +1,1 @@
-/icon/code.svg
+/icon/coder.svg

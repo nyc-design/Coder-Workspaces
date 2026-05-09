@@ -6,4 +6,4 @@ Two creation paths:
 
 Set workspace_mode="agent" for an AI-agent-managed workspace (HAPI runner, self-hosted Multica daemon, AI CLI tooling pre-wired). Default workspace_mode="self" gives you a personal IDE workspace without the agent runners.
 
-Suggested workspace name format for agent-created workspaces: {Project-Name}-Agents (e.g., Shadowscout-Agents).
+Suggested workspace name format for agent-created workspaces: {Project-Name}-Agents (e.g., WatchParty-Agents).
