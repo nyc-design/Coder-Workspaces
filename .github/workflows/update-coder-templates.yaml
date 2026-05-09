@@ -92,6 +92,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.changed_templates != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for GCP Workload Identity Federation
     strategy:
       matrix:
         template: ${{ fromJson(needs.detect-changes.outputs.changed_templates) }}
@@ -99,6 +102,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Auth to GCP via Workload Identity Federation (no SA key in GitHub).
+      # GCP_WIF_PROVIDER and GCP_WIF_SERVICE_ACCOUNT are repo Variables (not
+      # secrets) — see .github/SECRETS.md for one-time setup.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Fetch Coder secrets from GCP Secret Manager
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          export_to_environment: true
+          secrets: |-
+            CODER_URL:coder-nt/CODER_URL
+            CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
 
       - name: Get latest commit hash
         id: latest_commit
@@ -125,11 +145,11 @@ jobs:
         with:
           id: ${{ matrix.template }}
           dir: workspace-templates/${{ matrix.template }}
-          url: ${{ secrets.CODER_URL }}
+          url: ${{ env.CODER_URL }}
           name: ${{ steps.latest_commit.outputs.hash }}
           message: ${{ steps.commit_title.outputs.title }}
           activate: true
-          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+          coder_session_token: ${{ env.CODER_SESSION_TOKEN }}
 
       # Template-level metadata (display name, description, icon) is independent
       # of versioned Terraform pushes. Coder Agents picks templates by these
@@ -138,8 +158,6 @@ jobs:
       - name: Update template metadata (display_name / description / icon)
         if: steps.check_dir.outputs.exists == 'true'
         env:
-          CODER_URL: ${{ secrets.CODER_URL }}
-          CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
           TEMPLATE_DIR: workspace-templates/${{ matrix.template }}
           TEMPLATE_SLUG: ${{ matrix.template }}
         run: |

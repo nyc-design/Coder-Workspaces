@@ -15,6 +15,8 @@ permissions:
 jobs:
   launch:
     uses: nyc-design/Coder-Workspaces/.github/workflows/coder-workspace-launch.yaml@main
-    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write   # propagate to the called workflow for GCP WIF auth
     with:
       mode: ${{ inputs.mode }}

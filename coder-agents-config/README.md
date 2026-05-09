@@ -65,17 +65,21 @@ so secrets come out as opaque placeholders.
 
 ## Workflow secrets
 
-| Secret | Used for |
+All five secrets live in **GCP Secret Manager** (project `coder-nt`) and are
+fetched at workflow runtime via Workload Identity Federation. See
+[`.github/SECRETS.md`](../.github/SECRETS.md) for the one-time WIF setup
+(zero secrets stored in GitHub Actions).
+
+| GCP secret | Used for |
 |---|---|
 | `CODER_URL` | Base URL of the Coder deployment |
 | `CODER_SESSION_TOKEN` | Admin session token (Owner role) |
 | `SIDECAR_SHARED_API_KEY` | Substituted into `providers.yaml` (all 3 providers' `api_key`) |
 | `CONTEXT7_API_KEY` | Substituted into `mcp-servers.yaml` (Context7 header) |
-| `GH_PAT_FOR_MCP` | Substituted into `mcp-servers.yaml` (GitHub MCP bearer) |
+| `GH_PAT_FOR_MCP` | Substituted into `mcp-servers.yaml` (GitHub MCP bearer; mapped to env `GITHUB_PAT` to match the YAML placeholder) |
 
-The first two are also used by `update-coder-templates.yaml`. The other three
-are new for Coder Agents — add them to the GitHub repo's Actions secrets
-before the first sync run.
+GitHub Actions only stores two non-secret repo Variables (`GCP_WIF_PROVIDER`
+and `GCP_WIF_SERVICE_ACCOUNT`) for the WIF auth path.
 
 ## Caveats
 
