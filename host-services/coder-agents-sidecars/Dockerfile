@@ -72,10 +72,13 @@ RUN npm install -g \
  && npm cache clean --force
 
 # ── codex-bridge (single-file Node script) ───────────────────────────────────
-ARG CODEX_BRIDGE_REF=main
-RUN git clone --depth=1 --branch "${CODEX_BRIDGE_REF}" \
-      https://github.com/satriapamudji/codex-bridge.git /opt/codex-bridge \
- && rm -rf /opt/codex-bridge/.git
+# Default branch is `master` (not `main`). Pinned to a known-good commit for
+# reproducibility — bump CODEX_BRIDGE_REF to any branch/tag/SHA to upgrade.
+ARG CODEX_BRIDGE_REF=5ad8c99beb1375742d5ed47e4bc20d8ff5fb4469
+RUN git clone https://github.com/satriapamudji/codex-bridge.git /opt/codex-bridge \
+ && cd /opt/codex-bridge \
+ && git checkout "${CODEX_BRIDGE_REF}" \
+ && rm -rf .git
 
 # ── configs + s6 service definitions ─────────────────────────────────────────
 COPY host-services/coder-agents-sidecars/gemini-sidecar/config.yaml \
