@@ -1,3 +1,13 @@
+---
+# Toggles for the Coder Agents system-prompt config endpoint. sync.sh parses
+# this YAML frontmatter (everything between the two `---` delimiters) and the
+# rest of the file is the prompt body.
+#
+# include_default_system_prompt: when true, our prompt below stacks on top of
+#   Coder's built-in default. When false, our prompt fully replaces it.
+#   Keep true unless you really want to override Coder's defaults.
+include_default_system_prompt: true
+---
 ## Workspace creation policy
 
 - The user's primary GitHub account is `nyc-design`.

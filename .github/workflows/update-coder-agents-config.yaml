@@ -40,15 +40,16 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           export_to_environment: true
-          # GITHUB_PAT in env maps to ${GITHUB_PAT} in mcp-servers.yaml. The
-          # GCP secret is named GH_PAT_FOR_MCP to distinguish from the generic
-          # GH_PAT used for git auth in workspaces.
+          # Local env names match ${VAR} placeholders in our YAML files.
+          # GH_PAT_FOR_MCP avoids the GITHUB_ reserved prefix (which the
+          # Actions runner is permissive about for env vars set via this
+          # action, but using GH_ prefix is conventional and unambiguous).
           secrets: |-
             CODER_URL:coder-nt/CODER_URL
             CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
             SIDECAR_SHARED_API_KEY:coder-nt/SIDECAR_SHARED_API_KEY
             CONTEXT7_API_KEY:coder-nt/CONTEXT7_API_KEY
-            GITHUB_PAT:coder-nt/GH_PAT_FOR_MCP
+            GH_PAT_FOR_MCP:coder-nt/GH_PAT_FOR_MCP
 
       - name: Sync providers / models / MCP servers / system prompt / template-allowlist
         run: ./coder-agents-config/sync.sh coder-agents-config
