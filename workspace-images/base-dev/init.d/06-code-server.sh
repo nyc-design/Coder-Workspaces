@@ -3,31 +3,127 @@ set -eu
 
 log() { printf '[code-server-init] %s\n' "$*"; }
 
-# --- Pre-configure code-server workspace trust ---
-# Headless browser sessions use ephemeral profiles and trigger trust dialogs,
-# which blocks extension activation. Disable workspace trust entirely so
-# Pencil (and other extensions) activate without user interaction.
-log "pre-configuring code-server workspace trust"
-CS_SETTINGS_DIR="/home/coder/.local/share/code-server/User"
-mkdir -p "$CS_SETTINGS_DIR"
-CS_SETTINGS_FILE="$CS_SETTINGS_DIR/settings.json"
-if [ ! -f "$CS_SETTINGS_FILE" ]; then
-  echo '{}' > "$CS_SETTINGS_FILE"
-fi
-# Merge workspace trust setting into existing settings.json
-node -e "
-  const fs = require('fs');
-  const f = '$CS_SETTINGS_FILE';
-  const s = JSON.parse(fs.readFileSync(f, 'utf8'));
-  s['security.workspace.trust.enabled'] = false;
-  fs.writeFileSync(f, JSON.stringify(s, null, 2) + '\n');
-"
+code_server_install_root() {
+  if ! command -v code-server >/dev/null 2>&1; then
+    return 1
+  fi
 
-# --- code-server auth stability note ---
-# Do not patch code-server's bundled server-main.js/product.json at runtime.
-# Earlier runtime bundle patches seeded browser GitHub auth sessions from
-# GITHUB_TOKEN, but they made web-client startup behavior harder to reason about
-# and correlated with extension/webview regressions. Keep this init script limited
-# to user settings that code-server supports directly. GitHub CLI/Pull Requests
-# auth still receives server-side tokens via workspace-runtime environment
-# variables (GH_TOKEN/GITHUB_TOKEN/GITHUB_PAT/GITHUB_OAUTH_TOKEN).
+  local bin real_bin
+  bin="$(command -v code-server)"
+  real_bin="$(readlink -f "$bin" 2>/dev/null || printf '%s' "$bin")"
+  cd "$(dirname "$real_bin")/.." && pwd -P
+}
+
+# --- Server-side GitHub auth for VS Code's GitHub authentication provider ---
+# Keep GitHub auth out of code-server's core web bootstrap. Instead, patch only
+# the built-in GitHub Authentication extension so its normal SecretStorage-backed
+# session loader can fall back to the server-side token already supplied by the
+# workspace runtime. The extension verifies the token with GitHub and stores the
+# resulting sessions through its existing code path.
+patch_code_server_github_auth_extension() {
+  local install_root extension_js
+  if ! install_root="$(code_server_install_root)"; then
+    log "code-server binary not found; skipping GitHub auth extension patch"
+    return 0
+  fi
+
+  extension_js="$install_root/lib/vscode/extensions/github-authentication/dist/extension.js"
+  if [ ! -f "$extension_js" ]; then
+    log "GitHub authentication extension not found at $extension_js; skipping patch"
+    return 0
+  fi
+
+  EXTENSION_JS="$extension_js" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.EXTENSION_JS;
+let source = fs.readFileSync(file, 'utf8');
+const original = source;
+
+const fallback = String.raw`async getToken(){try{let r=await this.context.secrets.get(this.serviceId);if(r&&r!=="[]")return this.Logger.trace("Token acquired from secret storage."),r;if(this.serviceId==="github.auth"){let t=typeof process<"u"&&process.env?(process.env.GITHUB_OAUTH_TOKEN||process.env.GITHUB_TOKEN||process.env.GITHUB_PAT||process.env.GH_TOKEN):void 0;if(t){this.Logger.info("Using GitHub auth token from environment.");let n=[["user:email"],["repo"],["repo","workflow"],["read:user"],["read:user","user:email","repo"],["read:user","user:email","repo","workflow"]].map((i,o)=>({id:"coder-env-github-"+o,scopes:i,accessToken:t}));return JSON.stringify(n)}}return r}catch(r){return this.Logger.error("Getting token failed: "+r),Promise.resolve(void 0)}}`;
+
+if (source.includes(fallback)) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+const originalGetToken = 'async getToken(){try{let r=await this.context.secrets.get(this.serviceId);return r&&r!=="[]"&&this.Logger.trace("Token acquired from secret storage."),r}catch(r){return this.Logger.error(`Getting token failed: ${r}`),Promise.resolve(void 0)}}';
+
+if (!source.includes(originalGetToken)) {
+  console.error(`Could not find expected GitHub authentication getToken() implementation in ${file}`);
+  process.exit(1);
+}
+
+source = source.replace(originalGetToken, fallback);
+
+if (!fs.existsSync(`${file}.env-token-patch.bak`)) {
+  fs.copyFileSync(file, `${file}.env-token-patch.bak`);
+}
+fs.writeFileSync(file, source);
+console.log('patched');
+NODE
+}
+
+# VS Code prompts before letting extensions use an existing auth session unless
+# the extension is trusted in product.json or has already been allowed in user
+# application storage. Patch only product metadata so preinstalled GitHub tools
+# can reuse the central GitHub auth provider without an extra allow prompt.
+patch_code_server_trusted_github_extensions() {
+  local install_root product_json
+  if ! install_root="$(code_server_install_root)"; then
+    log "code-server binary not found; skipping trusted GitHub extensions patch"
+    return 0
+  fi
+
+  product_json="$install_root/lib/vscode/product.json"
+  if [ ! -f "$product_json" ]; then
+    log "product.json not found at $product_json; skipping trusted GitHub extensions patch"
+    return 0
+  fi
+
+  PRODUCT_JSON="$product_json" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.PRODUCT_JSON;
+const trustedIds = [
+  'github.vscode-github-actions',
+  'eamodio.gitlens',
+];
+const product = JSON.parse(fs.readFileSync(file, 'utf8'));
+const original = JSON.stringify(product);
+
+function addMissing(list) {
+  for (const id of trustedIds) {
+    if (!list.includes(id)) {
+      list.push(id);
+    }
+  }
+}
+
+if (Array.isArray(product.trustedExtensionAuthAccess)) {
+  addMissing(product.trustedExtensionAuthAccess);
+} else if (product.trustedExtensionAuthAccess && typeof product.trustedExtensionAuthAccess === 'object') {
+  const githubTrusted = Array.isArray(product.trustedExtensionAuthAccess.github)
+    ? product.trustedExtensionAuthAccess.github
+    : [];
+  addMissing(githubTrusted);
+  product.trustedExtensionAuthAccess.github = githubTrusted;
+} else {
+  product.trustedExtensionAuthAccess = [...trustedIds];
+}
+
+if (JSON.stringify(product) === original) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+if (!fs.existsSync(`${file}.trusted-auth-patch.bak`)) {
+  fs.copyFileSync(file, `${file}.trusted-auth-patch.bak`);
+}
+fs.writeFileSync(file, `${JSON.stringify(product, null, 2)}\n`);
+console.log('patched');
+NODE
+}
+
+patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
+patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
