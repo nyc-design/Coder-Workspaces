@@ -74,7 +74,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `03-git.sh` | GitHub auth, git pull defaults, global gitignore |
 | `04-gcp.sh` | GCP project setup, secrets discovery + loading |
 | `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
-| `06-code-server.sh` | Workspace trust pre-configuration |
+| `06-code-server.sh` | code-server defaults restoration and scoped GitHub auth extension/product metadata patches |
 | `07-vscode-themes.sh` | Installs baked `.vsix` themes from `shared-assets/vscode-themes/` into both code-server and VS Code Web |
 | `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
