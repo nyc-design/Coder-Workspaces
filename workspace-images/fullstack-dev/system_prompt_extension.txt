@@ -1,0 +1,3 @@
+-- Fullstack (FastAPI backend + Next.js frontend) --
+- API Contracts — For FastAPI backends, Pydantic request/response models for every endpoint — written as stubs before implementation. These contracts are the single source of truth between frontend and backend. TypeScript types are generated from the FastAPI OpenAPI spec via openapi-typescript.
+- Backend Implementation — Each endpoint should validate against its Pydantic contract and return correct responses before moving on.

@@ -47,4 +47,7 @@ RUN printf 'export DISPLAY=:99\n' > /etc/profile.d/10-display.sh
 COPY start-vnc.sh /usr/local/share/workspace-init.d/20-start-vnc.every.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-start-vnc.every.sh
 
+# Browser-automation system prompt extension.
+COPY system_prompt_extension.txt /usr/local/share/workspace-prompts/20-playwright.txt
+
 USER coder

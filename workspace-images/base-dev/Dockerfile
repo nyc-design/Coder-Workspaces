@@ -152,7 +152,7 @@ RUN git clone --depth 1 https://github.com/LazyVim/starter /opt/lazyvim-starter/
       > /opt/lazyvim-starter/config/lazyvim.json
 
 USER root
-RUN install -d -m 0755 /usr/local/share/workspace-init.d
+RUN install -d -m 0755 /usr/local/share/workspace-init.d /usr/local/share/workspace-prompts
 
 # MCP server lifecycle utilities:
 #   mcp-wrap    — exec wrapper that sets PR_SET_PDEATHSIG so MCP servers
@@ -162,7 +162,11 @@ COPY workspace-images/base-dev/bin/mcp-wrap /usr/local/bin/mcp-wrap
 COPY workspace-images/base-dev/bin/mcp-cleanup /usr/local/bin/mcp-cleanup
 RUN chmod +x /usr/local/bin/mcp-wrap /usr/local/bin/mcp-cleanup
 
-COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-init.d/system_prompt.txt
+# Base workspace system prompt. Child images add their own extensions to
+# /usr/local/share/workspace-prompts/ — 11-agent-prompts.sh concatenates
+# them in sorted order and writes the result to ~/.coder/AGENTS.md (with
+# symlinks for Claude/Codex/Gemini provider-specific files).
+COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-prompts/00-base.txt
 COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
