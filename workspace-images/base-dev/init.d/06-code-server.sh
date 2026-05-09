@@ -90,4 +90,75 @@ console.log('patched');
 NODE
 }
 
+
+
+# VS Code prompts before letting extensions use an existing auth session unless
+# the extension is trusted in product.json or has already been allowed in user
+# application storage. Patch product.json so preinstalled GitHub extensions can
+# reuse the central GitHub auth session on new devices without an extra click.
+patch_code_server_trusted_github_extensions() {
+  if ! command -v code-server >/dev/null 2>&1; then
+    log "code-server binary not found; skipping trusted GitHub extensions patch"
+    return 0
+  fi
+
+  local bin real_bin install_root product_json
+  bin="$(command -v code-server)"
+  real_bin="$(readlink -f "$bin" 2>/dev/null || printf '%s' "$bin")"
+  install_root="$(cd "$(dirname "$real_bin")/.." && pwd -P)"
+  product_json="$install_root/lib/vscode/product.json"
+
+  if [ ! -f "$product_json" ]; then
+    log "product.json not found at $product_json; skipping trusted GitHub extensions patch"
+    return 0
+  fi
+
+  PRODUCT_JSON="$product_json" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.PRODUCT_JSON;
+const trustedIds = [
+  'github.vscode-github-actions',
+  'eamodio.gitlens',
+];
+const product = JSON.parse(fs.readFileSync(file, 'utf8'));
+const original = JSON.stringify(product);
+
+function addMissing(list) {
+  let changed = false;
+  for (const id of trustedIds) {
+    if (!list.includes(id)) {
+      list.push(id);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+if (Array.isArray(product.trustedExtensionAuthAccess)) {
+  addMissing(product.trustedExtensionAuthAccess);
+} else if (product.trustedExtensionAuthAccess && typeof product.trustedExtensionAuthAccess === 'object') {
+  const githubTrusted = Array.isArray(product.trustedExtensionAuthAccess.github)
+    ? product.trustedExtensionAuthAccess.github
+    : [];
+  addMissing(githubTrusted);
+  product.trustedExtensionAuthAccess.github = githubTrusted;
+} else {
+  product.trustedExtensionAuthAccess = [...trustedIds];
+}
+
+if (JSON.stringify(product) === original) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+if (!fs.existsSync(`${file}.trusted-auth-patch.bak`)) {
+  fs.copyFileSync(file, `${file}.trusted-auth-patch.bak`);
+}
+fs.writeFileSync(file, `${JSON.stringify(product, null, 2)}\n`);
+console.log('patched');
+NODE
+}
+
 patch_code_server_github_auth || log "warning: failed to patch code-server GitHub auth injection"
+patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
