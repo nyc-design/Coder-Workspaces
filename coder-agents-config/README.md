@@ -13,6 +13,7 @@ GitHub Actions workflow on every commit that touches this directory.
 | `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` tuple |
 | `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` field |
 | `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton, PUT) |
+| `plan-mode-instructions.txt` | `/api/experimental/chats/config/plan-mode-instructions` | (singleton, PUT) |
 | `template-allowlist.yaml` | `/api/experimental/chats/config/template-allowlist` | (singleton, PUT) — slugs resolved to template UUIDs at sync time |
 | `sync.sh` | — (the script the workflow runs) | — |
 
@@ -26,6 +27,7 @@ Per resource type:
 | **Models** | **Declarative** | POST/PATCH desired; **DELETE any model in Coder not listed in `models.yaml`**. The YAML is source of truth. |
 | MCP Servers | **Additive** | Same as providers. |
 | System prompt | PUT singleton | Always overwritten. |
+| Plan mode instructions | PUT singleton | Always overwritten. |
 | Template allowlist | PUT singleton | Always overwritten. Empty list / missing file = all templates allowed. |
 
 Why models are declarative: cost tracking, context limits, and reasoning

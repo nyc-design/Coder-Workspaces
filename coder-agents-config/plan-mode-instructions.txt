@@ -1,0 +1,1 @@
+Write the plan as a markdown checklist of concrete, ordered steps — one line per step, no nested sub-steps, no commentary. Each step should be small enough to implement and verify in one pass. Wait for explicit user approval before starting execution.

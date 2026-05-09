@@ -172,6 +172,21 @@ push_system_prompt() {
   echo "    PUT system prompt ($(wc -c < "$file") bytes)"
 }
 
+# ───────── PLAN MODE INSTRUCTIONS (PUT singleton) ───────────────────────────
+push_plan_mode_instructions() {
+  local file="$CONFIG_DIR/plan-mode-instructions.txt"
+  [ -f "$file" ] || { echo "no plan-mode-instructions.txt, skipping"; return; }
+
+  echo "==> syncing plan mode instructions from $file"
+  local body
+  body="$(jq -n --rawfile p "$file" '{plan_mode_instructions: $p}')"
+  curl -sS --fail-with-body -X PUT \
+    -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
+    -d "$body" \
+    "${CODER_URL}/api/experimental/chats/config/plan-mode-instructions" >/dev/null
+  echo "    PUT plan-mode-instructions ($(wc -c < "$file") bytes)"
+}
+
 # ───────── TEMPLATE ALLOWLIST (PUT singleton) ───────────────────────────────
 # Coder Agents stores the allowlist as template UUIDs. We track template slugs
 # in YAML for readability — resolve slug → UUID at sync time via the v2
@@ -269,6 +284,10 @@ pull_all() {
   coder_get '/api/experimental/chats/config/system-prompt' | \
     jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
 
+  echo "  plan-mode-instructions.txt"
+  coder_get '/api/experimental/chats/config/plan-mode-instructions' | \
+    jq -r '.plan_mode_instructions' > "$CONFIG_DIR/plan-mode-instructions.txt.new"
+
   # Template allowlist — convert UUIDs back to slugs via v2 templates list
   # for readability (matching how the file is committed).
   echo "  template-allowlist.yaml"
@@ -281,11 +300,12 @@ pull_all() {
 
   echo
   echo "Wrote *.new files alongside existing YAML. Diff and rename:"
-  echo "  diff $CONFIG_DIR/providers.yaml{,.new}          && mv $CONFIG_DIR/providers.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/models.yaml{,.new}             && mv $CONFIG_DIR/models.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}        && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new} && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}       && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo "  diff $CONFIG_DIR/providers.yaml{,.new}              && mv $CONFIG_DIR/providers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/models.yaml{,.new}                 && mv $CONFIG_DIR/models.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}            && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new}     && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}           && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo "  diff $CONFIG_DIR/plan-mode-instructions.txt{,.new}  && mv $CONFIG_DIR/plan-mode-instructions.txt{.new,}"
   echo
   echo "Heads up: secret fields come back as opaque placeholders. Restore"
   echo "your \${VAR} references in api_key / custom_headers before committing."
@@ -293,12 +313,13 @@ pull_all() {
 
 case "$MODE" in
   push)
-    # Order matters: providers → models (with delete pass) → MCPs → prompt.
+    # Order matters: providers → models (with delete pass) → MCPs → prompts.
     # Coder rejects model creation if its provider isn't already configured.
     push_providers
     push_models
     push_mcp_servers
     push_system_prompt
+    push_plan_mode_instructions
     push_template_allowlist
     echo "==> push done"
     ;;
