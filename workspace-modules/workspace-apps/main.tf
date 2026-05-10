@@ -17,37 +17,30 @@ module "cursor" {
 
 
 module "code-server" {
-  count  = var.enable_apps && var.enable_code_server ? 1 : 0
-  source = "registry.coder.com/coder/code-server/coder"
-  folder = "/workspaces/${var.project_name}"
+  count           = var.enable_apps && var.enable_code_server ? 1 : 0
+  source          = "registry.coder.com/coder/code-server/coder"
+  install_version = "4.117.0" # Pin: 4.118.0 broke WebKit (transferable streams in webview detach ArrayBuffers)
+  folder          = "/workspaces/${var.project_name}"
 
   agent_id = var.agent_id
   order    = 1
   open_in  = "tab"
 
   settings = {
-    "workbench.colorTheme"                      = "Default Dark Modern",
-    "git.useIntegratedAskPass"                  = "false",
-    "likec4.mcp.enabled"                        = "true",
-#    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
-#    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
-    "todo-tree.tree.showBadges"                 = "true",
-    "todo-tree.tree.disableCompactFolders"      = "false",
-    "todo-tree.tree.showCountsInTree"           = "true",
-    "todo-tree.tree.scanMode"                   = "current file",
-    "excalidraw.workspaceLibraryPath"           = "/home/coder/.excalidraw/library.excalidrawlib"
+    "workbench.colorTheme"                 = "Solarized Moon",
+    "git.useIntegratedAskPass"             = false,
+    "likec4.mcp.enabled"                   = true,
+    "todo-tree.tree.showBadges"            = true,
+    "todo-tree.tree.disableCompactFolders" = false,
+    "todo-tree.tree.showCountsInTree"      = true,
+    "todo-tree.tree.scanMode"              = "current file",
+    "mdb.showOverviewPageAfterInstall"     = false
   }
-
-/*
-  machine_settings = {
-    "extensions.experimental.affinity" = { "asvetliakov.vscode-neovim" = 1 }
-  }
-*/
-
 
   extensions = [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
+    "eamodio.gitlens",
     "Anthropic.claude-code",
     "highagency.pencildev",
     "mongodb.mongodb-vscode",
@@ -61,17 +54,14 @@ module "code-server" {
     "bradlc.vscode-tailwindcss",
     "Gruntfuggly.todo-tree",
     "usernamehw.errorlens",
-    "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
-    "jayblack388.md-checkboxes",
     "rhalaly.scope-to-this",
     "jakobhoeg.vscode-pokemon",
     "d9once.pokechi",
     "octohash.powermode-plus",
-#    "asvetliakov.vscode-neovim",
   ]
 }
 
@@ -86,21 +76,20 @@ module "vscode-web" {
   accept_license = true
 
   settings = {
-    "workbench.colorTheme"                      = "Default Dark Modern",
-    "git.useIntegratedAskPass"                  = "false",
-    "likec4.mcp.enabled"                        = "true",
-#    "vscode-neovim.neovimExecutablePaths.linux" = "/usr/local/bin/nvim",
-#    "extensions.experimental.affinity"          = { "asvetliakov.vscode-neovim" = 1 },
-    "todo-tree.tree.showBadges"                 = "true",
-    "todo-tree.tree.disableCompactFolders"      = "false",
-    "todo-tree.tree.showCountsInTree"           = "true",
-    "todo-tree.tree.scanMode"                   = "current file",
-    "excalidraw.workspaceLibraryPath"           = "/home/coder/.excalidraw/library.excalidrawlib"
+    "workbench.colorTheme"                 = "Default Dark Modern",
+    "git.useIntegratedAskPass"             = false,
+    "likec4.mcp.enabled"                   = true,
+    "todo-tree.tree.showBadges"            = true,
+    "todo-tree.tree.disableCompactFolders" = false,
+    "todo-tree.tree.showCountsInTree"      = true,
+    "todo-tree.tree.scanMode"              = "current file",
+    "mdb.showOverviewPageAfterInstall"     = false
   }
 
   extensions = [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
+    "eamodio.gitlens",
     "Github.copilot",
     "Anthropic.claude-code",
     "highagency.pencildev",
@@ -114,17 +103,14 @@ module "vscode-web" {
     "bradlc.vscode-tailwindcss",
     "Gruntfuggly.todo-tree",
     "usernamehw.errorlens",
-    "hediet.vscode-drawio",
     "joshbolduc.story-explorer",
     "bruno-api-client.bruno",
     "pomdtr.excalidraw-editor",
     "hashicorp.terraform",
-    "jayblack388.md-checkboxes",
     "rhalaly.scope-to-this",
     "jakobhoeg.vscode-pokemon",
     "d9once.pokechi",
     "octohash.powermode-plus",
-#    "asvetliakov.vscode-neovim",
   ]
 }
 

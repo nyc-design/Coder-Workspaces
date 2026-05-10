@@ -116,5 +116,138 @@ console.log('patched');
 NODE
 }
 
+# --- Pencil first-run welcome auto-open disable ---
+# Pencil's activate() checks globalState `firstRunDone` and, when unset, focuses
+# the Pencil sidebar and opens the bundled welcome.pen. code-server stores
+# extension globalState in browser IndexedDB, so every fresh browser/PWA
+# session counts as a first run, causing welcome.pen to open on every load.
+# Short-circuit the check so the auto-open never fires; the manual command
+# `pencil.openWelcomeDocument` and the regular `.pen` editor are unaffected.
+patch_code_server_pencil_disable_first_run_open() {
+  local extension_dir bundle_js
+  extension_dir="$(ls -1d /home/coder/.local/share/code-server/extensions/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
+    log "Pencil extension not installed; skipping first-run open patch"
+    return 0
+  fi
+
+  bundle_js="$(ls -1 "$extension_dir"/out/main-*.js 2>/dev/null | grep -v '\.map$' | head -1 || true)"
+  if [ -z "$bundle_js" ] || [ ! -f "$bundle_js" ]; then
+    log "Pencil extension main bundle not found under $extension_dir/out; skipping first-run open patch"
+    return 0
+  fi
+
+  BUNDLE_JS="$bundle_js" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.BUNDLE_JS;
+let source = fs.readFileSync(file, 'utf8');
+
+const original = 'if(!t.globalState.get("firstRunDone"))if(we.window.state.focused)';
+const patched  = 'if(!1)if(we.window.state.focused)';
+
+if (source.includes(patched) && !source.includes(original)) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+if (!source.includes(original)) {
+  console.error(`Could not find expected Pencil first-run check in ${file}`);
+  process.exit(1);
+}
+
+source = source.replace(original, patched);
+
+if (!fs.existsSync(`${file}.first-run-disable.bak`)) {
+  fs.copyFileSync(file, `${file}.first-run-disable.bak`);
+}
+fs.writeFileSync(file, source);
+console.log('patched');
+NODE
+}
+
+# --- Workbench bundle: trust GitHub auth for additional extensions ---
+# The browser-side IProductService reads `trustedExtensionAuthAccess` from a
+# bundled productConfiguration literal in the workbench bundles, not from
+# product.json at runtime. Patching product.json alone has no effect on the
+# grant-access dialog. We locate the bundled array via a regex on the property
+# name (no fragile tail anchor on specific extension IDs), parse it as JSON,
+# idempotently append our extra trusted IDs, and write it back. Surviving an
+# upstream reorder/insertion in that array now only requires the property
+# name and surrounding `[...]` literal to remain intact.
+patch_code_server_workbench_bundle_auth_trust() {
+  local install_root
+  if ! install_root="$(code_server_install_root)"; then
+    log "code-server binary not found; skipping workbench bundle auth trust patch"
+    return 0
+  fi
+
+  local bundles=(
+    "$install_root/lib/vscode/out/vs/code/browser/workbench/workbench.js"
+    "$install_root/lib/vscode/out/vs/workbench/workbench.web.main.internal.js"
+  )
+
+  local extra_ids='github.vscode-github-actions eamodio.gitlens'
+
+  for bundle in "${bundles[@]}"; do
+    if [ ! -f "$bundle" ]; then
+      log "workbench bundle not found, skipping: $bundle"
+      continue
+    fi
+
+    BUNDLE_JS="$bundle" EXTRA_IDS="$extra_ids" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.BUNDLE_JS;
+const extraIds = process.env.EXTRA_IDS.split(/\s+/).filter(Boolean);
+
+let source = fs.readFileSync(file, 'utf8');
+
+const re = /trustedExtensionAuthAccess:(\[[^\]]*\])/;
+const m = source.match(re);
+if (!m) {
+  console.error(`Could not find trustedExtensionAuthAccess array literal in ${file}`);
+  process.exit(1);
+}
+
+let arr;
+try {
+  arr = JSON.parse(m[1]);
+} catch (e) {
+  console.error(`Failed to parse trustedExtensionAuthAccess array in ${file}: ${e.message}`);
+  process.exit(1);
+}
+if (!Array.isArray(arr)) {
+  console.error(`trustedExtensionAuthAccess in ${file} is not an array`);
+  process.exit(1);
+}
+
+const present = new Set(arr.map((s) => String(s).toLowerCase()));
+let added = false;
+for (const id of extraIds) {
+  if (!present.has(id.toLowerCase())) {
+    arr.push(id);
+    added = true;
+  }
+}
+if (!added) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+const replacement = 'trustedExtensionAuthAccess:' + JSON.stringify(arr);
+const patched = source.replace(re, replacement);
+
+if (!fs.existsSync(`${file}.trusted-auth-patch.bak`)) {
+  fs.copyFileSync(file, `${file}.trusted-auth-patch.bak`);
+}
+fs.writeFileSync(file, patched);
+console.log('patched');
+NODE
+  done
+}
+
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
+patch_code_server_workbench_bundle_auth_trust || log "warning: failed to patch workbench bundle auth trust"
 patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
+patch_code_server_pencil_disable_first_run_open || log "warning: failed to patch Pencil first-run welcome"
