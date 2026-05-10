@@ -263,7 +263,7 @@ CFG
 
   display_apps {
     web_terminal           = true
-    vscode                 = true
+    vscode                 = false
     vscode_insiders        = false
     ssh_helper             = false
     port_forwarding_helper = true

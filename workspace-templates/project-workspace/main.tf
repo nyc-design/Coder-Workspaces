@@ -236,6 +236,12 @@ resource "coder_agent" "main" {
     CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
 
+  display_apps {
+    vscode          = false
+    vscode_insiders = false
+    web_terminal    = true
+  }
+
   dynamic "metadata" {
     for_each = module.workspace_apps_metadata.agent_metadata_items
     content {
