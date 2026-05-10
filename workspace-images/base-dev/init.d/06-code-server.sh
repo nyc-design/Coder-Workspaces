@@ -64,74 +64,6 @@ console.log('patched');
 NODE
 }
 
-# VS Code prompts before letting extensions use an existing auth session unless
-# the extension is trusted in product.json or has already been allowed in user
-# application storage. Patch only product metadata so preinstalled GitHub tools
-# can reuse the central GitHub auth provider without an extra allow prompt.
-patch_code_server_trusted_github_extensions() {
-  local install_root product_json
-  if ! install_root="$(code_server_install_root)"; then
-    log "code-server binary not found; skipping trusted GitHub extensions patch"
-    return 0
-  fi
-
-  product_json="$install_root/lib/vscode/product.json"
-  if [ ! -f "$product_json" ]; then
-    log "product.json not found at $product_json; skipping trusted GitHub extensions patch"
-    return 0
-  fi
-
-  PRODUCT_JSON="$product_json" node <<'NODE'
-const fs = require('fs');
-
-const file = process.env.PRODUCT_JSON;
-const trustedIdsByProvider = {
-  github: [
-    'github.vscode-github-actions',
-    'eamodio.gitlens',
-  ],
-};
-const product = JSON.parse(fs.readFileSync(file, 'utf8'));
-const original = JSON.stringify(product);
-
-function addMissing(list, ids) {
-  for (const id of ids) {
-    const normalizedId = id.toLowerCase();
-    if (!list.some((existing) => String(existing).toLowerCase() === normalizedId)) {
-      list.push(id);
-    }
-  }
-}
-
-if (!product.trustedExtensionAuthAccess || Array.isArray(product.trustedExtensionAuthAccess)) {
-  product.trustedExtensionAuthAccess = {
-    github: Array.isArray(product.trustedExtensionAuthAccess)
-      ? product.trustedExtensionAuthAccess
-      : [],
-  };
-}
-
-for (const [providerId, trustedIds] of Object.entries(trustedIdsByProvider)) {
-  const providerTrusted = Array.isArray(product.trustedExtensionAuthAccess[providerId])
-    ? product.trustedExtensionAuthAccess[providerId]
-    : [];
-  addMissing(providerTrusted, trustedIds);
-  product.trustedExtensionAuthAccess[providerId] = providerTrusted;
-}
-
-if (JSON.stringify(product) === original) {
-  console.log('already patched');
-  process.exit(0);
-}
-
-if (!fs.existsSync(`${file}.trusted-auth-patch.bak`)) {
-  fs.copyFileSync(file, `${file}.trusted-auth-patch.bak`);
-}
-fs.writeFileSync(file, `${JSON.stringify(product, null, 2)}\n`);
-console.log('patched');
-NODE
-}
-
 # --- Pencil extension session fallback to CLI session file ---
 # code-server stores extension globalState in browser IndexedDB rather than on
 # disk, so the Pencil extension's session is per-browser. Pencil's CLI keeps a
@@ -184,50 +116,5 @@ console.log('patched');
 NODE
 }
 
-# --- Patch browser workbench bundles for GitHub auth trust ---
-# The trustedExtensionAuthAccess array is baked into the browser-side workbench
-# bundles at build time. Patching product.json only affects the server-side
-# IProductService; the browser IProductService (where isAccessAllowed() runs)
-# reads from the hardcoded bundle value. We do a literal string append in the
-# two browser-served bundles so the grant-access dialog never shows for
-# GitHub Actions and GitLens.
-patch_code_server_workbench_bundle_auth_trust() {
-  local install_root
-  if ! install_root="$(code_server_install_root)"; then
-    log "code-server binary not found; skipping workbench bundle auth trust patch"
-    return 0
-  fi
-
-  local anchor='"github.copilot","github.copilot-chat"]'
-  local patched='"github.copilot","github.copilot-chat","github.vscode-github-actions","eamodio.gitlens"]'
-
-  local bundles=(
-    "$install_root/lib/vscode/out/vs/code/browser/workbench/workbench.js"
-    "$install_root/lib/vscode/out/vs/workbench/workbench.web.main.internal.js"
-  )
-
-  local patched_any=0
-  for bundle in "${bundles[@]}"; do
-    [ -f "$bundle" ] || continue
-    if grep -qF "$patched" "$bundle"; then
-      log "$(basename "$bundle") already patched; skipping"
-      continue
-    fi
-    if ! grep -qF "$anchor" "$bundle"; then
-      log "warning: expected trustedExtensionAuthAccess anchor not found in $(basename "$bundle"); skipping"
-      continue
-    fi
-    if [ ! -f "${bundle}.trusted-auth-patch.bak" ]; then
-      cp "$bundle" "${bundle}.trusted-auth-patch.bak"
-    fi
-    sed -i 's|"github\.copilot","github\.copilot-chat"\]|"github.copilot","github.copilot-chat","github.vscode-github-actions","eamodio.gitlens"]|g' "$bundle"
-    log "patched $(basename "$bundle") trustedExtensionAuthAccess"
-    patched_any=1
-  done
-  [ "$patched_any" -eq 1 ] || log "no workbench bundles needed patching"
-}
-
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
-patch_code_server_trusted_github_extensions || log "warning: failed to patch code-server trusted GitHub extensions"
-patch_code_server_workbench_bundle_auth_trust || log "warning: failed to patch workbench bundle auth trust"
 patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
