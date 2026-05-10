@@ -1,1 +1,0 @@
-Persistent Windows VM on GCP with Guacamole RDP browser desktop. Use for Windows-native dev that won't run in Linux.
