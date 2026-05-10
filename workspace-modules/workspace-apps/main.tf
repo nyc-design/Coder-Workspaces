@@ -17,7 +17,7 @@ module "vscode-desktop" {
   coder_app_icon         = "/icon/desktop.svg"
   coder_app_slug         = "vscode"
   coder_app_display_name = "VS Code Desktop"
-  coder_app_order        = 4
+  coder_app_order        = 5
 
   folder   = "/workspaces/${var.project_name}"
   protocol = "vscode"
@@ -29,7 +29,7 @@ module "cursor" {
   version  = "1.2.1"
   agent_id = var.agent_id
   folder   = "/workspaces/${var.project_name}"
-  order    = 5
+  order    = 6
 }
 
 
@@ -150,7 +150,7 @@ module "filebrowser" {
   agent_id      = var.agent_id
   folder        = "/workspaces/${var.project_name}"
   database_path = "/tmp/filebrowser.db"
-  order         = 1
+  order         = 4
 }
 
 
@@ -162,7 +162,7 @@ resource "coder_app" "claude_usage" {
   icon         = "/icon/claude.svg"
   url          = "https://claude.ai/settings/usage"
   external     = true
-  order        = 2
+  order        = 1
 }
 
 
@@ -174,5 +174,5 @@ resource "coder_app" "codex_usage" {
   icon         = "/icon/openai.svg"
   url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
   external     = true
-  order        = 3
+  order        = 2
 }
