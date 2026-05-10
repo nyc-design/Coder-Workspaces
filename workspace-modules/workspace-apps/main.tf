@@ -7,12 +7,29 @@ terraform {
 }
 
 
+module "vscode-desktop" {
+  count   = var.enable_apps && var.enable_vscode_desktop ? 1 : 0
+  source  = "registry.coder.com/coder/vscode-desktop-core/coder"
+  version = "1.0.2"
+
+  agent_id = var.agent_id
+
+  coder_app_icon         = "/icon/desktop.svg"
+  coder_app_slug         = "vscode"
+  coder_app_display_name = "VS Code Desktop"
+  coder_app_order        = 4
+
+  folder   = "/workspaces/${var.project_name}"
+  protocol = "vscode"
+}
+
 module "cursor" {
   count    = var.enable_apps && var.enable_cursor ? 1 : 0
   source   = "registry.coder.com/coder/cursor/coder"
   version  = "1.2.1"
   agent_id = var.agent_id
   folder   = "/workspaces/${var.project_name}"
+  order    = 5
 }
 
 
@@ -23,7 +40,7 @@ module "code-server" {
   folder          = "/workspaces/${var.project_name}"
 
   agent_id = var.agent_id
-  order    = 1
+  order    = 0
   open_in  = "tab"
 
   settings = {
@@ -122,7 +139,7 @@ resource "coder_app" "neovim" {
   display_name = "Neovim"
   icon         = "/icon/terminal.svg"
   command      = "nvim"
-  order        = 3
+  order        = 7
 }
 
 
@@ -133,7 +150,7 @@ module "filebrowser" {
   agent_id      = var.agent_id
   folder        = "/workspaces/${var.project_name}"
   database_path = "/tmp/filebrowser.db"
-  order         = 4
+  order         = 1
 }
 
 
@@ -145,7 +162,7 @@ resource "coder_app" "claude_usage" {
   icon         = "/icon/claude.svg"
   url          = "https://claude.ai/settings/usage"
   external     = true
-  order        = 11
+  order        = 2
 }
 
 
@@ -157,5 +174,5 @@ resource "coder_app" "codex_usage" {
   icon         = "/icon/openai.svg"
   url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
   external     = true
-  order        = 12
+  order        = 3
 }

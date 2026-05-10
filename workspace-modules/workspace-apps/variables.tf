@@ -22,6 +22,12 @@ variable "enable_cursor" {
   default     = true
 }
 
+variable "enable_vscode_desktop" {
+  description = "Whether to create the VS Code Desktop app"
+  type        = bool
+  default     = true
+}
+
 variable "enable_code_server" {
   description = "Whether to create the code-server app"
   type        = bool
