@@ -26,6 +26,11 @@ RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
 COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/30-fullstack-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/30-fullstack-init.sh
 
+# Python Tier 2 manifest. The frontend Tier 2 manifest is already inherited
+# from the nextjs-dev image layer; only the python one needs an explicit COPY
+# here because fullstack-dev does not derive from python-dev.
+COPY workspace-images/python-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
+
 # Fullstack-specific system prompt extension. Stacks on top of the inherited
 # nextjs-dev prompt extension (already at 20-nextjs.txt from the parent image).
 COPY workspace-images/fullstack-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/30-fullstack.txt

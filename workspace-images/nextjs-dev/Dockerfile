@@ -47,6 +47,12 @@ RUN chmod +x /usr/local/share/workspace-init.d/20-nextjs-init.sh
 # by 11-agent-prompts.sh alongside the base prompt.
 COPY workspace-images/nextjs-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/20-nextjs.txt
 
+# Tier 2 (frontend) extension manifest, merged with the inherited Tier 1
+# manifest at workspace start by 25-extensions-install.sh and
+# 26-settings-apply.sh. fullstack-dev FROM nextjs-dev inherits this manifest
+# transitively via the image layer.
+COPY workspace-images/nextjs-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
+
 # Set Node.js workspace defaults
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
