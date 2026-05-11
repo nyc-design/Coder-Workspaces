@@ -17,6 +17,9 @@ locals {
   # Terraform locals limited to ports, paths, and CLI flags.
 
   # ---- code-server (OpenVSX) ----
+  # Extension installation and settings application have moved to the
+  # manifest framework run by workspace-init.d; the launcher only starts
+  # the binary.
   code_server_port           = 13337
   code_server_install_prefix = "/opt/code-server"
   code_server_extensions_dir = "/home/coder/.vscode-extensions/shared"
