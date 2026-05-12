@@ -90,9 +90,6 @@ RUN SIGNOZ_VERSION=0.2.1 \
  && rm -rf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}"
 
 # code-server — OpenVSX-based browser editor served on the code-server Coder app.
-# Pinned to 4.117.0; 4.118.0 broke WebKit and is not safe to roll forward yet.
-# Installed once into the image so the workspace boot script just launches it
-# (replaces the old registry.coder.com/coder/code-server module download path).
 ENV CODE_SERVER_VERSION=4.117.0
 ENV CODE_SERVER_PREFIX=/opt/code-server
 RUN curl -fsSL https://code-server.dev/install.sh \
@@ -101,9 +98,6 @@ RUN curl -fsSL https://code-server.dev/install.sh \
  && chown -R coder:coder "${CODE_SERVER_PREFIX}"
 
 # vscode-web — Microsoft VS Code server bundle, used by the vscode-web Coder app.
-# Latest stable commit at image build time is baked in (image rebuilds pick up
-# newer commits). Installed under a separate prefix so its 'code-server' binary
-# does not collide with the OpenVSX code-server above.
 ENV VSCODE_WEB_PREFIX=/opt/vscode-web
 RUN ARCH=$(uname -m) \
  && case "$ARCH" in x86_64) ARCH=x64 ;; aarch64) ARCH=arm64 ;; *) echo "Unsupported arch $ARCH" >&2; exit 1 ;; esac \
