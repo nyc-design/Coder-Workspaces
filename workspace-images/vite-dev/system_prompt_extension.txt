@@ -1,0 +1,7 @@
+-- Frontend / Vite + React --
+- Package manager: `pnpm`. Use `pnpm dev` / `pnpm build` / `pnpm test` (vitest).
+- Lint + format: Biome — `pnpm biome check --write` / `pnpm biome format --write`. Default config is at `/usr/local/share/biome/biome.json`; project may override with its own `biome.json`.
+- Type checking: `tsc --noEmit` (or via `pnpm tsc`). The TypeScript LSP runs in the editor.
+- Unit tests: Vitest. E2E: Playwright (Chromium only on ARM Linux).
+- Browser automation for agents: Playwright CLI skill (preferred) or Playwright MCP (fallback).
+- Frontend Implementation — Build pages and features by composing React components and calling contracted API endpoints. Types are generated from the backend's OpenAPI spec via openapi-typescript — do not hand-write API response types.

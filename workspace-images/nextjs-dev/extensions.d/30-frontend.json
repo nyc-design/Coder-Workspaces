@@ -1,6 +1,0 @@
-{
-  "_comment": "Tier 2 extensions manifest (nextjs-dev / future frontend-dev). Layers on top of base-dev's 10-base.json. fullstack-dev FROM nextjs-dev inherits this manifest transitively via the underlying image layer.",
-  "shared": [
-    "bradlc.vscode-tailwindcss"
-  ]
-}

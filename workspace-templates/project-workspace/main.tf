@@ -115,7 +115,7 @@ data "coder_parameter" "new_project_type" {
   display_name = "New Project Type"
   type         = "string"
   default      = "base"
-  description  = "Project scaffold: base = minimal git repo, python = Poetry+pytest, nextjs = TypeScript+Tailwind+Storybook, cpp = CMake+vcpkg+GoogleTest, fullstack = FastAPI backend + Next.js frontend monorepo."
+  description  = "Project scaffold: base = minimal git repo, python = uv+ruff+pytest, vite = React+TypeScript+Tailwind+Biome+Vitest+Playwright, cpp = CMake+vcpkg+GoogleTest, fullstack = FastAPI backend + Vite/React frontend monorepo."
   order        = 1
 
   option {
@@ -123,19 +123,19 @@ data "coder_parameter" "new_project_type" {
     value = "base"
   }
   option {
-    name  = "Python (Poetry, pytest, FastAPI-ready)"
+    name  = "Python (uv, ruff, pytest, FastAPI-ready)"
     value = "python"
   }
   option {
-    name  = "Next.js (TypeScript, Tailwind, Storybook)"
-    value = "nextjs"
+    name  = "Vite (React, TypeScript, Tailwind, Biome, Vitest, Playwright)"
+    value = "vite"
   }
   option {
     name  = "C++ (CMake, vcpkg, GoogleTest)"
     value = "cpp"
   }
   option {
-    name  = "Fullstack (FastAPI + Next.js)"
+    name  = "Fullstack (FastAPI + Vite/React)"
     value = "fullstack"
   }
 }

@@ -14,7 +14,7 @@ workspace-images/
 │   └── run-workspace-inits     # Init script runner utility
 ├── cpp-dev/                    # C++ development image
 ├── fullstack-dev/              # Full-stack development image
-├── nextjs-dev/                 # Next.js development image
+├── vite-dev/                   # Vite/React development image
 ├── playwright-dev/             # Playwright testing image
 └── python-dev/                 # Python development image
 

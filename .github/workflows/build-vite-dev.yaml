@@ -1,12 +1,12 @@
-name: Build & Push nextjs-dev (multi-arch, native runners) - GHCR
+name: Build & Push vite-dev (multi-arch, native runners) - GHCR
 
 on:
   push:
     branches:
       - main
     paths:
-      - "workspace-images/nextjs-dev/**"
-      - ".github/workflows/build-nextjs-dev.yaml"
+      - "workspace-images/vite-dev/**"
+      - ".github/workflows/build-vite-dev.yaml"
   workflow_dispatch:
   workflow_run:
     workflows: ["Build & Push base-dev (multi-arch, native runners) - GHCR"]
@@ -22,7 +22,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: workspace-images
-  IMAGE_NAME: nextjs-dev
+  IMAGE_NAME: vite-dev
 
 jobs:
   build:
@@ -61,7 +61,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: workspace-images/nextjs-dev/Dockerfile
+          file: workspace-images/vite-dev/Dockerfile
           platforms: ${{ matrix.platform }}
           tags: ${{ env.IMG }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true

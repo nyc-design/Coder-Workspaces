@@ -11,35 +11,11 @@ apt-get update -y && apt-get install -y --no-install-recommends \
   python3-testresources \
 && rm -rf /var/lib/apt/lists/*
 
-# Essential development tools
+# Curated Python tooling — package manager (uv), lint+format (ruff),
+# type checker / LSP (basedpyright), unit tests (pytest), interactive REPL.
+# Project-specific libraries (numpy, pandas, fastapi, etc.) belong in each
+# project's pyproject.toml, not the base image.
 python3 -m pip install --no-cache-dir --break-system-packages --ignore-installed \
-    pipenv virtualenv
-
-# Linters and formatters
-python3 -m pip install --no-cache-dir --break-system-packages \
-    black isort flake8 pylint mypy bandit
-
-# Testing tools
-python3 -m pip install --no-cache-dir --break-system-packages \
-    pytest pytest-cov coverage pre-commit \
-    pytest-xdist pytest-mock
-
-# Scientific libraries and data tools
-python3 -m pip install --no-cache-dir --break-system-packages \
-    requests numpy pandas matplotlib seaborn \
-    types-requests types-setuptools
-
-# Jupyter and development utilities
-python3 -m pip install --no-cache-dir --break-system-packages \
-    jupyter jupyterlab notebook \
-    ipython ipdb pdbpp
-
-# Documentation and packaging tools
-python3 -m pip install --no-cache-dir --break-system-packages \
-    sphinx sphinx-rtd-theme \
-    twine build
-
-# Poetry (--ignore-installed to avoid platformdirs conflict)
-python3 -m pip install --no-cache-dir --break-system-packages --ignore-installed poetry
+    uv ruff basedpyright pytest ipython
 
 echo "[install-python] Python installation complete"

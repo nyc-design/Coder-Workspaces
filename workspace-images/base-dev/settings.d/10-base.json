@@ -15,6 +15,13 @@
     "mdb.showOverviewPageAfterInstall": false,
     "editor.fontFamily": "Cascadia Mono, Consolas, monospace",
     "editor.fontLigatures": false,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.autofetch": true

@@ -1,5 +1,5 @@
 {
-  "_comment": "Tier 1 extension manifest (global). Owned by base-dev; applied to every workspace. Each child image (python-dev, nextjs-dev, fullstack-dev) drops its own Tier 2 manifest into the same dir; tier order is by filename sort. Settings live in a sibling settings.d/ tree.",
+  "_comment": "Tier 1 extension manifest (global). Owned by base-dev; applied to every workspace. Each child image (python-dev, vite-dev, fullstack-dev) drops its own Tier 2 manifest into the same dir; tier order is by filename sort. Settings live in a sibling settings.d/ tree.",
 
   "shared": [
     "GitHub.vscode-github-actions",

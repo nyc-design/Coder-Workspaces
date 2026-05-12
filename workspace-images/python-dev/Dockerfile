@@ -7,28 +7,21 @@ USER root
 COPY workspace-images/shared/install-python.sh /tmp/install-python.sh
 RUN chmod +x /tmp/install-python.sh && /tmp/install-python.sh && rm /tmp/install-python.sh
 
-# Create Python-specific init script
-COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
-RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
-
 # Tier 2 (python) extension manifest, merged with the inherited Tier 1 manifest
 # at workspace start by 25-extensions-install.sh and 26-settings-apply.sh.
 COPY workspace-images/python-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
+
+# Tier 2 (python) settings manifest
+COPY workspace-images/python-dev/settings.d/ /usr/local/share/workspace-settings.d/
 
 # Set Python environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-# Configure Poetry for microservices workflow
-ENV POETRY_VENV_IN_PROJECT=1
-ENV POETRY_CACHE_DIR=/home/coder/.cache/pypoetry
+ENV UV_CACHE_DIR=/home/coder/.cache/uv
 
 USER coder
 
-# Configure Python user environment
-RUN python3 -m pip install --user --no-cache-dir --break-system-packages \
-    cookiecutter python-dotenv
-
-# Create common Python directories
-RUN mkdir -p /home/coder/.cache/pip
+# Common cache directories
+RUN mkdir -p /home/coder/.cache/pip /home/coder/.cache/uv

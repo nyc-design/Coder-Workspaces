@@ -1,0 +1,16 @@
+{
+  "_comment": "Tier 2 settings manifest (python-dev). Wires Ruff as the default Python formatter and basedpyright as the LSP. .machine because these are template-enforced wirings tied to baked binaries.",
+  "machine": {
+    "[python]": {
+      "editor.defaultFormatter": "charliermarsh.ruff",
+      "editor.codeActionsOnSave": {
+        "source.fixAll.ruff": "explicit",
+        "source.organizeImports.ruff": "explicit"
+      }
+    },
+    "python.languageServer": "None",
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "basedpyright.analysis.typeCheckingMode": "standard"
+  }
+}
