@@ -3,6 +3,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
 
+# Make apt resilient to transient mirror/PPA flakes (Canonical's git-core PPA
+# and launchpadcontent.net occasionally return 503s mid-build).
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+      > /etc/apt/apt.conf.d/99-retries
+
 # Core deps + Python + build tools
 # bubblewrap + uidmap are required by Codex's sandboxed exec (newuidmap/newgidmap).
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
