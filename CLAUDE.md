@@ -18,7 +18,7 @@ workspace-images/          # Docker images for different development stacks
 │   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 05-rtk, ..., 10-mcp-cleanup)
 ├── shared/               # Shared install scripts used by multiple images
 │   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
-├── cpp-dev/              # C++ development environment
+├── cpp-dev/              # C++ development environment (gcc/clang/cmake/ninja/vcpkg)
 ├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
@@ -345,6 +345,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
 - **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
+- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Merged with the inherited Tier 1 base manifest at workspace start by `25-extensions-install.sh` / `26-settings-apply.sh`.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
 - **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output

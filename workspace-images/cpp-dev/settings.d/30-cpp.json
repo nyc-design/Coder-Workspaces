@@ -1,0 +1,17 @@
+{
+  "_comment": "Tier 2 settings manifest (cpp-dev). Wires cpptools for IntelliSense + clang-format, and cmake-tools as the build/test/debug driver with Ninja. .machine because these are template-enforced wirings tied to baked binaries (cmake, ninja, clang-format, ccache, vcpkg).",
+  "machine": {
+    "[cpp]": {
+      "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "[c]": {
+      "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.cStandard": "c17",
+    "C_Cpp.clang_format_fallbackStyle": "Google",
+    "cmake.generator": "Ninja",
+    "cmake.configureOnOpen": true,
+    "cmake.exportCompileCommandsFile": true
+  }
+}
