@@ -89,6 +89,26 @@ RUN SIGNOZ_VERSION=0.2.1 \
  && install "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" -D -t /usr/local/bin/ \
  && rm -rf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}"
 
+# code-server — OpenVSX-based browser editor served on the code-server Coder app.
+ENV CODE_SERVER_VERSION=4.117.0
+ENV CODE_SERVER_PREFIX=/opt/code-server
+RUN curl -fsSL https://code-server.dev/install.sh \
+      | sh -s -- --method=standalone --prefix="${CODE_SERVER_PREFIX}" --version="${CODE_SERVER_VERSION}" \
+ && ln -sf "${CODE_SERVER_PREFIX}/bin/code-server" /usr/local/bin/code-server \
+ && chown -R coder:coder "${CODE_SERVER_PREFIX}"
+
+# vscode-web — Microsoft VS Code server bundle, used by the vscode-web Coder app.
+ENV VSCODE_WEB_PREFIX=/opt/vscode-web
+RUN ARCH=$(uname -m) \
+ && case "$ARCH" in x86_64) ARCH=x64 ;; aarch64) ARCH=arm64 ;; *) echo "Unsupported arch $ARCH" >&2; exit 1 ;; esac \
+ && HASH=$(curl -fsSL "https://update.code.visualstudio.com/api/commits/stable/server-linux-${ARCH}-web" | cut -d '"' -f 2) \
+ && test -n "$HASH" \
+ && mkdir -p "${VSCODE_WEB_PREFIX}" \
+ && curl -fsSL "https://vscode.download.prss.microsoft.com/dbazure/download/stable/${HASH}/vscode-server-linux-${ARCH}-web.tar.gz" \
+      | tar -xz -C "${VSCODE_WEB_PREFIX}" --strip-components 1 \
+ && ln -sf "${VSCODE_WEB_PREFIX}/bin/code-server" /usr/local/bin/vscode-web \
+ && chown -R coder:coder "${VSCODE_WEB_PREFIX}"
+
 USER coder
 RUN git config --global credential.helper "store --file=/home/coder/.git-credentials" \
  && gh config set git_protocol https || true
