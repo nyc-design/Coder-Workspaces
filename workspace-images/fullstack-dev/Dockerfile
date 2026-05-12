@@ -14,13 +14,6 @@ ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV UV_CACHE_DIR=/home/coder/.cache/uv
 
-# Init scripts: vite (20-vite-init.sh) already in image from vite-dev.
-# Add python init + fullstack-only init.
-COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
-RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
-COPY workspace-images/fullstack-dev/fullstack-init.sh /usr/local/share/workspace-init.d/30-fullstack-init.sh
-RUN chmod +x /usr/local/share/workspace-init.d/30-fullstack-init.sh
-
 # Python Tier 2 manifests. The frontend Tier 2 manifests are already inherited
 # from the vite-dev image layer; only the python ones need an explicit COPY
 # here because fullstack-dev does not derive from python-dev.
