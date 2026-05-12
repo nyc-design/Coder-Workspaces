@@ -9,7 +9,7 @@ This repository contains Docker build files and initialization scripts for Coder
 ├── build-base-dev.yaml   # Multi-arch build for base development image
 ├── build-cpp-dev.yaml    # C++ development image build
 ├── build-fullstack-dev.yaml  # Full-stack development image build
-├── build-nextjs-dev.yaml # Next.js development image build
+├── build-vite-dev.yaml   # Vite/React development image build
 └── build-python-dev.yaml # Python development image build
 
 workspace-images/          # Docker images for different development stacks
@@ -18,8 +18,8 @@ workspace-images/          # Docker images for different development stacks
 ├── shared/               # Shared install scripts used by multiple images
 │   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
 ├── cpp-dev/              # C++ development environment
-├── fullstack-dev/        # Full-stack web development (extends nextjs-dev + shared Python)
-├── nextjs-dev/           # Next.js specific setup (Node.js, Playwright, npm globals)
+├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
+├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
 └── python-dev/           # Python development environment (uses shared/install-python.sh)
 
@@ -53,7 +53,7 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ```
 base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ├── python-dev (uses shared/install-python.sh)
-├── nextjs-dev (Node.js, npm globals, Playwright)
+├── vite-dev (Node.js, npm globals, Playwright)
 │   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 └── playwright-dev
@@ -140,10 +140,10 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
 
 - `workspace-images/base-dev/system_prompt.txt` is copied into the image at
   `/usr/local/share/workspace-prompts/00-base.txt` (universal content).
-- Each child image (`nextjs-dev`, `fullstack-dev`, `playwright-dev`, etc.) can
+- Each child image (`vite-dev`, `fullstack-dev`, `playwright-dev`, etc.) can
   contribute a `system_prompt_extension.txt` that's copied to
   `/usr/local/share/workspace-prompts/20-<image>.txt`. fullstack-dev adds its
-  own at `30-fullstack.txt` so it stacks on top of the inherited nextjs prompt.
+  own at `30-fullstack.txt` so it stacks on top of the inherited vite prompt.
 - [`11-agent-prompts.sh`](workspace-images/base-dev/init.d/11-agent-prompts.sh)
   concatenates `*.txt` in sorted order into `~/.coder/AGENTS.md` (the path
   Coder Agents reads by default — see chatd's `agent/agentcontextconfig/api.go`
@@ -216,7 +216,7 @@ sidecar still receives the `/v1/*` paths it expects.
 - Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
 - If Pencil MCP tool calls fail or return no response, switch to Pencil CLI headless mode (`pencil interactive -i input.pen -o output.pen`) and continue there.
 - No `pencil-ready` / `pencil-close` pre-step is required.
-- Playwright MCP uses its own `mcp-chromium-*` browser build (separate from standard `chromium-*`). Both are installed during workspace init in fullstack/nextjs images.
+- Playwright MCP uses its own `mcp-chromium-*` browser build (separate from standard `chromium-*`). Both are installed during workspace init in fullstack/vite images.
 
 ### Shell Configuration
 - Uses Starship prompt with Lion theme
@@ -278,7 +278,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
 - npm global install prefix is `/usr/local/share/npm-global` (shared by image-time and runtime installs as user `coder`)
 - `base-dev` globally installs the core AI/dev CLIs, including `ctx7` and `stitch-mcp`, into `/usr/local/share/npm-global`
-- `nextjs-dev` does not force a global `NODE_ENV`; project commands should set their own runtime mode
+- `vite-dev` does not force a global `NODE_ENV`; project commands should set their own runtime mode
 - Starship prompt changes won't be visible until new interactive shell starts
 
 ## GitHub Actions Workflow Details
@@ -292,7 +292,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 ### Build Chain
 ```
 base-dev → python-dev
-base-dev → nextjs-dev → fullstack-dev
+base-dev → vite-dev → fullstack-dev
 base-dev → cpp-dev
 ```
 

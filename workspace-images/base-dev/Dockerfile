@@ -10,6 +10,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv build-essential \
     tree ripgrep fd-find \
     bubblewrap uidmap \
+    pre-commit httpie direnv \
  && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud CLI (modern method + single RUN per Google's Docker tip)

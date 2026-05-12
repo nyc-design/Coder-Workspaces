@@ -1,0 +1,9 @@
+{
+  "_comment": "Tier 2 extensions manifest (vite-dev / frontend). Layers on top of base-dev's 10-base.json. fullstack-dev FROM vite-dev inherits this manifest transitively via the underlying image layer.",
+  "shared": [
+    "biomejs.biome",
+    "ms-playwright.playwright",
+    "vitest.explorer",
+    "bradlc.vscode-tailwindcss"
+  ]
+}

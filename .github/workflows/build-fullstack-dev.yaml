@@ -7,11 +7,12 @@ on:
     paths:
       - "workspace-images/fullstack-dev/**"
       - "workspace-images/shared/**"
-      - "workspace-images/python-dev/python-init.sh"
+      - "workspace-images/python-dev/**"
+      - "workspace-images/vite-dev/**"
       - ".github/workflows/build-fullstack-dev.yaml"
   workflow_dispatch:
   workflow_run:
-    workflows: ["Build & Push nextjs-dev (multi-arch, native runners) - GHCR"]
+    workflows: ["Build & Push vite-dev (multi-arch, native runners) - GHCR"]
     types:
       - completed
     branches:

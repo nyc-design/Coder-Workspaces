@@ -1,0 +1,42 @@
+{
+  "_comment": "Tier 2 settings manifest (vite-dev / frontend). Wires Biome as the default formatter for JS/TS/JSON and points it at the workspace-default config baked into /usr/local/share/biome/biome.json. .machine because these are template-enforced wirings tied to baked binaries; users override per-project by adding their own biome.json.",
+  "machine": {
+    "biome.configurationPath": "/usr/local/share/biome/biome.json",
+    "[javascript]": {
+      "editor.defaultFormatter": "biomejs.biome",
+      "editor.codeActionsOnSave": {
+        "source.organizeImports.biome": "explicit",
+        "quickfix.biome": "explicit"
+      }
+    },
+    "[javascriptreact]": {
+      "editor.defaultFormatter": "biomejs.biome",
+      "editor.codeActionsOnSave": {
+        "source.organizeImports.biome": "explicit",
+        "quickfix.biome": "explicit"
+      }
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "biomejs.biome",
+      "editor.codeActionsOnSave": {
+        "source.organizeImports.biome": "explicit",
+        "quickfix.biome": "explicit"
+      }
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "biomejs.biome",
+      "editor.codeActionsOnSave": {
+        "source.organizeImports.biome": "explicit",
+        "quickfix.biome": "explicit"
+      }
+    },
+    "[json]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "[jsonc]": {
+      "editor.defaultFormatter": "biomejs.biome"
+    },
+    "playwright.reuseBrowser": true,
+    "playwright.showTrace": true
+  }
+}

@@ -7,7 +7,7 @@ Replaces the older `repo-envbuilder` template. The previous Coder Agents-specifi
 ## Features
 
 - **Flexible Project Setup**: Choose between existing GitHub repositories or create new projects
-- **Multiple Development Stacks**: Support for Python, Next.js, C++, fullstack, and base development environments
+- **Multiple Development Stacks**: Support for Python, Vite/React, C++, fullstack, and base development environments
 - **Automatic Scaffolding**: Pre-configured project structures with best practices
 - **GitHub Integration**: Seamless repository creation and cloning
 - **GCP Secrets Integration**: Automatic configuration of secrets from Google Cloud Secret Manager
@@ -25,10 +25,10 @@ Replaces the older `repo-envbuilder` template. The previous Coder Agents-specifi
 ### For New Projects
 1. **New Project Type**: Choose from:
    - Base Project (minimal setup)
-   - Python Project (Poetry, pytest, Jupyter)
-   - Next.js Project (TypeScript, Tailwind CSS, ESLint)
+   - Python Project (uv, ruff, pytest)
+   - Vite Project (React, TypeScript, Tailwind, Biome, Vitest, Playwright)
    - C++ Project (CMake, vcpkg, testing tools)
-   - Fullstack Project (Next.js + Python FastAPI)
+   - Fullstack Project (Vite/React + Python FastAPI)
 
 2. **Project Name**: Name for your new project (default: "my-new-project")
 3. **Create GitHub Repository**: Option to create a new GitHub repository
@@ -38,25 +38,24 @@ Replaces the older `repo-envbuilder` template. The previous Coder Agents-specifi
 The template automatically selects the appropriate Docker image based on project type:
 
 - **base-dev**: Minimal development environment with Git, Node.js, Python, GCP CLI
-- **python-dev**: Python-focused with Poetry, Jupyter, testing tools, linters
-- **nextjs-dev**: Frontend development with Next.js, TypeScript, build tools
+- **python-dev**: Python-focused with uv, ruff, basedpyright, pytest, ipython
+- **vite-dev**: Frontend development with Vite/React, TypeScript, Biome, Vitest, Playwright
 - **cpp-dev**: C++ development with compilers, CMake, vcpkg, debugging tools
-- **fullstack-dev**: Combined Python backend + Next.js frontend environment
+- **fullstack-dev**: Combined Python backend + Vite/React frontend environment
 
 ## Project Scaffolding
 
 Each project type includes pre-configured scaffolds with:
 
 ### Python Projects
-- `pyproject.toml` with Poetry configuration
+- `pyproject.toml` managed by `uv`
 - Basic project structure with `src/` and `tests/`
-- Pre-commit hooks setup
-- Jupyter notebook configuration
+- Ruff for lint + format, basedpyright for type checking, pytest for tests
 
-### Next.js Projects
+### Vite Projects
 - TypeScript configuration
 - Tailwind CSS setup
-- ESLint and Prettier configuration
+- Biome for lint + format, Vitest for unit tests, Playwright for E2E
 - Component templates and utilities
 
 ### C++ Projects
@@ -67,8 +66,8 @@ Each project type includes pre-configured scaffolds with:
 
 ### Fullstack Projects
 - Monorepo structure with `frontend/` and `backend/`
-- Next.js frontend with TypeScript
-- Python FastAPI backend with Poetry
+- Vite/React frontend with TypeScript
+- Python FastAPI backend managed by `uv`
 - Coordinated development scripts
 
 ## Environment Variables
