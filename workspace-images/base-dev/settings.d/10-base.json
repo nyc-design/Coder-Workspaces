@@ -1,7 +1,15 @@
 {
   "_comment": "Tier 1 settings manifest (global). Owned by base-dev; applied to every workspace. Child images drop sibling Tier 2 settings into the same dir; tier order is by filename sort, later wins on collisions. Extensions live in a sibling extensions.d/ tree.",
 
-  "user": {},
+  "user": {
+    "workbench.colorTheme": "Solarized Moon",
+    "pokechi.position": "explorer",
+    "window.menuBarVisibility": "classic",
+    "claudeCode.preferredLocation": "panel",
+    "workbench.activityBar.location": "top",
+    "chat.viewSessions.orientation": "stacked",
+    "editor.fontFamily": "Cascadia Mono, Consolas, monospace"
+  },
   "machine": {
     "git.useIntegratedAskPass": false,
     "likec4.mcp.enabled": true,
@@ -9,6 +17,10 @@
     "todo-tree.tree.disableCompactFolders": false,
     "todo-tree.tree.showCountsInTree": true,
     "todo-tree.tree.scanMode": "current file",
-    "mdb.showOverviewPageAfterInstall": false
+    "mdb.showOverviewPageAfterInstall": false,
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "git.autofetch": true,
+    "editor.fontLigatures": false
   }
 }
