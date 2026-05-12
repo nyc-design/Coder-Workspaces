@@ -10,7 +10,8 @@ This repository contains Docker build files and initialization scripts for Coder
 ├── build-cpp-dev.yaml    # C++ development image build
 ├── build-fullstack-dev.yaml  # Full-stack development image build
 ├── build-vite-dev.yaml   # Vite/React development image build
-└── build-python-dev.yaml # Python development image build
+├── build-python-dev.yaml # Python development image build
+└── build-rust-dev.yaml   # Rust development image build
 
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, AI CLIs, RTK)
@@ -21,7 +22,8 @@ workspace-images/          # Docker images for different development stacks
 ├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
-└── python-dev/           # Python development environment (uses shared/install-python.sh)
+├── python-dev/           # Python development environment (uses shared/install-python.sh)
+└── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
 
 workspace-templates/       # Coder workspace template definitions
 ├── windows-server-gcp/    # Windows VM on GCP with browser-based RDP access
@@ -56,6 +58,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ├── vite-dev (Node.js, npm globals, Playwright)
 │   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
+├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
 └── playwright-dev
 ```
 
@@ -294,6 +297,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 base-dev → python-dev
 base-dev → vite-dev → fullstack-dev
 base-dev → cpp-dev
+base-dev → rust-dev
 ```
 
 ### Build Triggers

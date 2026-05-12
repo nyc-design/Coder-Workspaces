@@ -16,7 +16,8 @@ workspace-images/
 ├── fullstack-dev/              # Full-stack development image
 ├── vite-dev/                   # Vite/React development image
 ├── playwright-dev/             # Playwright testing image
-└── python-dev/                 # Python development image
+├── python-dev/                 # Python development image
+└── rust-dev/                   # Rust development image
 
 workspace-templates/            # Coder workspace template definitions
 └── repo-devcontainer/         # Repository-based devcontainer template

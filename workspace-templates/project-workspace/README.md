@@ -40,6 +40,7 @@ The template automatically selects the appropriate Docker image based on project
 - **base-dev**: Minimal development environment with Git, Node.js, Python, GCP CLI
 - **python-dev**: Python-focused with uv, ruff, basedpyright, pytest, ipython
 - **vite-dev**: Frontend development with Vite/React, TypeScript, Biome, Vitest, Playwright
+- **rust-dev**: Rust development with rustup, cargo, clippy, rustfmt, rust-analyzer, cargo-binstall
 - **cpp-dev**: C++ development with compilers, CMake, vcpkg, debugging tools
 - **fullstack-dev**: Combined Python backend + Vite/React frontend environment
 

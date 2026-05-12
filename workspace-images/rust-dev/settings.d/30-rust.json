@@ -1,0 +1,12 @@
+{
+  "_comment": "Tier 2 settings manifest (rust-dev). Wires rust-analyzer as the Rust LSP and routes save-time checks through clippy. .machine because these are template-enforced wirings tied to baked binaries.",
+  "machine": {
+    "[rust]": {
+      "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.procMacro.enable": true
+  }
+}

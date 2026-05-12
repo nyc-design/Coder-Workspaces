@@ -115,7 +115,7 @@ data "coder_parameter" "new_project_type" {
   display_name = "New Project Type"
   type         = "string"
   default      = "base"
-  description  = "Project scaffold: base = minimal git repo, python = uv+ruff+pytest, vite = React+TypeScript+Tailwind+Biome+Vitest+Playwright, cpp = CMake+vcpkg+GoogleTest, fullstack = FastAPI backend + Vite/React frontend monorepo."
+  description  = "Project scaffold: base = minimal git repo, python = uv+ruff+pytest, vite = React+TypeScript+Tailwind+Biome+Vitest+Playwright, rust = cargo+clippy+rustfmt, cpp = CMake+vcpkg+GoogleTest, fullstack = FastAPI backend + Vite/React frontend monorepo."
   order        = 1
 
   option {
@@ -129,6 +129,10 @@ data "coder_parameter" "new_project_type" {
   option {
     name  = "Vite (React, TypeScript, Tailwind, Biome, Vitest, Playwright)"
     value = "vite"
+  }
+  option {
+    name  = "Rust (cargo, clippy, rustfmt, rust-analyzer)"
+    value = "rust"
   }
   option {
     name  = "C++ (CMake, vcpkg, GoogleTest)"
