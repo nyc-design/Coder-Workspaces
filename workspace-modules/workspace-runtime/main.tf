@@ -28,16 +28,8 @@ locals {
     { container_path = "/home/coder/.codex", host_path = "/home/ubuntu/secrets/.codex", read_only = false },
     { container_path = "/home/coder/.agents", host_path = "/home/ubuntu/secrets/.agents", read_only = false },
     { container_path = "/home/coder/.supermaven", host_path = "/home/ubuntu/secrets/.supermaven", read_only = false },
-    # VS Code / code-server extensions are persisted globally across workspaces.
-    # Two dirs: "shared" is installed via OpenVSX (code-server + vscode-web both read);
-    # "vscode-web" holds MS-marketplace-only extensions (Copilot, Gemini, etc.) that
-    # cannot run under code-server. vscode-web sees a merged view (shared + vscode-web).
     { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
     { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
-    # Extension state (auth tokens, saved DB connections, etc.) is persisted
-    # globally so AI/DB extensions don't need re-auth in every new workspace.
-    # User settings, keybindings, and workspaceStorage stay per-workspace in
-    # the home Docker volume so each new workspace starts with image defaults.
     { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },
     { container_path = "/home/coder/.excalidraw", host_path = "/home/ubuntu/secrets/.excalidraw", read_only = false },
     { container_path = "/home/coder/.claude", host_path = "/home/ubuntu/secrets/.claude", read_only = false },
