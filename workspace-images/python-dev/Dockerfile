@@ -11,6 +11,10 @@ RUN chmod +x /tmp/install-python.sh && /tmp/install-python.sh && rm /tmp/install
 COPY workspace-images/python-dev/python-init.sh /usr/local/share/workspace-init.d/20-python-init.sh
 RUN chmod +x /usr/local/share/workspace-init.d/20-python-init.sh
 
+# Tier 2 (python) extension manifest, merged with the inherited Tier 1 manifest
+# at workspace start by 25-extensions-install.sh and 26-settings-apply.sh.
+COPY workspace-images/python-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
+
 # Set Python environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

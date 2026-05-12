@@ -6,6 +6,40 @@ terraform {
   }
 }
 
+data "coder_workspace" "me" {}
+data "coder_workspace_owner" "me" {}
+
+locals {
+  # The launchers below are intentionally thin: they assume the binaries are
+  # already on disk (baked into base-dev) and that anything else editor-related
+  # — extension installs, User/Machine settings.json files, in-place patches
+  # — is the responsibility of workspace-init.d scripts in base-dev. Keep
+  # Terraform locals limited to ports, paths, and CLI flags.
+
+  # ---- code-server (OpenVSX) ----
+  # Extension installation and settings application have moved to the
+  # manifest framework run by workspace-init.d; the launcher only starts
+  # the binary.
+  code_server_port           = 13337
+  code_server_install_prefix = "/opt/code-server"
+  code_server_extensions_dir = "/home/coder/.vscode-extensions/shared"
+  code_server_log_path       = "/tmp/code-server.log"
+
+  # ---- vscode-web (Microsoft) ----
+  vscode_web_port              = 13338
+  vscode_web_install_prefix    = "/opt/vscode-web"
+  vscode_web_extensions_dir    = "/home/coder/.vscode-extensions/vscode-web"
+  vscode_web_shared_extensions = "/home/coder/.vscode-extensions/shared"
+  vscode_web_log_path          = "/tmp/vscode-web.log"
+  vscode_web_telemetry_level   = "error"
+  vscode_web_subdomain         = true
+  vscode_web_server_base_path = (
+    local.vscode_web_subdomain
+    ? ""
+    : format("/@%s/%s/apps/vscode-web/", data.coder_workspace_owner.me.name, data.coder_workspace.me.name)
+  )
+}
+
 
 module "vscode-desktop" {
   count   = var.enable_apps && var.enable_vscode_desktop ? 1 : 0
@@ -33,109 +67,88 @@ module "cursor" {
 }
 
 
-module "code-server" {
-  count           = var.enable_apps && var.enable_code_server ? 1 : 0
-  source          = "registry.coder.com/coder/code-server/coder"
-  install_version = "4.117.0" # Pin: 4.118.0 broke WebKit (transferable streams in webview detach ArrayBuffers)
-  folder          = "/workspaces/${var.project_name}"
+# code-server (OpenVSX) — thin wrapper around the binary baked into base-dev.
+# Binary is installed at /opt/code-server/bin/code-server by the image build;
+# this resource just configures and launches it. Replaces the
+# registry.coder.com/coder/code-server module so we avoid a download on each
+# workspace start. Extension installation is intentionally not handled here
+# anymore — the manifest framework introduced in the next PR populates the
+# shared extensions dir at image build / first boot, and persisted extensions
+# survive across restarts via the host-bound shared mount.
+resource "coder_script" "code_server" {
+  count        = var.enable_apps && var.enable_code_server ? 1 : 0
+  agent_id     = var.agent_id
+  display_name = "code-server"
+  icon         = "/icon/code.svg"
+  run_on_start = true
 
-  agent_id       = var.agent_id
-  order          = 0
-  open_in        = "tab"
-  extensions_dir = "/home/coder/.vscode-extensions/shared"
-
-  settings = {
-    "workbench.colorTheme"                 = "Solarized Moon",
-    "git.useIntegratedAskPass"             = false,
-    "likec4.mcp.enabled"                   = true,
-    "todo-tree.tree.showBadges"            = true,
-    "todo-tree.tree.disableCompactFolders" = false,
-    "todo-tree.tree.showCountsInTree"      = true,
-    "todo-tree.tree.scanMode"              = "current file",
-    "mdb.showOverviewPageAfterInstall"     = false
-  }
-
-  extensions = [
-    "GitHub.vscode-github-actions",
-    "GitHub.vscode-pull-request-github",
-    "eamodio.gitlens",
-    "Anthropic.claude-code",
-    "highagency.pencildev",
-    "mongodb.mongodb-vscode",
-    "openai.chatgpt",
-    "ms-python.python",
-    "detachhead.basedpyright",
-    "Supermaven.supermaven",
-    "ms-azuretools.vscode-docker",
-    "likec4.likec4-vscode",
-    "nefrob.vscode-just-syntax",
-    "bradlc.vscode-tailwindcss",
-    "Gruntfuggly.todo-tree",
-    "usernamehw.errorlens",
-    "joshbolduc.story-explorer",
-    "bruno-api-client.bruno",
-    "pomdtr.excalidraw-editor",
-    "abridge.file-explorer-tools",
-    "hashicorp.terraform",
-    "rhalaly.scope-to-this",
-    "jakobhoeg.vscode-pokemon",
-    "d9once.pokechi",
-    "octohash.powermode-plus",
-  ]
+  script = templatefile("${path.module}/scripts/code-server-launch.sh", {
+    INSTALL_PREFIX = local.code_server_install_prefix
+    EXTENSIONS_DIR = local.code_server_extensions_dir
+    LOG_PATH       = local.code_server_log_path
+    PORT           = local.code_server_port
+    APP_NAME       = "code-server"
+  })
 }
 
+resource "coder_app" "code_server" {
+  count        = var.enable_apps && var.enable_code_server ? 1 : 0
+  agent_id     = var.agent_id
+  slug         = "code-server"
+  display_name = "code-server"
+  url          = "http://localhost:${local.code_server_port}/?folder=${urlencode("/workspaces/${var.project_name}")}"
+  icon         = "/icon/code.svg"
+  subdomain    = false
+  share        = "owner"
+  order        = 0
+  open_in      = "tab"
 
-module "vscode-web" {
-  count  = var.enable_apps && var.enable_vscode_web ? 1 : 0
-  source = "registry.coder.com/coder/vscode-web/coder"
-  folder = "/workspaces/${var.project_name}"
-
-  agent_id       = var.agent_id
-  order          = 2
-  accept_license = true
-  # vscode-web reads a merged extensions dir (shared OpenVSX extensions plus
-  # MS-marketplace-only ones). The base-dev init script symlinks the shared
-  # dir into the vscode-web dir on workspace start.
-  extensions_dir = "/home/coder/.vscode-extensions/vscode-web"
-
-  settings = {
-    "workbench.colorTheme"                 = "Default Dark Modern",
-    "git.useIntegratedAskPass"             = false,
-    "likec4.mcp.enabled"                   = true,
-    "todo-tree.tree.showBadges"            = true,
-    "todo-tree.tree.disableCompactFolders" = false,
-    "todo-tree.tree.showCountsInTree"      = true,
-    "todo-tree.tree.scanMode"              = "current file",
-    "mdb.showOverviewPageAfterInstall"     = false
+  healthcheck {
+    url       = "http://localhost:${local.code_server_port}/healthz"
+    interval  = 5
+    threshold = 6
   }
+}
 
-  extensions = [
-    "GitHub.vscode-github-actions",
-    "GitHub.vscode-pull-request-github",
-    "eamodio.gitlens",
-    "Github.copilot",
-    "Anthropic.claude-code",
-    "highagency.pencildev",
-    "mongodb.mongodb-vscode",
-    "openai.chatgpt",
-    "ms-python.python",
-    "ms-azuretools.vscode-docker",
-    "Google.geminicodeassist",
-    "likec4.likec4-vscode",
-    "nefrob.vscode-just-syntax",
-    "bradlc.vscode-tailwindcss",
-    "Gruntfuggly.todo-tree",
-    "usernamehw.errorlens",
-    "joshbolduc.story-explorer",
-    "bruno-api-client.bruno",
-    "pomdtr.excalidraw-editor",
-    "abridge.file-explorer-tools",
-    "hashicorp.terraform",
-    "rhalaly.scope-to-this",
-    "jakobhoeg.vscode-pokemon",
-    "d9once.pokechi",
-    "octohash.powermode-plus",
-  ]
+# vscode-web (Microsoft) — thin wrapper around the binary baked into base-dev.
+# Binary is installed at /opt/vscode-web/bin/code-server by the image build.
+# The launcher symlinks every subdir of the shared OpenVSX extensions dir into
+# vscode-web's own extensions dir on each start so vscode-web sees a merged
+# view (shared + Marketplace-only) with zero on-disk duplication.
+resource "coder_script" "vscode_web" {
+  count        = var.enable_apps && var.enable_vscode_web ? 1 : 0
+  agent_id     = var.agent_id
+  display_name = "VS Code Web"
+  icon         = "/icon/code.svg"
+  run_on_start = true
+
+  script = templatefile("${path.module}/scripts/vscode-web-launch.sh", {
+    INSTALL_PREFIX        = local.vscode_web_install_prefix
+    EXTENSIONS_DIR        = local.vscode_web_extensions_dir
+    SHARED_EXTENSIONS_DIR = local.vscode_web_shared_extensions
+    LOG_PATH              = local.vscode_web_log_path
+    PORT                  = local.vscode_web_port
+    TELEMETRY_LEVEL       = local.vscode_web_telemetry_level
+    SERVER_BASE_PATH      = local.vscode_web_server_base_path
+  })
+}
+
+resource "coder_app" "vscode_web" {
+  count        = var.enable_apps && var.enable_vscode_web ? 1 : 0
+  agent_id     = var.agent_id
+  slug         = "vscode-web"
+  display_name = "VS Code Web"
+  url          = "http://localhost:${local.vscode_web_port}${local.vscode_web_server_base_path}?folder=${urlencode("/workspaces/${var.project_name}")}"
+  icon         = "/icon/code.svg"
+  subdomain    = local.vscode_web_subdomain
+  share        = "owner"
+  order        = 2
+
+  healthcheck {
+    url       = local.vscode_web_subdomain ? "http://localhost:${local.vscode_web_port}/healthz" : "http://localhost:${local.vscode_web_port}${local.vscode_web_server_base_path}healthz"
+    interval  = 5
+    threshold = 6
+  }
 }
 
 

@@ -114,7 +114,7 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
  && gh config set git_protocol https || true
 
 USER root
-RUN install -d -m 0755 /usr/local/share/workspace-init.d /usr/local/share/workspace-prompts
+RUN install -d -m 0755 /usr/local/share/workspace-init.d /usr/local/share/workspace-prompts /usr/local/share/workspace-extensions.d /usr/local/share/workspace-settings.d
 
 # Base workspace system prompt. Child images add their own extensions to
 # /usr/local/share/workspace-prompts/ — 11-agent-prompts.sh concatenates
@@ -125,6 +125,13 @@ COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
 RUN chmod +x /usr/local/share/workspace-init.d/*.sh
+
+# Tier 1 (global) extension/settings manifests consumed by
+# 25-extensions-install.sh and 26-settings-apply.sh. Child images add Tier 2
+# manifests to the same directory; per-repo Tier 3 sources are read directly
+# from the project tree by the init scripts.
+COPY workspace-images/base-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
+COPY workspace-images/base-dev/settings.d/ /usr/local/share/workspace-settings.d/
 
 COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
 RUN chmod +x /usr/local/bin/run-workspace-inits

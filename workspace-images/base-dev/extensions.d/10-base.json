@@ -1,0 +1,32 @@
+{
+  "_comment": "Tier 1 extension manifest (global). Owned by base-dev; applied to every workspace. Each child image (python-dev, nextjs-dev, fullstack-dev) drops its own Tier 2 manifest into the same dir; tier order is by filename sort. Settings live in a sibling settings.d/ tree.",
+
+  "shared": [
+    "GitHub.vscode-github-actions",
+    "GitHub.vscode-pull-request-github",
+    "eamodio.gitlens",
+    "Anthropic.claude-code",
+    "highagency.pencildev",
+    "mongodb.mongodb-vscode",
+    "openai.chatgpt",
+    "Supermaven.supermaven",
+    "ms-azuretools.vscode-docker",
+    "likec4.likec4-vscode",
+    "nefrob.vscode-just-syntax",
+    "Gruntfuggly.todo-tree",
+    "usernamehw.errorlens",
+    "joshbolduc.story-explorer",
+    "bruno-api-client.bruno",
+    "pomdtr.excalidraw-editor",
+    "abridge.file-explorer-tools",
+    "hashicorp.terraform",
+    "rhalaly.scope-to-this",
+    "jakobhoeg.vscode-pokemon",
+    "d9once.pokechi",
+    "octohash.powermode-plus"
+  ],
+  "vscode_web_only": [
+    "GitHub.copilot",
+    "Google.geminicodeassist"
+  ]
+}

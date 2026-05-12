@@ -1,0 +1,7 @@
+{
+  "_comment": "Tier 2 extensions manifest (python-dev). Layers on top of base-dev's 10-base.json. Inherited unchanged by fullstack-dev via an explicit COPY in that image's Dockerfile (fullstack-dev FROM nextjs-dev, so it doesn't pick this up transitively).",
+  "shared": [
+    "ms-python.python",
+    "detachhead.basedpyright"
+  ]
+}
