@@ -39,9 +39,10 @@ module "code-server" {
   install_version = "4.117.0" # Pin: 4.118.0 broke WebKit (transferable streams in webview detach ArrayBuffers)
   folder          = "/workspaces/${var.project_name}"
 
-  agent_id = var.agent_id
-  order    = 0
-  open_in  = "tab"
+  agent_id       = var.agent_id
+  order          = 0
+  open_in        = "tab"
+  extensions_dir = "/home/coder/.vscode-extensions/shared"
 
   settings = {
     "workbench.colorTheme"                 = "Solarized Moon",
@@ -92,6 +93,10 @@ module "vscode-web" {
   agent_id       = var.agent_id
   order          = 2
   accept_license = true
+  # vscode-web reads a merged extensions dir (shared OpenVSX extensions plus
+  # MS-marketplace-only ones). The base-dev init script symlinks the shared
+  # dir into the vscode-web dir on workspace start.
+  extensions_dir = "/home/coder/.vscode-extensions/vscode-web"
 
   settings = {
     "workbench.colorTheme"                 = "Default Dark Modern",

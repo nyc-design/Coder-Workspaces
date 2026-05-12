@@ -4,8 +4,11 @@ set -eu
 log() { printf '[vscode-themes-init] %s\n' "$*"; }
 
 THEMES_DIR="/usr/local/share/shared-assets/vscode-themes"
-CS_EXT_DIR="$HOME/.local/share/code-server/extensions"
-VSCODE_EXT_DIR="$HOME/.vscode-server/extensions"
+# Globally persisted extension dirs (host-bound in workspace-runtime).
+# Shared dir is used by code-server and vscode-web (vscode-web merges).
+# vscode-web dir is MS-marketplace-only extensions for VS Code Web.
+CS_EXT_DIR="$HOME/.vscode-extensions/shared"
+VSCODE_EXT_DIR="$HOME/.vscode-extensions/vscode-web"
 
 install_into_vscode_server() {
   local vsix_path="$1"
@@ -54,7 +57,7 @@ for vsix_path in "$THEMES_DIR"/*.vsix; do
   fi
   found_any=1
   log "installing $(basename "$vsix_path") into code-server"
-  code-server --install-extension "$vsix_path" --force >/tmp/code-server-theme-install.log 2>&1 \
+  code-server --extensions-dir="$CS_EXT_DIR" --install-extension "$vsix_path" --force >/tmp/code-server-theme-install.log 2>&1 \
     || { log "code-server install failed for $(basename "$vsix_path"); tailing log"; tail -n 50 /tmp/code-server-theme-install.log || true; exit 1; }
   install_into_vscode_server "$vsix_path"
 done
