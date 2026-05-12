@@ -1,4 +1,0 @@
--- Browser automation environment --
-- This image is a runtime for browser-based agent tasks (Playwright + VNC), not a general dev environment — keep workspace state minimal.
-- Browser automation: Playwright CLI skill (preferred) or Playwright MCP (fallback).
-- VNC is exposed for visual debugging when iterating on selectors or watching tests run.
