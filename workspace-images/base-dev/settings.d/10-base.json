@@ -8,19 +8,19 @@
     "claudeCode.preferredLocation": "panel",
     "workbench.activityBar.location": "top",
     "chat.viewSessions.orientation": "stacked",
-    "editor.fontFamily": "Cascadia Mono, Consolas, monospace"
-  },
-  "machine": {
-    "git.useIntegratedAskPass": false,
-    "likec4.mcp.enabled": true,
     "todo-tree.tree.showBadges": true,
     "todo-tree.tree.disableCompactFolders": false,
     "todo-tree.tree.showCountsInTree": true,
     "todo-tree.tree.scanMode": "current file",
     "mdb.showOverviewPageAfterInstall": false,
+    "editor.fontFamily": "Cascadia Mono, Consolas, monospace",
+    "editor.fontLigatures": false,
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
-    "git.autofetch": true,
-    "editor.fontLigatures": false
+    "git.autofetch": true
+  },
+  "machine": {
+    "git.useIntegratedAskPass": false,
+    "likec4.mcp.enabled": true
   }
 }
