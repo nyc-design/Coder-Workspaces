@@ -26,12 +26,27 @@ APP_NAME="${APP_NAME}"
 
 mkdir -p "$EXTENSIONS_DIR"
 
-echo "Launching code-server on 127.0.0.1:$PORT (extensions: $EXTENSIONS_DIR)"
+# Activation gate: code-server's --extensions-dir flag activates every
+# extension subdir it finds, but the shared cache may contain extensions
+# from other workspace types (or past projects). Compute the diff between
+# cache contents and the union of currently active manifests, and pass
+# --disable-extension for each leftover so only the manifest set is
+# enabled. compute-extension-disable-list is baked into base-dev.
+disable_args=()
+if command -v compute-extension-disable-list >/dev/null 2>&1; then
+  while IFS= read -r id; do
+    [ -z "$id" ] && continue
+    disable_args+=(--disable-extension "$id")
+  done < <(EXTENSIONS_DIR="$EXTENSIONS_DIR" compute-extension-disable-list 2>/dev/null || true)
+fi
+
+echo "Launching code-server on 127.0.0.1:$PORT (extensions: $EXTENSIONS_DIR, disabled: $${#disable_args[@]})"
 "$CODE_SERVER" \
   --auth=none \
   --bind-addr="127.0.0.1:$PORT" \
   --app-name="$APP_NAME" \
   --extensions-dir="$EXTENSIONS_DIR" \
+  "$${disable_args[@]}" \
   > "$LOG_PATH" 2>&1 &
 
 echo "code-server PID $!; logs: $LOG_PATH"

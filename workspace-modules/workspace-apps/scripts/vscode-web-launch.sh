@@ -44,7 +44,20 @@ if [ -n "$SERVER_BASE_PATH" ]; then
   SERVER_BASE_PATH_ARG="--server-base-path=$SERVER_BASE_PATH"
 fi
 
-echo "Launching vscode-web on 127.0.0.1:$PORT (extensions: $EXTENSIONS_DIR)"
+# Activation gate: vscode-web's --extensions-dir activates every extension
+# subdir it finds (including the symlinks we just created into the shared
+# cache). Disable any cached extension that isn't in the union of currently
+# active manifests so only the manifest set is enabled.
+# compute-extension-disable-list is baked into base-dev.
+disable_args=()
+if command -v compute-extension-disable-list >/dev/null 2>&1; then
+  while IFS= read -r id; do
+    [ -z "$id" ] && continue
+    disable_args+=(--disable-extension "$id")
+  done < <(EXTENSIONS_DIR="$EXTENSIONS_DIR" compute-extension-disable-list 2>/dev/null || true)
+fi
+
+echo "Launching vscode-web on 127.0.0.1:$PORT (extensions: $EXTENSIONS_DIR, disabled: $${#disable_args[@]})"
 "$VSCODE_WEB" serve-local \
   --port="$PORT" \
   --host=127.0.0.1 \
@@ -53,6 +66,7 @@ echo "Launching vscode-web on 127.0.0.1:$PORT (extensions: $EXTENSIONS_DIR)"
   --telemetry-level="$TELEMETRY_LEVEL" \
   --extensions-dir="$EXTENSIONS_DIR" \
   $SERVER_BASE_PATH_ARG \
+  "$${disable_args[@]}" \
   > "$LOG_PATH" 2>&1 &
 
 echo "vscode-web PID $!; logs: $LOG_PATH"
