@@ -10,18 +10,20 @@ This repository contains Docker build files and initialization scripts for Coder
 ├── build-cpp-dev.yaml    # C++ development image build
 ├── build-fullstack-dev.yaml  # Full-stack development image build
 ├── build-vite-dev.yaml   # Vite/React development image build
-└── build-python-dev.yaml # Python development image build
+├── build-python-dev.yaml # Python development image build
+└── build-rust-dev.yaml   # Rust development image build
 
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, AI CLIs, RTK)
 │   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 05-rtk, ..., 10-mcp-cleanup)
 ├── shared/               # Shared install scripts used by multiple images
 │   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
-├── cpp-dev/              # C++ development environment
+├── cpp-dev/              # C++ development environment (gcc/clang/cmake/ninja/vcpkg)
 ├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
-└── python-dev/           # Python development environment (uses shared/install-python.sh)
+├── python-dev/           # Python development environment (uses shared/install-python.sh)
+└── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
 
 workspace-templates/       # Coder workspace template definitions
 ├── windows-server-gcp/    # Windows VM on GCP with browser-based RDP access
@@ -56,6 +58,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ├── vite-dev (Node.js, npm globals, Playwright)
 │   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
+├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
 └── playwright-dev
 ```
 
@@ -294,6 +297,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 base-dev → python-dev
 base-dev → vite-dev → fullstack-dev
 base-dev → cpp-dev
+base-dev → rust-dev
 ```
 
 ### Build Triggers
@@ -341,6 +345,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
 - **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
+- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Merged with the inherited Tier 1 base manifest at workspace start by `25-extensions-install.sh` / `26-settings-apply.sh`.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
 - **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output

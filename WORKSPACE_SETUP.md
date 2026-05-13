@@ -16,7 +16,8 @@ workspace-images/
 ├── fullstack-dev/              # Full-stack development image
 ├── vite-dev/                   # Vite/React development image
 ├── playwright-dev/             # Playwright testing image
-└── python-dev/                 # Python development image
+├── python-dev/                 # Python development image
+└── rust-dev/                   # Rust development image
 
 workspace-templates/            # Coder workspace template definitions
 └── repo-devcontainer/         # Repository-based devcontainer template
@@ -86,6 +87,30 @@ The init script configures a custom Starship prompt with:
 2. **Environment Variables**: Changes made to shell configuration files during init only affect future shell sessions, not the current workspace session.
 
 ## Development Workflow
+
+### Project-side: host LSPs vs. devcontainer
+
+The workspace image is the dev environment. Each project should expose its
+toolchain via a `.devcontainer/devcontainer.json` that references the
+relevant `*-dev:latest` image (see `nyc-design/Project-Scaffolds` for
+templates per language). The container handles compilation and runtime;
+the **host workspace** (this Coder workspace) handles editor LSPs.
+
+LSPs (basedpyright, biome, tsc) run on the host and want a local
+`./.venv` / `./node_modules` alongside the source. There are no
+bind-mounts from container back to host — you populate them yourself:
+
+| After editing... | Run on the host (workspace terminal) |
+|---|---|
+| `pyproject.toml` | `uv sync` |
+| `package.json` | `pnpm install` |
+| `Cargo.toml` | `cargo fetch` (rust-analyzer reads target/) |
+
+No `pyrightconfig.json` is needed — basedpyright auto-detects `./.venv`.
+No `tsconfig` tweaks are needed — tsc and biome auto-detect
+`./node_modules`. The container's `postCreateCommand` runs the same
+commands inside the container; the host run is just so the editor sees
+the deps.
 
 ### Making Changes to Init Scripts
 

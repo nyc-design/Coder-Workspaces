@@ -1,0 +1,8 @@
+{
+  "_comment": "Tier 2 extensions manifest (rust-dev). Layers on top of base-dev's 10-base.json.",
+  "shared": [
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml",
+    "vadimcn.vscode-lldb"
+  ]
+}
