@@ -38,7 +38,10 @@ install_into_vscode_server() {
 
   log "installing ${ext_key}@${version} into VS Code Web extension dir"
   rm -rf "${VSCODE_EXT_DIR:?}/${ext_key}-"*
-  unzip -qq "$vsix_path" -d "$tmp_dir"
+  # -o: overwrite without prompting. The first unzip above pulled out just
+  # extension/package.json into the same tmp_dir, so this second extraction
+  # would otherwise hit an interactive overwrite prompt and abort with EOF.
+  unzip -o -qq "$vsix_path" -d "$tmp_dir"
   mv "${tmp_dir}/extension" "$target_dir"
   rm -rf "$tmp_dir"
 }
