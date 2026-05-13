@@ -89,7 +89,7 @@ docker compose up -d coder-agents-sidecars
 docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
 docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
 docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login claude   # optional, for `subscription/` lane
-# kirocc: copy data.sqlite3 from a host that ran `kiro auth login` into /data/auth/kirocc/
+docker exec -it coder-agents-sidecars kiro-auth-login                                                # Kiro Builder ID, for `kiro/` lane
 
 # 5. Pick up the new credentials
 docker restart coder-agents-sidecars
@@ -198,10 +198,11 @@ long-lived OAuth token — rotate periodically, revoke on leak.
 
 | Provider | Headless? | Lifetime | Refresh |
 |---|---|---|---|
-| Claude | Yes — `claude setup-token` | ~1 year | Manual rotation |
-| Claude (alt) | No (browser, in-container `claude login`) | 8h tokens, infinite refresh | Auto via SDK |
+| Claude (`meridian/`) | Yes — `claude setup-token` | ~1 year | Manual rotation |
+| Claude (`subscription/`) | No (browser, in-container `cli-proxy-api --login claude`) | 8h tokens, infinite refresh | Auto via CLIProxyAPI |
 | Codex | No (browser, in-container `cli-proxy-api --login codex`) | ~30 days idle | Auto via CLIProxyAPI |
 | Gemini | No (browser, in-container `cli-proxy-api --login gemini`) | Months–years if used regularly | Auto via CLIProxyAPI |
+| Kiro (`kiro/`) | No (device-code, in-container `kiro-auth-login`) | ~90 days idle (Builder ID) | Auto via kirocc (same fig_auth flow as the CLI) |
 
 Per-provider specifics (token rotation, ToS notes, multi-account) in each
 sidecar's `README.md`.
@@ -268,7 +269,9 @@ host-services/coder-agents-sidecars/
 ├── cliproxy-sidecar/
 │   ├── README.md                   # CLIProxyAPI: Codex + Gemini + (opt) Claude auth
 │   └── config.yaml                 # baked into image at /etc/coder-agents-sidecars/cli-proxy.yaml
-├── kirocc-sidecar/README.md        # Kiro Builder ID bootstrap
+├── kirocc-sidecar/
+│   ├── README.md                   # Kiro Builder ID bootstrap
+│   └── kiro-auth-login             # in-container wrapper for `q login --use-device-flow`
 ├── dispatcher/                     # model-prefix router (Python/Starlette)
 │   ├── README.md
 │   ├── dispatcher.py

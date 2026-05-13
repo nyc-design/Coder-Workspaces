@@ -18,7 +18,7 @@ ARG S6_OVERLAY_VERSION=3.2.0.2
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils tini \
+      ca-certificates curl xz-utils tini unzip \
       python3 python3-pip python3-venv \
     ; \
     rm -rf /var/lib/apt/lists/*; \
@@ -64,6 +64,30 @@ RUN set -eux; \
     tar -xzf kirocc.tar.gz kirocc; \
     install -m 0755 kirocc /usr/local/bin/kirocc; \
     rm -f /tmp/kirocc.tar.gz /tmp/kirocc
+
+# ── Amazon Q / Kiro CLI binary (writes kirocc's OAuth SQLite via `q login`) ──
+# kirocc has no login flow; it reads tokens from a SQLite database that the
+# upstream Amazon Q / Kiro CLI writes (same fig_auth schema in both). The
+# branded `kiro-cli.deb` is amd64-only as of 2026-05 and drags in
+# libayatana-appindicator3-1 / libwebkit2gtk-4.1-0 / libgtk-3-0 for its
+# chat/desktop/term sibling binaries — none of which are needed for the
+# login flow. The static musl `q` build covers both archs in ~100 MB with
+# zero runtime deps. Only `q` is installed (qchat/qterm are stripped).
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64) Q_ARCH=x86_64 ;; \
+      arm64) Q_ARCH=aarch64 ;; \
+      *) echo "unsupported arch: $TARGETARCH" && exit 1 ;; \
+    esac; \
+    cd /tmp; \
+    curl -fsSLo q.zip \
+      "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-${Q_ARCH}-linux-musl.zip"; \
+    unzip -q q.zip 'q/bin/q'; \
+    install -m 0755 q/bin/q /usr/local/bin/q; \
+    rm -rf /tmp/q /tmp/q.zip
+COPY host-services/coder-agents-sidecars/kirocc-sidecar/kiro-auth-login \
+     /usr/local/bin/kiro-auth-login
+RUN chmod +x /usr/local/bin/kiro-auth-login
 
 # ── CLIProxyAPI binary (Codex + Gemini sidecar engine) ───────────────────────
 # Asset filename pattern (verified against v6.10.9):

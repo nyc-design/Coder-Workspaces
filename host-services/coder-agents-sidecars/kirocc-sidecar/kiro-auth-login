@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# kiro-auth-login — one-shot interactive Builder ID login for the kirocc sidecar.
+# Invoke from the host:
+#
+#   docker exec -it coder-agents-sidecars kiro-auth-login
+#
+# Prints a device-flow URL + code. Open the URL in any browser, paste the
+# code, complete sign-in; OAuth tokens are written to
+# /data/auth/kirocc/data.sqlite3 (where kirocc reads them) and survive image
+# rebuilds via the named volume.
+set -euo pipefail
+
+KIROCC_DATA_DIR="${KIROCC_DATA_DIR:-/data/auth/kirocc}"
+mkdir -p "${KIROCC_DATA_DIR}"
+
+# `q login` (upstream Amazon Q / Kiro CLI) writes to $XDG_DATA_HOME/amazon-q/.
+# Redirect that subdir to kirocc's read path via a symlink so the SQLite
+# ends up where kirocc looks for it — and future refresh-token rotations
+# (kirocc updates the same row) stay in the same physical file.
+export XDG_DATA_HOME=/data/auth
+ln -sfn kirocc /data/auth/amazon-q
+
+q login --license free --use-device-flow "$@"
+
+if [ -e "${KIROCC_DATA_DIR}/data.sqlite3" ]; then
+  chmod 600 "${KIROCC_DATA_DIR}/data.sqlite3"
+  echo
+  echo "[kirocc] tokens written to ${KIROCC_DATA_DIR}/data.sqlite3"
+  echo "[kirocc] restart the sidecar so the kirocc longrun picks them up:"
+  echo "[kirocc]   docker restart coder-agents-sidecars"
+fi
