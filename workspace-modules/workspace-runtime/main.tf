@@ -27,7 +27,6 @@ locals {
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
     { container_path = "/home/coder/.codex", host_path = "/home/ubuntu/secrets/.codex", read_only = false },
     { container_path = "/home/coder/.agents", host_path = "/home/ubuntu/secrets/.agents", read_only = false },
-    { container_path = "/home/coder/.supermaven", host_path = "/home/ubuntu/secrets/.supermaven", read_only = false },
     { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
     { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
     { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },
