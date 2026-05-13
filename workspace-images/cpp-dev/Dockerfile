@@ -13,6 +13,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
         cmake ninja-build make pkg-config \
         libssl-dev \
         ccache \
+        zip unzip tar \
  && rm -rf /var/lib/apt/lists/*
 
 # vcpkg (C++ package manager) installed system-wide. Projects opt in by
