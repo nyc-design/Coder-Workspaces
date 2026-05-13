@@ -11,6 +11,9 @@
 
 set -e
 
+# First-boot ownership fix: see code-server-launch.sh for the rationale.
+sudo find /home/coder -xdev -not -user coder -exec chown coder:coder {} + 2>/dev/null || true
+
 VSCODE_WEB="${INSTALL_PREFIX}/bin/code-server"
 EXTENSIONS_DIR="${EXTENSIONS_DIR}"
 SHARED_EXTENSIONS_DIR="${SHARED_EXTENSIONS_DIR}"

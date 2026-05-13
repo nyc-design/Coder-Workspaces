@@ -15,7 +15,7 @@ ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
         sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable \
-            --component clippy rustfmt rust-src \
+            -c clippy -c rustfmt -c rust-src \
  && chown -R coder:coder /usr/local/cargo /usr/local/rustup
 
 # Tier 2 (rust) extension manifest, merged with the inherited Tier 1 manifest

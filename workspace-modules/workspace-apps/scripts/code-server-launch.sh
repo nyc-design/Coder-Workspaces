@@ -10,6 +10,14 @@
 
 set -e
 
+# First-boot ownership fix: envbuilder may leave parts of /home/coder owned
+# by uids other than coder. Coder runs coder_agent.startup_script (which has
+# its own chown step) in parallel with coder_script resources, so we cannot
+# rely on workspace-startup's chown landing first. Doing it inline here keeps
+# the launcher correct under any ordering. Idempotent and fast when there's
+# nothing to fix.
+sudo find /home/coder -xdev -not -user coder -exec chown coder:coder {} + 2>/dev/null || true
+
 CODE_SERVER="${INSTALL_PREFIX}/bin/code-server"
 EXTENSIONS_DIR="${EXTENSIONS_DIR}"
 LOG_PATH="${LOG_PATH}"
