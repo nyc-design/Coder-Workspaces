@@ -134,8 +134,8 @@ RUN chmod +x /usr/local/share/workspace-init.d/*.sh
 COPY workspace-images/base-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
 COPY workspace-images/base-dev/settings.d/ /usr/local/share/workspace-settings.d/
 
-COPY workspace-images/base-dev/run-workspace-inits /usr/local/bin/run-workspace-inits
-COPY workspace-images/base-dev/compute-extension-disable-list /usr/local/bin/compute-extension-disable-list
+COPY workspace-images/base-dev/scripts/run-workspace-inits /usr/local/bin/run-workspace-inits
+COPY workspace-images/base-dev/scripts/compute-extension-disable-list /usr/local/bin/compute-extension-disable-list
 RUN chmod +x /usr/local/bin/run-workspace-inits /usr/local/bin/compute-extension-disable-list
 
 USER coder
