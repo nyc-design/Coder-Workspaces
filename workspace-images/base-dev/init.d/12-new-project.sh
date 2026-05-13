@@ -4,12 +4,16 @@
 # When the workspace was created with `is_existing_project = "new"`, the
 # project-workspace template points envbuilder at a Project-Scaffolds
 # scaffold/<type> branch. Envbuilder clones it, which leaves a .git/
-# directory tied to nyc-design/Project-Scaffolds. The user wants a clean
-# repo they own, so on first start we drop that .git/, reinit, and make
-# a single "Initial commit from <type> scaffold" commit.
+# directory tied to nyc-design/Project-Scaffolds. We drop that .git/,
+# reinit, and make a single "Initial commit from <type> scaffold" commit
+# so the user owns the history.
 #
-# A sentinel file prevents this from running again after the user has
-# started doing real git work in the project.
+# Re-run safety: instead of a sentinel file, we use the existing `origin`
+# URL as the state signal. Project-Scaffolds is never a legitimate
+# `origin` for a real project, so if `origin` still points there, this
+# workspace hasn't been reinit'd yet. After our `git init`, there is no
+# `origin` at all (the user adds their own later), so subsequent boots
+# fall through without touching anything.
 
 set -euo pipefail
 
@@ -30,10 +34,11 @@ if [[ ! -d "${project_dir}" ]]; then
     exit 0
 fi
 
-sentinel="${project_dir}/.coder/new-project-initialized"
-if [[ -f "${sentinel}" ]]; then
-    exit 0
-fi
+current_origin="$(git -C "${project_dir}" remote get-url origin 2>/dev/null || true)"
+case "${current_origin}" in
+    *Project-Scaffolds*) ;;
+    *) exit 0 ;;
+esac
 
 cd "${project_dir}"
 
@@ -45,6 +50,3 @@ git add -A
 # GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL / GIT_COMMITTER_* come from the
 # coder agent env, set in project-workspace/main.tf.
 git commit -q -m "Initial commit from ${project_type} scaffold"
-
-mkdir -p "${project_dir}/.coder"
-touch "${sentinel}"
