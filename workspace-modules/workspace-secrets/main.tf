@@ -27,7 +27,8 @@ data "google_secret_manager_secret_version" "signoz_api_key" {
 }
 
 data "google_secret_manager_secret_version" "codestral_api_key" {
-  secret = "CODESTRAL_API_KEY"
+  project = "ai-sidecar-nt"
+  secret  = "CODESTRAL_API_KEY"
 }
 
 data "google_secret_manager_secret_version" "hapi_cli_api_token" {
