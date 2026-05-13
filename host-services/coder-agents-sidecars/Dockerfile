@@ -35,11 +35,35 @@ RUN set -eux; \
     tar -C / -Jxpf /tmp/s6-arch.tar.xz; \
     rm -f /tmp/s6-*.tar.xz
 
-# ── Headroom (Python venv) ────────────────────────────────────────────────────
+# ── Headroom + dispatcher (shared Python venv) ───────────────────────────────
 # Local rule-based + ONNX compression. Bundles RTK for shell-output rewriting.
+# Same venv hosts the dispatcher (Starlette + httpx + secret-manager).
 # No torch/LLMLingua-2 to keep image lean — rebuild with [proxy,ml] if needed.
 RUN python3 -m venv /opt/headroom-venv \
  && /opt/headroom-venv/bin/pip install --no-cache-dir 'headroom-ai[proxy]'
+COPY host-services/coder-agents-sidecars/dispatcher/requirements.txt \
+     /tmp/dispatcher-requirements.txt
+RUN /opt/headroom-venv/bin/pip install --no-cache-dir -r /tmp/dispatcher-requirements.txt \
+ && rm -f /tmp/dispatcher-requirements.txt
+COPY host-services/coder-agents-sidecars/dispatcher/dispatcher.py \
+     host-services/coder-agents-sidecars/dispatcher/bootstrap_secrets.py \
+     /usr/local/lib/coder-agents-sidecars/
+
+# ── kirocc binary (Kiro Builder ID → Anthropic Messages proxy) ───────────────
+ARG KIROCC_VERSION=v0.1.0
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64) ARCH=amd64 ;; \
+      arm64) ARCH=arm64 ;; \
+      *) echo "unsupported arch: $TARGETARCH" && exit 1 ;; \
+    esac; \
+    VERSION_NO_V="${KIROCC_VERSION#v}"; \
+    cd /tmp; \
+    curl -fsSLo kirocc.tar.gz \
+      "https://github.com/d-kuro/kirocc/releases/download/${KIROCC_VERSION}/kirocc_${VERSION_NO_V}_linux_${ARCH}.tar.gz"; \
+    tar -xzf kirocc.tar.gz kirocc; \
+    install -m 0755 kirocc /usr/local/bin/kirocc; \
+    rm -f /tmp/kirocc.tar.gz /tmp/kirocc
 
 # ── CLIProxyAPI binary (Codex + Gemini sidecar engine) ───────────────────────
 # Asset filename pattern (verified against v6.10.9):
@@ -78,10 +102,12 @@ COPY host-services/coder-agents-sidecars/s6/ /etc/s6-overlay/s6-rc.d/
 RUN chmod +x \
       /etc/s6-overlay/s6-rc.d/headroom/run \
       /etc/s6-overlay/s6-rc.d/claude-sidecar/run \
-      /etc/s6-overlay/s6-rc.d/cliproxy-sidecar/run
+      /etc/s6-overlay/s6-rc.d/cliproxy-sidecar/run \
+      /etc/s6-overlay/s6-rc.d/dispatcher/run \
+      /etc/s6-overlay/s6-rc.d/kirocc/run
 
 # Pre-create auth subdirs so first-start doesn't trip on missing paths.
-RUN mkdir -p /data/auth/cliproxy /data/auth/claude /run/coder-agents-sidecars
+RUN mkdir -p /data/auth/cliproxy /data/auth/claude /data/auth/kirocc /run/coder-agents-sidecars
 
 # ── runtime defaults ─────────────────────────────────────────────────────────
 ENV S6_KEEP_ENV=1 \
@@ -93,10 +119,14 @@ ENV S6_KEEP_ENV=1 \
     HEADROOM_MODE=token \
     HEADROOM_STATELESS=true \
     HEADROOM_TELEMETRY=off \
-    ANTHROPIC_TARGET_API_URL=http://127.0.0.1:3456 \
+    ANTHROPIC_TARGET_API_URL=http://127.0.0.1:8788 \
     OPENAI_TARGET_API_URL=http://127.0.0.1:8317 \
     GEMINI_TARGET_API_URL=http://127.0.0.1:8317 \
     CLOUDCODE_TARGET_API_URL=http://127.0.0.1:8317 \
+    \
+    DISPATCHER_HOST=127.0.0.1 \
+    DISPATCHER_PORT=8788 \
+    SIDECAR_GCP_PROJECT=ai-sidecar-nt \
     \
     MERIDIAN_HOST=127.0.0.1 \
     MERIDIAN_PORT=3456 \
@@ -104,7 +134,10 @@ ENV S6_KEEP_ENV=1 \
     CLAUDE_CONFIG_DIR=/data/auth/claude
 
 VOLUME ["/data/auth"]
-EXPOSE 8787
+# 8787 is Headroom (Claude/Codex/Gemini). 8788 is the dispatcher (OpenAI-compat
+# direct + Claude fan-out). Both are routed to from Traefik; bind to all
+# interfaces inside the container but never publish to the host.
+EXPOSE 8787 8788
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
   CMD curl --fail --silent http://127.0.0.1:8787/readyz || exit 1

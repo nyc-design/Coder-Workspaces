@@ -10,8 +10,12 @@
 # workflow from GitHub repo secrets / GCP Secret Manager).
 
 providers:
+  # Anthropic Messages API. Model name encodes the upstream:
+  #   meridian/claude-* → Meridian + Claude Code OAuth (Pro/Max)
+  #   subscription/claude-* → CLIProxyAPI --login claude
+  #   kiro/claude-* → kirocc (Kiro Builder ID)
   - provider: anthropic
-    display_name: Anthropic (Pro/Max via Sidecar)
+    display_name: Anthropic (Pro/Max + Subscription + Kiro)
     base_url: https://llm.tapiavala.com/claude
     api_key: ${SIDECAR_SHARED_API_KEY}
     enabled: true
@@ -33,6 +37,18 @@ providers:
     base_url: https://llm.tapiavala.com/gemini
     api_key: ${SIDECAR_SHARED_API_KEY}
     enabled: false
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false
+
+  # OpenAI-compatible chat completions. Model name encodes the upstream:
+  #   groq/* | cerebras/* | codestral/* | zen/*
+  # The dispatcher swaps the shared bearer for the per-upstream API key.
+  - provider: openaicompat
+    display_name: OpenAI-Compatible (Groq + Cerebras + Codestral + Zen)
+    base_url: https://llm.tapiavala.com/openai
+    api_key: ${SIDECAR_SHARED_API_KEY}
+    enabled: true
     central_api_key_enabled: true
     allow_user_api_key: false
     allow_central_api_key_fallback: false

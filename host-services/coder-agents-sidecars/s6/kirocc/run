@@ -1,0 +1,29 @@
+#!/command/with-contenv bash
+# kirocc: Anthropic Messages API → Kiro Builder ID OAuth proxy.
+# Reads OAuth state from a kiro-cli SQLite database; populate by running the
+# `kiro` CLI on a host machine and copying its data.sqlite3 into the volume.
+set -euo pipefail
+
+SECRETS_FILE=/run/coder-agents-sidecars/secrets.env
+if [ -r "${SECRETS_FILE}" ]; then
+  # shellcheck disable=SC1090
+  source "${SECRETS_FILE}"
+fi
+
+KIROCC_DATA_DIR="${KIROCC_DATA_DIR:-/data/auth/kirocc}"
+KIROCC_DB="${KIROCC_DATA_DIR}/data.sqlite3"
+mkdir -p "${KIROCC_DATA_DIR}"
+
+if [ ! -s "${KIROCC_DB}" ]; then
+  echo "[kirocc] no SQLite DB at ${KIROCC_DB}" >&2
+  echo "[kirocc] bootstrap by copying \$HOME/.local/share/kiro-cli/data.sqlite3" >&2
+  echo "[kirocc] from a host that has logged in via the kiro CLI." >&2
+fi
+
+# kirocc collides with Meridian on default port 3456; pin to 9090. Shared API
+# key is enforced by kirocc itself via -api-key.
+exec kirocc \
+  -host 127.0.0.1 \
+  -port 9090 \
+  -db "${KIROCC_DB}" \
+  -api-key "${SIDECAR_SHARED_API_KEY:-}"

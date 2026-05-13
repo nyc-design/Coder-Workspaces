@@ -3,8 +3,15 @@
 # OAuth via the official SDK so requests fingerprint as Claude Code.
 set -euo pipefail
 
-# If MERIDIAN_PROFILES wasn't pre-supplied but a token env var was, build a
-# single-profile JSON inline. Tokens are alphanumeric+dash so JSON-safe.
+SECRETS_FILE=/run/coder-agents-sidecars/secrets.env
+if [ -r "${SECRETS_FILE}" ]; then
+  # shellcheck disable=SC1090
+  source "${SECRETS_FILE}"
+fi
+
+# If MERIDIAN_PROFILES wasn't pre-supplied but the OAuth token was loaded from
+# secrets.env (or the host env), build a single-profile JSON inline. Tokens are
+# alphanumeric+dash so JSON-safe.
 if [ -z "${MERIDIAN_PROFILES:-}" ] && [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   export MERIDIAN_PROFILES="$(printf '[{"id":"default","oauthToken":"%s"}]' "${CLAUDE_CODE_OAUTH_TOKEN}")"
   export MERIDIAN_DEFAULT_PROFILE="${MERIDIAN_DEFAULT_PROFILE:-default}"
@@ -13,6 +20,12 @@ fi
 if [ -z "${MERIDIAN_PROFILES:-}" ]; then
   echo "[claude-sidecar] no CLAUDE_CODE_OAUTH_TOKEN or MERIDIAN_PROFILES set" >&2
   echo "[claude-sidecar] requests will fail until creds are provided" >&2
+fi
+
+# Enforce the shared key on the loopback Meridian listener so a misconfigured
+# dispatcher can't bypass it.
+if [ -n "${SIDECAR_SHARED_API_KEY:-}" ]; then
+  export MERIDIAN_API_KEY="${SIDECAR_SHARED_API_KEY}"
 fi
 
 exec meridian

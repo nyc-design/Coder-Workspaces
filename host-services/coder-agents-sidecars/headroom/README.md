@@ -13,10 +13,18 @@ the container — only Headroom's `:8787` is exposed):
 
 | Incoming path | Upstream env var | Resolves to (loopback) |
 |---|---|---|
-| `POST /v1/messages` | `ANTHROPIC_TARGET_API_URL` | `http://127.0.0.1:3456` (claude-sidecar) |
+| `POST /v1/messages` | `ANTHROPIC_TARGET_API_URL` | `http://127.0.0.1:8788` (dispatcher → meridian / cliproxy / kirocc) |
 | `POST /v1/responses` | `OPENAI_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Codex) |
 | `POST /v1beta/models/{model}:generateContent` | `GEMINI_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Gemini) |
 | `POST /v1internal:streamGenerateContent` | `CLOUDCODE_TARGET_API_URL` | `http://127.0.0.1:8317` (cliproxy-sidecar, Cloud Code Assist) |
+
+Only `/v1/messages` now goes through the dispatcher — it parses the leading
+`<prefix>/` on the request body's `model` field (`meridian/`, `subscription/`,
+or `kiro/`) and picks the right Claude upstream. `/codex` and `/gemini` go
+straight to CLIProxy because each has only one upstream and one model namespace.
+`/openai` (OpenAI-compatible chat completions for Groq/Cerebras/Codestral/Zen)
+bypasses Headroom entirely — Traefik routes those requests directly to the
+dispatcher on `:8788`.
 
 Traefik in front of this image strips `/claude/`, `/codex/`, `/gemini/` prefixes
 before forwarding so Headroom only ever sees the native API paths above. Coder

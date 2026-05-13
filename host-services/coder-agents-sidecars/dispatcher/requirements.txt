@@ -1,0 +1,5 @@
+# Pinned for reproducible image builds. Bump deliberately.
+starlette==0.41.3
+uvicorn[standard]==0.32.1
+httpx==0.27.2
+google-cloud-secret-manager==2.21.1

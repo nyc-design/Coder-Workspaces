@@ -1,0 +1,15 @@
+#!/command/with-contenv bash
+# Dispatcher: model-prefix router on 127.0.0.1:8788. Fronts /v1/messages and
+# /v1/chat/completions; fans out to Meridian / CLIProxy / kirocc / direct
+# upstreams. Depends on bootstrap-secrets having written /run/.../secrets.env.
+set -euo pipefail
+
+SECRETS_FILE=/run/coder-agents-sidecars/secrets.env
+if [ ! -r "${SECRETS_FILE}" ]; then
+  echo "[dispatcher] ${SECRETS_FILE} missing — bootstrap-secrets must run first" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "${SECRETS_FILE}"
+
+exec /opt/headroom-venv/bin/python /usr/local/lib/coder-agents-sidecars/dispatcher.py

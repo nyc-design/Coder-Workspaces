@@ -1,36 +1,48 @@
 # Append this service to the host docker-compose on the Coder VM.
 #
 # Routing (via Traefik on llm.tapiavala.com):
-#   https://llm.tapiavala.com/claude/  → strip prefix → Headroom /v1/messages         → claude-sidecar
-#   https://llm.tapiavala.com/codex/   → strip prefix → Headroom /v1/responses        → cliproxy-sidecar (Codex)
-#   https://llm.tapiavala.com/gemini/  → strip prefix → Headroom /v1beta/...          → cliproxy-sidecar (Gemini)
+#   https://llm.tapiavala.com/claude/  → Headroom :8787 → dispatcher :8788 → {meridian | cliproxy | kirocc}
+#                                                       (prefix in `model`: meridian/ | subscription/ | kiro/)
+#   https://llm.tapiavala.com/codex/   → Headroom :8787 → cliproxy-sidecar :8317 (Codex OAuth)
+#   https://llm.tapiavala.com/gemini/  → Headroom :8787 → cliproxy-sidecar :8317 (Gemini OAuth)
+#   https://llm.tapiavala.com/openai/  → dispatcher :8788  → {groq | cerebras | codestral | zen}
+#                                                       (prefix in `model`: groq/ | cerebras/ | codestral/ | zen/)
 #
-# Use the same three URLs in Coder admin AND in any laptop/workspace CLI that takes
+# Use the same four URLs in Coder admin AND in any laptop/workspace CLI that takes
 # a custom base URL (Claude Code's ANTHROPIC_BASE_URL, Codex's OPENAI_BASE_URL, etc.).
-# All bear `Authorization: Bearer ${SIDECAR_SHARED_API_KEY}` (or `x-api-key:` /
-# `x-goog-api-key:` for the respective provider conventions).
+# All bear `Authorization: Bearer ${SIDECAR_SHARED_API_KEY}`; the dispatcher swaps
+# in per-upstream credentials server-side for external lanes.
 #
 # After deploying:
-#   1. Set CLAUDE_CODE_OAUTH_TOKEN and SIDECAR_SHARED_API_KEY in the host .env
-#      (generate with `openssl rand -hex 32` and `claude setup-token`).
+#   1. Set GOOGLE_APPLICATION_CREDENTIALS_JSON in the host .env (one-line raw or
+#      base64 SA JSON for sidecar-runtime@ai-sidecar-nt.iam.gserviceaccount.com).
+#      All other credentials live in GCP Secret Manager project `ai-sidecar-nt`
+#      and are fetched at container start by the bootstrap-secrets oneshot.
 #   2. Point llm.tapiavala.com DNS at this host. Let's Encrypt (le) issues automatically.
 #   3. docker compose pull coder-agents-sidecars && docker compose up -d coder-agents-sidecars
 #   4. One-time browser logins (creds land in the named volume):
 #        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
 #        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+#        docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login claude   # (optional subscription/ lane)
+#      For the kiro/ lane: copy data.sqlite3 from a host that ran `kiro auth login`
+#      into /data/auth/kirocc/ (see kirocc-sidecar/README.md).
 #   5. docker restart coder-agents-sidecars
 #   6. In Coder admin → AI Providers, paste these as base URLs (API key = SIDECAR_SHARED_API_KEY):
-#        Anthropic → https://llm.tapiavala.com/claude
-#        OpenAI    → https://llm.tapiavala.com/codex
-#        Google    → https://llm.tapiavala.com/gemini
+#        Anthropic    → https://llm.tapiavala.com/claude
+#        OpenAI Codex → https://llm.tapiavala.com/codex
+#        Google       → https://llm.tapiavala.com/gemini
+#        OpenAI compat→ https://llm.tapiavala.com/openai   (groq/cerebras/codestral/zen)
 services:
   coder-agents-sidecars:
     image: ghcr.io/nyc-design/host-services/coder-agents-sidecars:latest
     container_name: coder-agents-sidecars
     restart: unless-stopped
     environment:
-      SIDECAR_SHARED_API_KEY: ${SIDECAR_SHARED_API_KEY:?set in .env}
-      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}
+      # Service-account JSON for GCP Secret Manager (project ai-sidecar-nt).
+      # Everything else — SIDECAR_SHARED_API_KEY, CLAUDE_CODE_OAUTH_TOKEN,
+      # GROQ_API_KEY, CEREBRAS_API_KEY, CODESTRAL_API_KEY, ZEN_API_KEY — is
+      # fetched at startup by the bootstrap-secrets oneshot.
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: ${GOOGLE_APPLICATION_CREDENTIALS_JSON:?set in .env}
     volumes:
       - coder-agents-sidecars-auth:/data/auth
     # Direct host port left commented out — Traefik handles ingress. Uncomment
@@ -40,8 +52,10 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Single backend service definition (port the container listens on).
+      # Two backend service definitions: 8787 is Headroom (Claude/Codex/Gemini
+      # pipeline), 8788 is the dispatcher (OpenAI-compat direct fan-out).
       - "traefik.http.services.coder-agents-sidecars.loadbalancer.server.port=8787"
+      - "traefik.http.services.coder-agents-sidecars-dispatcher.loadbalancer.server.port=8788"
 
       # Three routers, one per provider subpath. All three forward to the same
       # backend; the stripPrefix middleware removes the /claude /codex /gemini
@@ -84,6 +98,16 @@ services:
       - "traefik.http.routers.cas-gemini.service=coder-agents-sidecars"
       - "traefik.http.routers.cas-gemini.middlewares=cas-gemini-strip"
       - "traefik.http.middlewares.cas-gemini-strip.stripprefix.prefixes=/gemini"
+
+      # /openai/* → dispatcher directly (skipping Headroom; the OpenAI-compat
+      # chat-completions shape doesn't pass through Headroom's compression
+      # pipeline). Clients prefix `model` with groq/ | cerebras/ | codestral/ | zen/.
+      - "traefik.http.routers.cas-openai.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/openai/`)"
+      - "traefik.http.routers.cas-openai.entrypoints=websecure"
+      - "traefik.http.routers.cas-openai.tls.certresolver=le"
+      - "traefik.http.routers.cas-openai.service=coder-agents-sidecars-dispatcher"
+      - "traefik.http.routers.cas-openai.middlewares=cas-openai-strip"
+      - "traefik.http.middlewares.cas-openai-strip.stripprefix.prefixes=/openai"
 
       # Watchtower auto-update opt-in (matches the coder-pwa pattern).
       - "com.centurylinklabs.watchtower.enable=true"

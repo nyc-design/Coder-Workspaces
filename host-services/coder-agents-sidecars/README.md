@@ -16,28 +16,43 @@ Multi-arch (`linux/amd64` + `linux/arm64`).
 
 ## What's inside
 
-Three processes supervised by [s6-overlay v3](https://github.com/just-containers/s6-overlay):
+Six processes supervised by [s6-overlay v3](https://github.com/just-containers/s6-overlay):
 
 ```
-                                ┌─► 127.0.0.1:3456 claude-sidecar    (Meridian + Claude SDK) ─► api.anthropic.com
-:8787 (only exposed)            │
-  └─► headroom (compress) ──────┤
-                                │
-                                └─► 127.0.0.1:8317 cliproxy-sidecar  (CLIProxyAPI: Codex + Gemini OAuth)
-                                                                       ├─► chatgpt.com/backend-api/codex
-                                                                       └─► generativelanguage.googleapis.com
+                                  ┌─► 127.0.0.1:3456 claude-sidecar    (Meridian + Claude Code SDK)        ─► api.anthropic.com
+          ┌─► dispatcher :8788 ──┼─► 127.0.0.1:8317 cliproxy-sidecar  (CLIProxyAPI --login claude)        ─► api.anthropic.com
+:8787 ─► headroom (compress)    │  └─► 127.0.0.1:9090 kirocc            (Kiro Builder ID → Messages API)    ─► kiro.amazonaws.com
+  └─/codex─────────────────┤
+  └─/gemini───────────────┤
+                                  └─► 127.0.0.1:8317 cliproxy-sidecar  (Codex + Gemini OAuth)
+                                                                         ├─► chatgpt.com/backend-api/codex
+                                                                         └─► generativelanguage.googleapis.com
+
+:8788 (dispatcher, /openai/* only) ─► {groq | cerebras | codestral | zen}  (direct HTTPS, key swap server-side)
 ```
 
-| Provider Coder sees | Backed by sidecar | Underlying tool | Subscription |
+The dispatcher reads a leading `<prefix>/` on the request body's `model` field
+to pick the upstream, strips it before forwarding, and (for external lanes)
+swaps the inbound shared bearer for the per-upstream API key it loaded from GCP
+Secret Manager at startup.
+
+| Coder provider | Lane (model prefix) | Sidecar / upstream | Subscription / key |
 |---|---|---|---|
-| Anthropic | claude-sidecar | [Meridian](https://github.com/rynfar/meridian) + `@anthropic-ai/claude-code` SDK | Claude Pro/Max |
-| OpenAI | cliproxy-sidecar | [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (Codex mode) | ChatGPT Plus/Pro |
-| Google | cliproxy-sidecar | [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (Gemini mode) | Gemini Advanced |
+| Anthropic | `meridian/claude-*` | claude-sidecar ([Meridian](https://github.com/rynfar/meridian) + Claude Code SDK) | Claude Pro/Max OAuth |
+| Anthropic | `subscription/claude-*` | cliproxy-sidecar ([CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) `--login claude`) | Claude Pro/Max OAuth |
+| Anthropic | `kiro/claude-*` | kirocc ([d-kuro/kirocc](https://github.com/d-kuro/kirocc)) | Kiro Builder ID |
+| OpenAI (Codex) | n/a (single upstream) | cliproxy-sidecar | ChatGPT Plus/Pro OAuth |
+| Google | n/a (single upstream) | cliproxy-sidecar | Gemini Advanced OAuth |
+| OpenAI-compat | `groq/*` | api.groq.com | Groq API key |
+| OpenAI-compat | `cerebras/*` | api.cerebras.ai | Cerebras API key |
+| OpenAI-compat | `codestral/*` | codestral.mistral.ai | Codestral API key |
+| OpenAI-compat | `zen/*` | opencode.ai/zen | Zen API key |
 
-CLIProxyAPI handles both Codex and Gemini OAuth from one process, dispatched by
-path. Headroom routes per request path. Traefik (configured by the bundled
-compose snippet) fronts the whole thing on `https://llm.tapiavala.com` with
-three subpaths so each provider has a clean dedicated URL.
+All upstream credentials live in **GCP Secret Manager (project `ai-sidecar-nt`)**
+and are fetched once at container start by the `bootstrap-secrets` s6 oneshot,
+written to `/run/coder-agents-sidecars/secrets.env` (mode 600), then sourced by
+each longrun. Clients never see anything beyond the shared bearer.
+
 Compression is fully local (rule-based + ONNX `Kompress-base`, plus the bundled
 [RTK](https://github.com/rtk-ai/rtk) for shell-output rewriting); no extra LLM
 key required.
@@ -49,42 +64,72 @@ Append `docker-compose.snippet.yml` to whatever compose file already runs
 Encrypt can issue. Then:
 
 ```bash
-# 1. Set required env in the host .env
-cat >> .env <<EOF
-SIDECAR_SHARED_API_KEY=$(openssl rand -hex 32)
-CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token | tail -1)   # run on a host with claude CLI
-EOF
+# 1. Issue a runtime SA key and put it in the host .env (one line).
+#    The SA has roles/secretmanager.secretAccessor on projects/ai-sidecar-nt.
+gcloud iam service-accounts keys create /tmp/sa.json \
+  --iam-account=sidecar-runtime@ai-sidecar-nt.iam.gserviceaccount.com
+echo "GOOGLE_APPLICATION_CREDENTIALS_JSON='$(jq -c . /tmp/sa.json)'" >> .env
+shred -u /tmp/sa.json
 
-# 2. Pull + start
+# 2. Populate the secrets in GCP Secret Manager (one-time, project: ai-sidecar-nt):
+#      SIDECAR_SHARED_API_KEY    openssl rand -hex 32
+#      CLAUDE_CODE_OAUTH_TOKEN   claude setup-token   (run on a host with claude CLI)
+#      GROQ_API_KEY              from console.groq.com
+#      CEREBRAS_API_KEY          from cloud.cerebras.ai
+#      CODESTRAL_API_KEY         from console.mistral.ai (Codestral)
+#      ZEN_API_KEY               from opencode.ai
+#    For each:  echo -n '<value>' | gcloud secrets versions add <NAME> \
+#                 --project=ai-sidecar-nt --data-file=-
+
+# 3. Pull + start
 docker compose pull coder-agents-sidecars
 docker compose up -d coder-agents-sidecars
 
-# 3. One-time interactive logins (browser-based, run from your laptop)
+# 4. One-time interactive logins (browser-based; creds land in the named volume)
 docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
 docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+docker exec -it coder-agents-sidecars cli-proxy-api --auth-dir /data/auth/cliproxy --login claude   # optional, for `subscription/` lane
+# kirocc: copy data.sqlite3 from a host that ran `kiro auth login` into /data/auth/kirocc/
 
-# 4. Pick up the new credentials
+# 5. Pick up the new credentials
 docker restart coder-agents-sidecars
 
-# 5. Smoke-test (Traefik should be serving by now)
+# 6. Smoke-test (Traefik should be serving by now)
+SIDECAR_SHARED_API_KEY=$(gcloud secrets versions access latest \
+  --secret=SIDECAR_SHARED_API_KEY --project=ai-sidecar-nt)
 curl -fsS -o /dev/null -w '%{http_code}\n' \
      -H "Authorization: Bearer $SIDECAR_SHARED_API_KEY" \
-     https://llm.tapiavala.com/claude/v1/models   # expect 200
+     -H 'Content-Type: application/json' \
+     -d '{"model":"meridian/claude-3-5-sonnet-latest","max_tokens":4,"messages":[{"role":"user","content":"hi"}]}' \
+     https://llm.tapiavala.com/claude/v1/messages   # expect 200
 ```
 
 Credentials persist in the named volume `coder-agents-sidecars-auth` (mounted at
-`/data/auth`) so steps 3-4 only run once.
+`/data/auth`) so step 4 only runs once. Secret rotation is `gcloud secrets
+versions add` + `docker restart`; no `.env` edits needed.
 
 ## Wire into Coder Agents
 
 In **Coder admin → Deployment → AI → Providers**, override base URL on each
-provider:
+provider (or rely on `coder-agents-config/providers.yaml` to sync them):
 
-| Provider | Base URL (Coder admin) | API key (Coder admin) |
+| Provider | Base URL (Coder admin) | API key |
 |---|---|---|
 | Anthropic | `https://llm.tapiavala.com/claude` | `SIDECAR_SHARED_API_KEY` |
 | OpenAI    | `https://llm.tapiavala.com/codex`  | `SIDECAR_SHARED_API_KEY` |
 | Google    | `https://llm.tapiavala.com/gemini` | `SIDECAR_SHARED_API_KEY` |
+| OpenAI-compat | `https://llm.tapiavala.com/openai` | `SIDECAR_SHARED_API_KEY` |
+
+For the Anthropic and OpenAI-compat lanes, **model names carry routing
+prefixes**. Examples:
+
+- `meridian/claude-3-5-sonnet-latest` → Meridian + Claude Pro/Max OAuth
+- `subscription/claude-3-5-sonnet-latest` → CLIProxy `--login claude`
+- `kiro/claude-3-5-sonnet-latest` → kirocc (Kiro Builder ID)
+- `groq/llama-3.3-70b-versatile`, `cerebras/llama-3.3-70b`, `codestral/codestral-latest`, `zen/<model>` → direct upstreams
+
+The dispatcher strips the prefix before forwarding, so the actual upstream
+receives the native model name.
 
 End-to-end path layering for one Anthropic request:
 
@@ -217,18 +262,27 @@ host-services/coder-agents-sidecars/
 ├── README.md                       # this file
 ├── Dockerfile                      # consolidated multi-process image
 ├── docker-compose.snippet.yml      # drop into host docker-compose
-├── .env.example                    # required env vars
+├── .env.example                    # GOOGLE_APPLICATION_CREDENTIALS_JSON only
 ├── .gitignore
 ├── claude-sidecar/README.md        # Meridian / Claude Code SDK auth + ToS
 ├── cliproxy-sidecar/
-│   ├── README.md                   # CLIProxyAPI: Codex + Gemini auth + multi-account
+│   ├── README.md                   # CLIProxyAPI: Codex + Gemini + (opt) Claude auth
 │   └── config.yaml                 # baked into image at /etc/coder-agents-sidecars/cli-proxy.yaml
+├── kirocc-sidecar/README.md        # Kiro Builder ID bootstrap
+├── dispatcher/                     # model-prefix router (Python/Starlette)
+│   ├── README.md
+│   ├── dispatcher.py
+│   ├── bootstrap_secrets.py        # s6 oneshot: GCP Secret Manager → /run/.../secrets.env
+│   └── requirements.txt
 ├── headroom/README.md              # routing table + compression knobs
 └── s6/                             # s6-overlay v3 service tree
     ├── user/contents.d/            # service registration
+    ├── bootstrap-secrets/{type=oneshot,up}
+    ├── dispatcher/{run,type,dependencies.d/}
+    ├── kirocc/{run,type,dependencies.d/}
     ├── headroom/{run,type,dependencies.d/}
-    ├── claude-sidecar/{run,type}
-    └── cliproxy-sidecar/{run,type}
+    ├── claude-sidecar/{run,type,dependencies.d/}
+    └── cliproxy-sidecar/{run,type,dependencies.d/}
 ```
 
 ## Limitations / known gaps
