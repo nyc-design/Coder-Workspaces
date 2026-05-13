@@ -10,8 +10,9 @@ This repository contains Docker images and initialization scripts for Coder work
 workspace-images/
 ├── base-dev/                    # Base development image (foundation for all others)
 │   ├── Dockerfile              # Base Docker image definition
-│   ├── init-workspace.sh       # Main initialization script (MASTER VERSION)
-│   └── run-workspace-inits     # Init script runner utility
+│   └── scripts/                # Helper scripts baked into /usr/local/bin/
+│       ├── run-workspace-inits             # Init script runner utility
+│       └── compute-extension-disable-list  # Activation gate for cached extensions
 ├── cpp-dev/                    # C++ development image
 ├── fullstack-dev/              # Full-stack development image
 ├── vite-dev/                   # Vite/React development image
