@@ -1,0 +1,11 @@
+name: Workspace Config
+version: 0.0.1
+schema: v1
+models:
+  - name: Codestral
+    provider: mistral
+    model: codestral-latest
+    apiBase: https://codestral.mistral.ai/v1
+    apiKey: __CODESTRAL_API_KEY__
+    roles:
+      - autocomplete

@@ -22,6 +22,11 @@ output "signoz_api_key" {
   sensitive = true
 }
 
+output "codestral_api_key" {
+  value     = data.google_secret_manager_secret_version.codestral_api_key.secret_data
+  sensitive = true
+}
+
 output "hapi_cli_api_token" {
   value     = var.include_hapi ? data.google_secret_manager_secret_version.hapi_cli_api_token[0].secret_data : ""
   sensitive = true

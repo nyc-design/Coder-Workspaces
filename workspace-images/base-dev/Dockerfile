@@ -133,6 +133,7 @@ RUN chmod +x /usr/local/share/workspace-init.d/*.sh
 # from the project tree by the init scripts.
 COPY workspace-images/base-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
 COPY workspace-images/base-dev/settings.d/ /usr/local/share/workspace-settings.d/
+COPY workspace-images/base-dev/continue.d/ /usr/local/share/workspace-continue.d/
 
 COPY workspace-images/base-dev/scripts/run-workspace-inits /usr/local/bin/run-workspace-inits
 COPY workspace-images/base-dev/scripts/compute-extension-disable-list /usr/local/bin/compute-extension-disable-list
