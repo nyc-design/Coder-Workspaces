@@ -76,9 +76,22 @@ the dashboard-backed encrypted SQLite db.
 
 ## What's git-managed via this snippet
 
+- `JWT_SECRET` — signs dashboard session cookies. **Required.** Generate
+  with `openssl rand -base64 48` and expose as `OMNIROUTE_JWT_SECRET` in
+  the host `.env`.
+- `API_KEY_SECRET` — encrypts dashboard-managed API key values in SQLite.
+  **Required.** Generate with `openssl rand -hex 32` and expose as
+  `OMNIROUTE_API_KEY_SECRET`.
+- `INITIAL_PASSWORD` — initial dashboard admin password. **Required for
+  reverse-proxied Docker/VM installs** because upstream auto-completes the
+  unauthenticated onboarding wizard when this is set. Generate/store as
+  `OMNIROUTE_INITIAL_PASSWORD`, then log in at `/login`.
 - `STORAGE_ENCRYPTION_KEY` — encrypts the entire SQLite db at rest.
   **Required.** Generate with `openssl rand -hex 32`. Store in GCP Secret
   Manager and pull into `.env` like any other secret.
+- `NEXT_PUBLIC_BASE_URL=https://omniroute.tapiavala.com` — public origin
+  for dashboard links/OAuth callbacks.
+- `AUTH_COOKIE_SECURE=true` — secure cookies behind Traefik HTTPS.
 - Direct-key provider API keys — Groq, Cerebras, DeepSeek, xAI, Mistral,
   Perplexity, Together, Fireworks, Cohere, NVIDIA, Nebius. Set in `.env`
   to skip the dashboard bootstrap for each. Optional per-provider.
@@ -178,12 +191,17 @@ meridian/cliproxy, and re-creating every routing combo.
 
 1. Create the data dir on the host:
    `sudo mkdir -p /opt/coder-stack/omniroute-data`.
-2. Set `OMNIROUTE_STORAGE_ENCRYPTION_KEY` in host `.env` (and any
-   direct-key API keys you want pre-loaded).
+2. Set the required OmniRoute secrets in host `.env`:
+   `OMNIROUTE_JWT_SECRET`, `OMNIROUTE_API_KEY_SECRET`,
+   `OMNIROUTE_INITIAL_PASSWORD`, and `OMNIROUTE_STORAGE_ENCRYPTION_KEY`
+   (plus any direct-key API keys you want pre-loaded).
 3. `docker compose up -d omniroute`. If it crashes with a permission
    error on `/app/data`, chown the host dir to the container's UID
    (see Storage section).
-4. Visit `https://omniroute.tapiavala.com` and complete dashboard setup.
+4. Visit `https://omniroute.tapiavala.com/login` and log in with
+   `OMNIROUTE_INITIAL_PASSWORD`. Because this reverse-proxied deployment
+   sets `INITIAL_PASSWORD`, upstream skips the unauthenticated onboarding
+   wizard and marks setup complete automatically.
 5. **Configure the client-facing API key** (Settings → Client API Keys,
    or equivalent in the dashboard). Use the value of `LLM_GATEWAY_API_KEY`
    from your `.env` (generate with `openssl rand -hex 32`). This is the
