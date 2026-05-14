@@ -6,6 +6,19 @@ gateway with smart routing, automatic fallback, and Kiro support
 the upstream image directly from Docker Hub
 (`diegosouzapw/omniroute:latest`).
 
+## Public dashboard host
+
+Use `https://omniroute.tapiavala.com/`, not
+`https://llm.tapiavala.com/omniroute/`. OmniRoute is a Next.js app that
+redirects `/` to `/dashboard` and uses root-relative routes such as
+`/dashboard`, `/api`, and `/v1`. A Traefik path-prefix mount can strip the
+initial `/omniroute`, but it cannot safely rewrite every root-relative
+redirect, asset, API, and websocket URL emitted by the app. A dedicated
+subdomain is the clean fix.
+
+`https://llm.tapiavala.com/headroom/*` remains the client LLM entrypoint;
+`omniroute.tapiavala.com` is just the dashboard/direct gateway host.
+
 ## Role in the topology
 
 OmniRoute is the **single provider router** for every protocol shape that
@@ -54,7 +67,7 @@ order of stability:
 | Layer                          | Format    | Scope                                                                |
 |--------------------------------|-----------|----------------------------------------------------------------------|
 | `.env` env vars                | dotenv    | Storage encryption, direct-key provider API keys, ports, OAuth client IDs |
-| Dashboard at `/omniroute`      | n/a       | Routing rules ("combos"), models, prompts, OAuth login flows, internal-upstream wiring |
+| Dashboard at `omniroute.tapiavala.com`      | n/a       | Routing rules ("combos"), models, prompts, OAuth login flows, internal-upstream wiring |
 | `config/payloadRules.json`     | JSON      | Per-model upstream payload field injection/removal (narrow scope)    |
 
 There is **no general-purpose YAML/JSON config** for providers, keys, or
@@ -82,7 +95,7 @@ the dashboard-backed encrypted SQLite db.
   redundant unless you specifically want vendor-API fallback.
 - **Routing rules ("combos"), model aliases, prompts, webhooks** — no
   file format. Configure in the dashboard at
-  `https://llm.tapiavala.com/omniroute`.
+  `https://omniroute.tapiavala.com`.
 
 ## Wiring recipe (one-time, via dashboard or POST /api/v1/providers)
 
@@ -170,13 +183,13 @@ meridian/cliproxy, and re-creating every routing combo.
 3. `docker compose up -d omniroute`. If it crashes with a permission
    error on `/app/data`, chown the host dir to the container's UID
    (see Storage section).
-4. Visit `https://llm.tapiavala.com/omniroute` and complete dashboard setup.
+4. Visit `https://omniroute.tapiavala.com` and complete dashboard setup.
 5. **Configure the client-facing API key** (Settings → Client API Keys,
    or equivalent in the dashboard). Use the value of `LLM_GATEWAY_API_KEY`
    from your `.env` (generate with `openssl rand -hex 32`). This is the
    key that external callers — Coder Agents, workspace CLIs, your laptop
    — must present. Without it OmniRoute will accept unauthenticated
-   traffic from anyone who hits `https://llm.tapiavala.com/omniroute`.
+   traffic from anyone who hits `https://omniroute.tapiavala.com`.
 6. Register internal upstreams: meridian (Anthropic + OpenAI alias) and
    cliproxy (Claude fallback + Responses + Gemini-via-upstream-proxy). See "Wiring recipe"
    above. **For each, configure OmniRoute to present the matching

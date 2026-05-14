@@ -69,7 +69,7 @@ compression (small JSON payloads) and doesn't need centralized routing
 | Service        | Type       | Image                                  | Public via Traefik?            | Purpose                                              |
 |----------------|------------|----------------------------------------|--------------------------------|------------------------------------------------------|
 | `headroom`     | compose    | `ghcr.io/chopratejas/headroom`         | Yes — `/headroom/*`            | Centralized compression for all LLM traffic          |
-| `omniroute`    | compose    | `diegosouzapw/omniroute`               | Yes — `/omniroute/*` (dashboard) | Centralized provider routing                       |
+| `omniroute`    | compose    | `diegosouzapw/omniroute`               | Yes — `omniroute.tapiavala.com` (dashboard) | Centralized provider routing                       |
 | `meridian`     | compose    | `ghcr.io/rynfar/meridian`              | No — internal only             | Claude Pro/Max subscription proxy                    |
 | `cliproxy`     | built      | `ghcr.io/nyc-design/cliproxy`          | No — internal only             | Claude Code + Codex + Gemini OAuth proxy             |
 | `agentmemory`  | built      | `ghcr.io/nyc-design/agentmemory`       | No — internal only             | Persistent memory backend (iii-engine + agentmemory) |
@@ -84,8 +84,10 @@ rebuilt and pushed by their per-service workflow on push to `main`.
   `/v1/responses`, `/v1/chat/completions`, `/v1beta/models/.../generateContent`,
   `/v1internal:streamGenerateContent`). All four protocol shapes work
   through this single base URL.
-- **OmniRoute dashboard**: `https://llm.tapiavala.com/omniroute/` — for
-  configuring providers, OAuth flows, and routing combos.
+- **OmniRoute dashboard**: `https://omniroute.tapiavala.com/` — for
+  configuring providers, OAuth flows, and routing combos. Use a dedicated
+  host, not `/omniroute`, because OmniRoute redirects to root-relative
+  `/dashboard` and uses root-relative app/API paths.
 
 Workspaces, Coder Agents, laptop CLIs — they all use the same base URL.
 

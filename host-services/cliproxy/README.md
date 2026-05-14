@@ -66,26 +66,27 @@ docker network.
 
 ## Auth bootstrap
 
-Both OAuth flows are driven by the `cli-proxy-api` CLI itself, baked into
-the image. From your laptop, with the container running:
+All OAuth flows are driven by the `cli-proxy-api` CLI itself, baked into
+the image. Pass `--config /run/cliproxy/config.yaml`; the auth directory
+is read from that config (`auth-dir: /data/auth/cliproxy`). Do **not** pass
+`--auth-dir` — CLIProxyAPI v6.10.9 does not expose that flag.
+
+From your laptop, with the container running:
 
 ```bash
 # Codex (ChatGPT Plus/Pro)
 docker exec -it cliproxy cli-proxy-api \
   --config /run/cliproxy/config.yaml \
-  --auth-dir /data/auth/cliproxy \
   --codex-login
 
 # Gemini (personal Google)
 docker exec -it cliproxy cli-proxy-api \
   --config /run/cliproxy/config.yaml \
-  --auth-dir /data/auth/cliproxy \
   --login
 
 # Claude Code (Anthropic)
 docker exec -it cliproxy cli-proxy-api \
   --config /run/cliproxy/config.yaml \
-  --auth-dir /data/auth/cliproxy \
   --claude-login
 
 docker restart cliproxy
