@@ -1,12 +1,12 @@
-name: Build & Push coder-agents-sidecars (multi-arch, native runners) - GHCR
+name: Build & Push cliproxy (multi-arch, native runners) - GHCR
 
 on:
   push:
     branches:
       - main
     paths:
-      - "host-services/coder-agents-sidecars/**"
-      - ".github/workflows/build-coder-agents-sidecars.yaml"
+      - "host-services/cliproxy/**"
+      - ".github/workflows/build-cliproxy.yaml"
   workflow_dispatch:
 
 permissions:
@@ -15,8 +15,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: host-services
-  IMAGE_NAME: coder-agents-sidecars
+  IMAGE_NAME: cliproxy
 
 jobs:
   build:
@@ -42,7 +41,7 @@ jobs:
 
       - name: Compute image coords
         run: |
-          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
@@ -52,8 +51,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: host-services/coder-agents-sidecars/Dockerfile
+          context: host-services/cliproxy
+          file: host-services/cliproxy/Dockerfile
           platforms: ${{ matrix.platform }}
           tags: ${{ env.IMG }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
@@ -91,7 +90,7 @@ jobs:
 
       - name: Compute image coords
         run: |
-          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
@@ -138,7 +137,7 @@ jobs:
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
-          image-names: "${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}"
+          image-names: "${{ env.IMAGE_NAME }}"
           tag-selection: both
           keep-n-most-recent: 1
           cut-off: 0s

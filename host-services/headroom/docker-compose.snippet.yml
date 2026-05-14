@@ -1,0 +1,73 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# headroom (https://github.com/chopratejas/headroom) is the centralized
+# compression layer for ALL outbound LLM traffic. Sits in front of OmniRoute,
+# compresses prompts/tool outputs/conversation history via the ContentRouter
+# pipeline (SmartCrusher + Kompress + tool-result interceptors), and forwards
+# every protocol shape (Anthropic / OpenAI Chat / OpenAI Responses / Gemini
+# native / Cloud Code Assist) to OmniRoute, which does provider routing.
+#
+# Topology:
+#   client → Traefik /headroom/* → headroom :8787 → omniroute :20128
+#                                                       │
+#                                                       ├─→ meridian (Claude Code SDK; Pro/Max OAuth)
+#                                                       ├─→ cliproxy  (Codex + Gemini OAuth subscriptions)
+#                                                       ├─→ Kiro      (built-in OmniRoute adapter)
+#                                                       └─→ Groq/Cerebras/Mistral/etc. (direct API keys)
+#
+# Compression happens here ONCE. OmniRoute's own compression pipeline
+# (RTK + Caveman) is left disabled — see host-services/omniroute/README.md
+# for the rationale and to confirm the dashboard switch is off.
+#
+# Public URL: https://llm.tapiavala.com/headroom/* (Traefik strips prefix)
+# Internal:   http://headroom:8787
+
+services:
+  headroom:
+    image: ghcr.io/chopratejas/headroom:latest
+    container_name: headroom
+    restart: unless-stopped
+    environment:
+      HEADROOM_HOST: 0.0.0.0
+      HEADROOM_PORT: 8787
+      HEADROOM_MODE: token
+      HEADROOM_TELEMETRY: "off"
+      # NOTE: do NOT set HEADROOM_STATELESS=true — it disables all filesystem
+      # writes, which means proxy_savings.json never persists (savings ledger
+      # vanishes every restart) and --memory would be useless. We mount
+      # /data and point HEADROOM_WORKSPACE_DIR there instead.
+      HEADROOM_WORKSPACE_DIR: /data
+      HEADROOM_CONFIG_DIR: /data/config
+
+      # Single upstream for every protocol shape: OmniRoute. Verified in
+      # headroom/providers/registry.py:97-106 — these four env vars are the
+      # canonical knobs (the docs page is incomplete; CLOUDCODE is real).
+      # OmniRoute accepts all four inbound paths natively at :20128:
+      #   /v1/messages                              (Anthropic)
+      #   /v1/chat/completions                      (OpenAI Chat)
+      #   /v1/responses                             (OpenAI Responses / Codex)
+      #   /v1beta/models/{model}:generateContent    (Gemini native)
+      #   /v1internal:streamGenerateContent         (Cloud Code Assist / Pi)
+      ANTHROPIC_TARGET_API_URL: http://omniroute:20128
+      OPENAI_TARGET_API_URL: http://omniroute:20128
+      GEMINI_TARGET_API_URL: http://omniroute:20128
+      CLOUDCODE_TARGET_API_URL: http://omniroute:20128
+    volumes:
+      # Persistent savings ledger, TOIN telemetry, subscription state,
+      # license cache, optional memory.db. Keeping these on a volume means
+      # watchtower image swaps don't reset compression-savings history.
+      - headroom-data:/data
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.services.headroom.loadbalancer.server.port=8787"
+      - "traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/headroom`)"
+      - "traefik.http.routers.headroom.entrypoints=websecure"
+      - "traefik.http.routers.headroom.tls.certresolver=le"
+      - "traefik.http.routers.headroom.middlewares=headroom-strip"
+      - "traefik.http.middlewares.headroom-strip.stripprefix.prefixes=/headroom"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  headroom-data:

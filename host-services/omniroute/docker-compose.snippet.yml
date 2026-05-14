@@ -1,0 +1,106 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# OmniRoute (https://github.com/diegosouzapw/OmniRoute) — multi-provider
+# AI gateway. In our topology it is the SINGLE provider router for every
+# protocol shape; Headroom forwards all compressed traffic here, and
+# OmniRoute dispatches to meridian, cliproxy, Kiro, or any direct-key
+# provider depending on the requested model.
+#
+# Topology:
+#   headroom → omniroute :20128
+#                  ├─→ meridian :3456                 (claude-* models / Claude Code SDK)
+#                  ├─→ cliproxy :8317  /v1/responses  (gpt-* / Codex subscription)
+#                  ├─→ cliproxy :8317  /v1beta/...    (gemini-* subscription)
+#                  ├─→ Kiro adapter (built-in)        (kiro/* models)
+#                  └─→ Groq, Cerebras, Mistral, etc.  (direct-key providers)
+#
+# Configuration surface (verified against OmniRoute commit 41946c4):
+#   - Direct-key providers (Groq, Cerebras, etc.) → env vars below
+#   - Internal upstreams (meridian, cliproxy) → register via dashboard or
+#     POST /api/v1/providers (one-time bootstrap, persisted in SQLite)
+#   - Routing rules ("combos"), models, prompts → dashboard only,
+#     persisted in the same SQLite db
+#   - OAuth providers we don't use here (Claude/Codex/Gemini direct) are
+#     redundant — those quotas are reached through cliproxy / meridian
+#
+# Compression: keep the dashboard compression toggle OFF. Headroom is the
+# single compression layer for the stack — OmniRoute's RTK+Caveman
+# pipeline duplicates Headroom's work and corrupts Anthropic prompt-cache
+# markers (verified in OmniRoute open-sse/services/compression/cachingAware.ts).
+#
+# OmniRoute is SQLite-only (no Postgres adapter). DATA_DIR=/app/data
+# inside the container; the host bind mount preserves it across image
+# swaps AND keeps the SQLite file directly visible / backupable from the
+# host filesystem (no `docker run -v` dance to inspect).
+#
+# Auth model (three independent keys, see README for full diagram):
+#   - LLM_GATEWAY_API_KEY  : client → OmniRoute. Validated by OmniRoute via
+#                            dashboard config; NOT an env var on this
+#                            service. Bootstrap in dashboard after first
+#                            start (Settings → Client API Keys).
+#   - CLIPROXY_API_KEY     : OmniRoute → cliproxy. Same .env value as the
+#                            cliproxy service; configure on the cliproxy
+#                            provider entry in the OmniRoute dashboard.
+#   - MERIDIAN_API_KEY     : OmniRoute → meridian. Same .env value as the
+#                            meridian service; configure on the meridian
+#                            provider entry in the OmniRoute dashboard.
+#
+# Public URL: https://llm.tapiavala.com/omniroute/* (Traefik strips prefix)
+# Internal:   http://omniroute:20128
+
+services:
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: omniroute
+    restart: unless-stopped
+    environment:
+      # ── Storage ────────────────────────────────────────────────────────
+      DATA_DIR: /app/data
+      # Encrypts the entire SQLite db at rest (provider keys, OAuth tokens,
+      # combos). MUST be set; treat like a long-lived secret. Generate with
+      # `openssl rand -hex 32`. Pull from GCP Secret Manager into .env.
+      STORAGE_ENCRYPTION_KEY: ${OMNIROUTE_STORAGE_ENCRYPTION_KEY:?set in .env}
+
+      # ── Direct-key providers ───────────────────────────────────────────
+      # Per OmniRoute .env.example: "Preferred setup: Dashboard → Providers
+      # → Add API Key. Setting here is an alternative for Docker/headless
+      # deployments." Uncomment + populate from .env to skip the dashboard
+      # bootstrap for that provider. Each value can come from GCP Secret
+      # Manager; .env is the boundary.
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      TOGETHER_API_KEY: ${TOGETHER_API_KEY:-}
+      FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+    volumes:
+      # Holds the SQLite db (provider configs, OAuth tokens encrypted with
+      # STORAGE_ENCRYPTION_KEY, routing combos, models, prompts, usage stats,
+      # logs). Survives image upgrades. Lose this and you lose all
+      # routing/auth state. Bind-mounted (not a named volume) so the host
+      # operator can back up / inspect / restore the SQLite file directly.
+      # Create the dir before first `docker compose up`:
+      #     sudo mkdir -p /opt/coder-stack/omniroute-data
+      # If the container fails on first boot with a permission error,
+      # chown to the UID OmniRoute runs as (check `docker logs omniroute`
+      # and `docker exec omniroute id`).
+      - /opt/coder-stack/omniroute-data:/app/data
+    labels:
+      - "traefik.enable=true"
+
+      # NOTE: OmniRoute's default port is 20128, NOT 3000 (verified in
+      # CLAUDE.md). Single port for both API and dashboard.
+      - "traefik.http.services.omniroute.loadbalancer.server.port=20128"
+      - "traefik.http.routers.omniroute.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/omniroute`)"
+      - "traefik.http.routers.omniroute.entrypoints=websecure"
+      - "traefik.http.routers.omniroute.tls.certresolver=le"
+      - "traefik.http.routers.omniroute.middlewares=omniroute-strip"
+      - "traefik.http.middlewares.omniroute-strip.stripprefix.prefixes=/omniroute"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+

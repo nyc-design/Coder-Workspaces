@@ -1,0 +1,43 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# agentmemory is the persistent memory backend that workspaces talk to via
+# the @agentmemory/mcp MCP server. Holds session observations, embeddings,
+# and lifecycle metadata across workspace recreate.
+#
+# Storage backend is chosen at startup by the bundled docker-entrypoint.sh:
+#   UPSTASH_REDIS_URL set in .env → Redis (state/stream/cron all on Upstash)
+#   UPSTASH_REDIS_URL unset       → file-based on /data named volume
+#
+# In our topology agentmemory is INTERNAL-ONLY: workspaces reach it over
+# the docker network at http://agentmemory:3111. No Traefik labels —
+# nothing on the public internet should be hitting the memory store
+# directly. If you need the viewer (3113) from a laptop, port-forward
+# via SSH or expose behind Traefik with auth.
+#
+# Optional env in the host .env:
+#   UPSTASH_REDIS_URL  — full rediss:// URL from your Upstash console.
+#                        Format: rediss://default:PASSWORD@HOST:6379
+#                        Free tier (10k commands/day, 256MB) covers ~45
+#                        single-agent sessions per day. Pull from GCP
+#                        Secret Manager.
+
+services:
+  agentmemory:
+    image: ghcr.io/nyc-design/agentmemory:latest
+    container_name: agentmemory
+    restart: unless-stopped
+    environment:
+      # Empty default = file-based fallback. Set in .env to switch to Upstash.
+      UPSTASH_REDIS_URL: ${UPSTASH_REDIS_URL:-}
+    volumes:
+      # Always mounted. Holds embeddings index + viewer cache, plus
+      # state_store.db and stream_store/ when running in file-based mode.
+      # Safe to leave attached even when UPSTASH_REDIS_URL is set — the
+      # Redis paths just don't write there.
+      - agentmemory-data:/data
+    labels:
+      # Watchtower auto-update opt-in (no Traefik labels: internal-only).
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  agentmemory-data:

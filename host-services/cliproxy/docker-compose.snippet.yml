@@ -1,0 +1,50 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# cliproxy fronts ChatGPT Plus/Pro (Codex) and personal-Google (Gemini)
+# OAuth in one Go process. The bundled image bakes our config; OAuth
+# credentials live on the named volume so they survive image swaps from
+# watchtower.
+#
+# In our topology cliproxy is INTERNAL-ONLY: only OmniRoute reaches it.
+# OmniRoute registers cliproxy as TWO providers (verified in
+# OmniRoute open-sse/services/provider.ts):
+#
+#   1. openai-compatible-cliproxy-resp  baseUrl=http://cliproxy:8317/v1
+#                                       apiType=responses
+#       → handles /v1/responses traffic (Codex subscription)
+#
+#   2. cliproxyapi upstream-proxy mode for the gemini provider
+#       (PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"})
+#       → handles /v1beta/models/{model}:generateContent (Gemini subscription)
+#
+# Public traffic flows: client → headroom → omniroute → cliproxy.
+# No Traefik labels here — cliproxy is unreachable from outside the
+# Docker network on purpose, which also protects the OAuth credentials
+# in /data/auth from any direct ingress path.
+#
+# Bootstrap (one-time, browser-based; do this AFTER cliproxy is running):
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+#   docker restart cliproxy
+#
+# Required env in the host .env:
+#   CLIPROXY_API_KEY  — generated with `openssl rand -hex 32`. Same value
+#                       must be configured in OmniRoute when registering
+#                       cliproxy as a provider, so OmniRoute can authenticate
+#                       inbound calls. Treat as a long-lived shared secret.
+
+services:
+  cliproxy:
+    image: ghcr.io/nyc-design/cliproxy:latest
+    container_name: cliproxy
+    restart: unless-stopped
+    environment:
+      CLIPROXY_API_KEY: ${CLIPROXY_API_KEY:?set in .env}
+    volumes:
+      - cliproxy-auth:/data/auth
+    labels:
+      # Watchtower auto-update opt-in (no Traefik labels: internal-only).
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  cliproxy-auth:
