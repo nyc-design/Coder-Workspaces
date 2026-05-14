@@ -210,10 +210,6 @@ resource "coder_agent" "main" {
   # Shutdown cleanup is safe in both modes — commands no-op if nothing's running
   shutdown_script = <<-EOT
     #!/bin/bash
-    if command -v mcp-cleanup &>/dev/null; then
-      echo "[shutdown] cleaning up MCP servers..."
-      mcp-cleanup 2>/dev/null || true
-    fi
     if command -v hapi &>/dev/null; then
       echo "[shutdown] stopping HAPI runner..."
       hapi runner stop 2>/dev/null || true
@@ -230,13 +226,7 @@ resource "coder_agent" "main" {
     GIT_COMMITTER_NAME  = local.git_author_name
     GIT_COMMITTER_EMAIL = local.git_author_email
 
-    # Coder Agents (chatd) defaults SkillsDirs to `.agents/skills` resolved
-    # relative to this agent's `dir` (the project) — so the user-level
-    # canonical catalog at ~/.agents/skills is invisible to it without an
-    # override. Comma-separated list lets us keep both: user-global skills
-    # (where the `skills` CLI installs and 11-agent-prompts.sh symlinks the
-    # other agents to) AND project-local skills (default Coder Agents
-    # convention, useful for repo-specific skills checked into git).
+    # Coder Agents (chatd) defaults SkillsDirs to `.agents/skills`
     CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
 
@@ -269,7 +259,6 @@ module "workspace_runtime" {
   agent_id                   = coder_agent.main.id
   docker_env                 = module.workspace_envbuilder.docker_env
   github_pat                 = module.workspace_secrets.github_pat
-  include_playwright_mcp_browser = local.is_agent_mode
 
   extra_env = concat(
     [
@@ -298,8 +287,7 @@ module "workspace_runtime" {
   )
 
   extra_mounts = [
-    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false },
-    { container_path = "/home/coder/.cache/google-vscode-extension", host_path = "/home/ubuntu/secrets/google-vscode-extension", read_only = false },
+    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false }
   ]
 }
 
