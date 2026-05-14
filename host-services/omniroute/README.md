@@ -129,32 +129,81 @@ on first bootstrap. (Default is off; this is just a sanity check.)
 
 ## Storage
 
-| Path inside container | Volume            | Contents                                                                         |
-|-----------------------|-------------------|----------------------------------------------------------------------------------|
-| `/app/data`           | `omniroute-data`  | Encrypted SQLite db: provider configs, OAuth tokens, routing combos, models, logs |
+| Path inside container | Host path                       | Contents                                                                         |
+|-----------------------|---------------------------------|----------------------------------------------------------------------------------|
+| `/app/data`           | `/opt/coder-stack/omniroute-data` | Encrypted SQLite db: provider configs, OAuth tokens, routing combos, models, logs |
+
+**Bind mount, not a named volume.** The host directory must exist before
+the first `docker compose up`:
+
+```bash
+sudo mkdir -p /opt/coder-stack/omniroute-data
+```
+
+If the container exits on first boot with a permission error, chown to
+the UID OmniRoute runs as inside the container (the upstream image's
+runuser; check with `docker logs omniroute` and
+`docker exec omniroute id`). This is the chmod/chown dance you trade for
+direct host visibility of the SQLite file — worth it for backup +
+debug ergonomics.
 
 OmniRoute is **SQLite-only** — `package.json` ships `better-sqlite3` and
 no Postgres/MySQL driver. `src/lib/db/AGENTS.md` explicitly states
 "SQLite over PostgreSQL: simpler deployment, no separate database server".
 External Postgres (Neon, Cloud SQL, etc.) would require a fork.
 
-Watchtower upgrades preserve everything via the volume. **Back this volume
-up** — losing it means re-bootstrapping every provider OAuth flow,
-re-registering meridian/cliproxy, and re-creating every routing combo.
+Watchtower upgrades preserve everything via the bind mount. **Back this
+directory up** (`/opt/coder-stack/omniroute-data`) — losing it means
+re-bootstrapping every provider OAuth flow, re-registering
+meridian/cliproxy, and re-creating every routing combo.
 
 ## Bootstrap
 
-1. Set `OMNIROUTE_STORAGE_ENCRYPTION_KEY` in host `.env` (and any
+1. Create the data dir on the host:
+   `sudo mkdir -p /opt/coder-stack/omniroute-data`.
+2. Set `OMNIROUTE_STORAGE_ENCRYPTION_KEY` in host `.env` (and any
    direct-key API keys you want pre-loaded).
-2. `docker compose up -d omniroute`.
-3. Visit `https://llm.tapiavala.com/omniroute` and complete dashboard setup.
-4. Register internal upstreams: meridian (Anthropic + OpenAI alias) and
+3. `docker compose up -d omniroute`. If it crashes with a permission
+   error on `/app/data`, chown the host dir to the container's UID
+   (see Storage section).
+4. Visit `https://llm.tapiavala.com/omniroute` and complete dashboard setup.
+5. **Configure the client-facing API key** (Settings → Client API Keys,
+   or equivalent in the dashboard). Use the value of `LLM_GATEWAY_API_KEY`
+   from your `.env` (generate with `openssl rand -hex 32`). This is the
+   key that external callers — Coder Agents, workspace CLIs, your laptop
+   — must present. Without it OmniRoute will accept unauthenticated
+   traffic from anyone who hits `https://llm.tapiavala.com/omniroute`.
+6. Register internal upstreams: meridian (Anthropic + OpenAI alias) and
    cliproxy (Responses + Gemini-via-upstream-proxy). See "Wiring recipe"
-   above.
-5. Confirm Compression Settings master switch is OFF.
-6. Configure model aliases and combos so requests for `claude-*` go to
+   above. **For each, configure OmniRoute to present the matching
+   per-upstream API key on outbound calls** — `MERIDIAN_API_KEY` on the
+   meridian provider, `CLIPROXY_API_KEY` on the cliproxy provider. Same
+   values that the upstream services validate inbound.
+7. Confirm Compression Settings master switch is OFF.
+8. Configure model aliases and combos so requests for `claude-*` go to
    meridian, `gpt-*` go to cliproxy Codex, `gemini-*` go to cliproxy
    Gemini, etc.
+
+## Auth model
+
+Three independent API keys, three independent boundaries:
+
+```
+client ──[LLM_GATEWAY_API_KEY]──► omniroute ──[MERIDIAN_API_KEY]──► meridian
+                                          ╰──[CLIPROXY_API_KEY]──► cliproxy
+```
+
+| Key                    | Source                       | Validated by              | Presented by                                 |
+|------------------------|------------------------------|---------------------------|----------------------------------------------|
+| `LLM_GATEWAY_API_KEY`  | host `.env`, into dashboard  | OmniRoute (dashboard config) | client (`x-api-key` / `Authorization: Bearer`) |
+| `CLIPROXY_API_KEY`     | host `.env`                  | cliproxy (env-gated middleware) | OmniRoute (per-provider config in dashboard) |
+| `MERIDIAN_API_KEY`     | host `.env`                  | meridian (`src/proxy/auth.ts` middleware) | OmniRoute (per-provider config in dashboard) |
+
+Why three and not one shared key: if any one is compromised, the blast
+radius is bounded. A leaked `LLM_GATEWAY_API_KEY` doesn't let the
+attacker bypass OmniRoute to hit meridian directly; a compromised
+upstream key doesn't expose the public gateway. OmniRoute is the only
+component that ever sees all three.
 
 ## Endpoints
 

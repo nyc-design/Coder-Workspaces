@@ -27,6 +27,15 @@
 # Note: Meridian's auth is intentionally isolated from cliproxy's. Each
 # owns its own credential surface; named volume keeps SDK session/cache
 # state across image swaps.
+#
+# Inbound auth: when MERIDIAN_API_KEY is set, meridian's optional API
+# key middleware (verified at rynfar/meridian src/proxy/auth.ts) gates
+# /v1/* and /settings/* — callers must present a matching key via
+# `x-api-key` or `Authorization: Bearer`. This is the second auth hop
+# in the chain: OmniRoute presents this key when calling meridian, and
+# any other docker-network caller without the key is rejected. Generate
+# with `openssl rand -hex 32` and configure the SAME value on the
+# meridian provider entry in the OmniRoute dashboard.
 
 services:
   meridian:
@@ -51,6 +60,11 @@ services:
       # that don't exist here.
       MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}"}]'
       MERIDIAN_DEFAULT_PROFILE: default
+      # Gates /v1/* and /settings/* — only OmniRoute (which presents this
+      # value on every upstream call) should reach meridian over the docker
+      # network. Defense-in-depth against any other container on the same
+      # network accidentally hitting meridian directly.
+      MERIDIAN_API_KEY: ${MERIDIAN_API_KEY:?set in .env}
     volumes:
       # Per-profile SDK state lives under ~/.config/meridian/profiles/<id>/
       # (sessions, settings — never the credential, which is delivered via

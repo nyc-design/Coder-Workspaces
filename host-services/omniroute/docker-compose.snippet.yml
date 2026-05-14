@@ -29,7 +29,21 @@
 # markers (verified in OmniRoute open-sse/services/compression/cachingAware.ts).
 #
 # OmniRoute is SQLite-only (no Postgres adapter). DATA_DIR=/app/data
-# inside the container; the named volume preserves it across image swaps.
+# inside the container; the host bind mount preserves it across image
+# swaps AND keeps the SQLite file directly visible / backupable from the
+# host filesystem (no `docker run -v` dance to inspect).
+#
+# Auth model (three independent keys, see README for full diagram):
+#   - LLM_GATEWAY_API_KEY  : client → OmniRoute. Validated by OmniRoute via
+#                            dashboard config; NOT an env var on this
+#                            service. Bootstrap in dashboard after first
+#                            start (Settings → Client API Keys).
+#   - CLIPROXY_API_KEY     : OmniRoute → cliproxy. Same .env value as the
+#                            cliproxy service; configure on the cliproxy
+#                            provider entry in the OmniRoute dashboard.
+#   - MERIDIAN_API_KEY     : OmniRoute → meridian. Same .env value as the
+#                            meridian service; configure on the meridian
+#                            provider entry in the OmniRoute dashboard.
 #
 # Public URL: https://llm.tapiavala.com/omniroute/* (Traefik strips prefix)
 # Internal:   http://omniroute:20128
@@ -68,8 +82,14 @@ services:
       # Holds the SQLite db (provider configs, OAuth tokens encrypted with
       # STORAGE_ENCRYPTION_KEY, routing combos, models, prompts, usage stats,
       # logs). Survives image upgrades. Lose this and you lose all
-      # routing/auth state.
-      - omniroute-data:/app/data
+      # routing/auth state. Bind-mounted (not a named volume) so the host
+      # operator can back up / inspect / restore the SQLite file directly.
+      # Create the dir before first `docker compose up`:
+      #     sudo mkdir -p /opt/coder-stack/omniroute-data
+      # If the container fails on first boot with a permission error,
+      # chown to the UID OmniRoute runs as (check `docker logs omniroute`
+      # and `docker exec omniroute id`).
+      - /opt/coder-stack/omniroute-data:/app/data
     labels:
       - "traefik.enable=true"
 
@@ -84,5 +104,3 @@ services:
 
       - "com.centurylinklabs.watchtower.enable=true"
 
-volumes:
-  omniroute-data:

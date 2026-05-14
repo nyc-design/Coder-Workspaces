@@ -88,8 +88,34 @@ rebuilt and pushed by their per-service workflow on push to `main`.
   configuring providers, OAuth flows, and routing combos.
 
 Workspaces, Coder Agents, laptop CLIs — they all use the same base URL.
-Authentication varies by upstream (Headroom is transparent; OmniRoute
-validates per-provider).
+
+## Auth model
+
+Three independent API keys, one per boundary in the chain:
+
+```
+client ──[LLM_GATEWAY_API_KEY]──► headroom (transparent) ──► omniroute
+                                                              │
+                                          [MERIDIAN_API_KEY] ──┼──► meridian
+                                          [CLIPROXY_API_KEY] ──┴──► cliproxy
+```
+
+| Key                    | Where it lives          | Validated by                        | Presented by                                       |
+|------------------------|-------------------------|-------------------------------------|----------------------------------------------------|
+| `LLM_GATEWAY_API_KEY`  | host `.env` + OmniRoute dashboard | OmniRoute (Client API Keys config)  | client (laptop, Coder Agent, workspace CLI)        |
+| `CLIPROXY_API_KEY`     | host `.env` + OmniRoute dashboard | cliproxy env-gated middleware       | OmniRoute (per-provider config in dashboard)       |
+| `MERIDIAN_API_KEY`     | host `.env` + OmniRoute dashboard | meridian `src/proxy/auth.ts` middleware | OmniRoute (per-provider config in dashboard)   |
+
+Generate each with `openssl rand -hex 32`. Same `.env` value goes into
+the matching OmniRoute dashboard config; the upstream service reads it
+from env at startup. Headroom doesn't see or care about any of these —
+it's transparent at this layer.
+
+Why three keys, not one: bounded blast radius. A leaked
+`LLM_GATEWAY_API_KEY` can hit the gateway but can't reach meridian or
+cliproxy directly (different docker network names, different keys);
+a leaked upstream key can't impersonate the gateway. Rotate any single
+key without disturbing the others.
 
 ## Adding a new service
 

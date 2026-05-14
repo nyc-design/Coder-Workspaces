@@ -71,6 +71,32 @@ so watchtower upgrades don't reset conversation continuity. The OAuth
 token itself is delivered via env (never written to disk) so rotation is
 just a `docker restart`.
 
+## Inbound auth (`MERIDIAN_API_KEY`)
+
+Meridian's optional API key middleware (`src/proxy/auth.ts`) gates
+`/v1/*` and `/settings/*` when `MERIDIAN_API_KEY` is set in the env.
+Callers must present a matching value via `x-api-key` or
+`Authorization: Bearer`.
+
+In our stack this is **always set**. Even though meridian has no Traefik
+labels and is unreachable from outside the docker network, the API key
+requirement adds defense-in-depth against any *other* container on the
+same docker network accidentally hitting `http://meridian:3456` —
+misconfigured agentmemory, a workspace that joins the host network, a
+rogue debug script. Only OmniRoute should reach meridian, and OmniRoute
+presents the key on every upstream call.
+
+Generate with `openssl rand -hex 32` and set the **same value** in two
+places:
+
+1. Host `.env` as `MERIDIAN_API_KEY` — picked up by the compose snippet
+   and read by meridian on startup.
+2. The meridian provider entry in the OmniRoute dashboard — OmniRoute
+   presents this on every outbound call to `http://meridian:3456`.
+
+Rotation is `openssl rand`, update both places, `docker restart meridian`.
+Mismatch shows up immediately as 401 in OmniRoute logs.
+
 ## Passthrough mode
 
 `MERIDIAN_PASSTHROUGH=1` is set so tool_use blocks flow back to the caller

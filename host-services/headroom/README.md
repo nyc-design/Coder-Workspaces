@@ -60,12 +60,27 @@ from source with `[proxy,ml]` if you need neural compression (~700 MB).
 
 ## Auth
 
-Headroom does **not** inject credentials — it forwards the client's
+Headroom is **transparent at this layer** — it does not validate or
+inject any credentials of its own. It forwards the client's
 `Authorization` / `x-api-key` / `x-goog-api-key` headers untouched to
-OmniRoute, which validates them against its own configured providers
-and forwards to the right upstream (which in turn validates against
-its own credentials). Three layers of auth, but only one credential
-boundary that clients see.
+OmniRoute. OmniRoute is where the actual gatekeeping happens:
+
+- **Client-facing**: OmniRoute validates the inbound key against its
+  configured `LLM_GATEWAY_API_KEY` (dashboard-backed).
+- **Upstream-facing**: OmniRoute swaps in the matching per-upstream
+  key (`MERIDIAN_API_KEY` for meridian, `CLIPROXY_API_KEY` for cliproxy)
+  when dispatching, so the downstream service can validate the call.
+
+Two important consequences:
+
+1. Clients only see one credential boundary — the `LLM_GATEWAY_API_KEY`.
+   They never need to know about `MERIDIAN_API_KEY` or `CLIPROXY_API_KEY`.
+2. Headroom does not need any secrets in its `.env` — its `Authorization`
+   header is forwarded verbatim. Adding key-handling here would just
+   duplicate OmniRoute's gate.
+
+See `host-services/omniroute/README.md` → "Auth model" for the full
+three-key diagram.
 
 ## Optional bypass
 
