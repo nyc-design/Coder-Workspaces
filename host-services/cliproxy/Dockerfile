@@ -5,8 +5,9 @@
 #
 # Wraps the upstream Go binary
 # (https://github.com/router-for-me/CLIProxyAPI). Single process serves
-# both Codex (ChatGPT Plus/Pro OAuth) and Gemini (personal Google OAuth)
-# from the same auth-dir; the upstream auto-detects which credentials are
+# Codex (ChatGPT Plus/Pro OAuth), Gemini (personal Google OAuth), and
+# Claude Code (Anthropic OAuth) from the same auth-dir; the upstream
+# auto-detects which credentials are
 # present and serves whichever endpoints have valid auth.
 #
 # Multi-arch: linux/amd64 + linux/arm64.
@@ -59,6 +60,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 
 LABEL org.opencontainers.image.title="cliproxy" \
-      org.opencontainers.image.description="CLIProxyAPI built from upstream release with config baked in. Codex (ChatGPT Plus/Pro) + Gemini (personal Google) OAuth in one process." \
+      org.opencontainers.image.description="CLIProxyAPI built from upstream release with config baked in. Codex (ChatGPT Plus/Pro) + Gemini (personal Google) + Claude Code OAuth in one process." \
       org.opencontainers.image.source="https://github.com/nyc-design/Coder-Workspaces" \
       org.opencontainers.image.licenses="MIT"

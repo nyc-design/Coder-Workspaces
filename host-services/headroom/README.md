@@ -15,7 +15,7 @@ provider routing.
 client → Traefik /headroom/* → headroom :8787 → omniroute :20128
                                                     │
                                                     ├─→ meridian (Claude Pro/Max)
-                                                    ├─→ cliproxy (Codex / Gemini OAuth)
+                                                    ├─→ cliproxy (Claude Code / Codex / Gemini OAuth)
                                                     ├─→ Kiro (built-in)
                                                     └─→ direct API providers
 ```

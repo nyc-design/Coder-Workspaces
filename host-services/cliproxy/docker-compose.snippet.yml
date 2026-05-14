@@ -1,19 +1,22 @@
 # Append this service to the host docker-compose on the Coder VM.
 #
-# cliproxy fronts ChatGPT Plus/Pro (Codex) and personal-Google (Gemini)
-# OAuth in one Go process. The bundled image bakes our config; OAuth
+# cliproxy fronts ChatGPT Plus/Pro (Codex), personal-Google (Gemini), and
+# Claude Code (Anthropic) OAuth in one Go process. The bundled image bakes
+# our config; OAuth
 # credentials live on the named volume so they survive image swaps from
 # watchtower.
 #
 # In our topology cliproxy is INTERNAL-ONLY: only OmniRoute reaches it.
-# OmniRoute registers cliproxy as TWO providers (verified in
-# OmniRoute open-sse/services/provider.ts):
+# OmniRoute registers cliproxy as THREE provider paths:
 #
-#   1. openai-compatible-cliproxy-resp  baseUrl=http://cliproxy:8317/v1
-#                                       apiType=responses
+#   1. anthropic-compatible-cc-cliproxy-claude  baseUrl=http://cliproxy:8317/v1
+#       → handles /v1/messages traffic (Claude Code subscription fallback)
+#
+#   2. openai-compatible-cliproxy-resp          baseUrl=http://cliproxy:8317/v1
+#                                               apiType=responses
 #       → handles /v1/responses traffic (Codex subscription)
 #
-#   2. cliproxyapi upstream-proxy mode for the gemini provider
+#   3. cliproxyapi upstream-proxy mode for the gemini provider
 #       (PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"})
 #       → handles /v1beta/models/{model}:generateContent (Gemini subscription)
 #
@@ -23,8 +26,9 @@
 # in /data/auth from any direct ingress path.
 #
 # Bootstrap (one-time, browser-based; do this AFTER cliproxy is running):
-#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
-#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --codex-login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --claude-login
 #   docker restart cliproxy
 #
 # Required env in the host .env:
