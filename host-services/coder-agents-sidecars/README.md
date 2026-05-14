@@ -16,7 +16,7 @@ Multi-arch (`linux/amd64` + `linux/arm64`).
 
 ## What's inside
 
-Six processes supervised by [s6-overlay v3](https://github.com/just-containers/s6-overlay):
+Seven processes supervised by [s6-overlay v3](https://github.com/just-containers/s6-overlay):
 
 ```
                                   ┌─► 127.0.0.1:3456 claude-sidecar    (Meridian + Claude Code SDK)        ─► api.anthropic.com
@@ -29,6 +29,11 @@ Six processes supervised by [s6-overlay v3](https://github.com/just-containers/s
                                                                          └─► generativelanguage.googleapis.com
 
 :8788 (dispatcher, /openai/* only) ─► {groq | cerebras | codestral | zen}  (direct HTTPS, key swap server-side)
+
+:8789 (agentmemory-adapter, /agentmemory/* only) ─► MCP streamable_http
+     resolves X-Coder-Workspace-Id → stable project key (github:owner/repo)
+     via Coder API, so memory survives workspace recreate. Diagnostic mode:
+     single `memory_scope` tool; full memory engine is a follow-up.
 ```
 
 The dispatcher reads a leading `<prefix>/` on the request body's `model` field

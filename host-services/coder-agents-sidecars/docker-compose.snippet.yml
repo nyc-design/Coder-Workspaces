@@ -7,6 +7,8 @@
 #   https://llm.tapiavala.com/gemini/  → Headroom :8787 → cliproxy-sidecar :8317 (Gemini OAuth)
 #   https://llm.tapiavala.com/openai/  → dispatcher :8788  → {groq | cerebras | codestral | zen}
 #                                                       (prefix in `model`: groq/ | cerebras/ | codestral/ | zen/)
+#   https://llm.tapiavala.com/agentmemory/ → agentmemory-adapter :8789
+#                                                       (Coder-aware project-scope resolver MCP — diagnostic mode)
 #
 # Use the same four URLs in Coder admin AND in any laptop/workspace CLI that takes
 # a custom base URL (Claude Code's ANTHROPIC_BASE_URL, Codex's OPENAI_BASE_URL, etc.).
@@ -43,6 +45,11 @@ services:
       # GROQ_API_KEY, CEREBRAS_API_KEY, CODESTRAL_API_KEY, ZEN_API_KEY — is
       # fetched at startup by the bootstrap-secrets oneshot.
       GOOGLE_APPLICATION_CREDENTIALS_JSON: ${GOOGLE_APPLICATION_CREDENTIALS_JSON:?set in .env}
+      # Base URL of the Coder deployment (used by the agentmemory-adapter to
+      # resolve workspace UUID → repo_name build parameter → project key).
+      # Required for the github:owner/repo project key resolution; without it,
+      # the adapter falls back to coder-workspace:<workspace-name>.
+      CODER_API_URL: ${CODER_API_URL:?set in .env}
     volumes:
       - coder-agents-sidecars-auth:/data/auth
     # Direct host port left commented out — Traefik handles ingress. Uncomment
@@ -52,10 +59,12 @@ services:
     labels:
       - "traefik.enable=true"
 
-      # Two backend service definitions: 8787 is Headroom (Claude/Codex/Gemini
-      # pipeline), 8788 is the dispatcher (OpenAI-compat direct fan-out).
+      # Three backend service definitions: 8787 is Headroom (Claude/Codex/Gemini
+      # pipeline), 8788 is the dispatcher (OpenAI-compat direct fan-out),
+      # 8789 is the agentmemory-adapter (Coder-aware project-scope MCP).
       - "traefik.http.services.coder-agents-sidecars.loadbalancer.server.port=8787"
       - "traefik.http.services.coder-agents-sidecars-dispatcher.loadbalancer.server.port=8788"
+      - "traefik.http.services.coder-agents-sidecars-agentmemory.loadbalancer.server.port=8789"
 
       # Three routers, one per provider subpath. All three forward to the same
       # backend; the stripPrefix middleware removes the /claude /codex /gemini
@@ -108,6 +117,17 @@ services:
       - "traefik.http.routers.cas-openai.service=coder-agents-sidecars-dispatcher"
       - "traefik.http.routers.cas-openai.middlewares=cas-openai-strip"
       - "traefik.http.middlewares.cas-openai-strip.stripprefix.prefixes=/openai"
+
+      # /agentmemory/* → agentmemory-adapter (Coder-aware project-scope MCP).
+      # Resolves the ephemeral X-Coder-Workspace-Id forwarded by chatprovider
+      # into a stable project key so memory survives workspace recreate. Ships
+      # in diagnostic mode for now — single `memory_scope` tool.
+      - "traefik.http.routers.cas-agentmemory.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/agentmemory/`)"
+      - "traefik.http.routers.cas-agentmemory.entrypoints=websecure"
+      - "traefik.http.routers.cas-agentmemory.tls.certresolver=le"
+      - "traefik.http.routers.cas-agentmemory.service=coder-agents-sidecars-agentmemory"
+      - "traefik.http.routers.cas-agentmemory.middlewares=cas-agentmemory-strip"
+      - "traefik.http.middlewares.cas-agentmemory-strip.stripprefix.prefixes=/agentmemory"
 
       # Watchtower auto-update opt-in (matches the coder-pwa pattern).
       - "com.centurylinklabs.watchtower.enable=true"

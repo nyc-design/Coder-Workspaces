@@ -56,3 +56,16 @@ mcp_servers:
       Authorization: Bearer ${GH_PAT_FOR_MCP}
     enabled: true
     availability: default_on
+
+  - slug: agentmemory
+    display_name: AgentMemory
+    description: 'Coder-aware project-scope memory MCP (diagnostic mode). Translates the ephemeral workspace UUID into a stable project key (github:owner/repo) so memory survives workspace recreate. Currently exposes a single `memory_scope` diagnostic tool; full memory storage is a follow-up.'
+    icon_url: /icon/database.svg
+    transport: streamable_http
+    url: https://llm.tapiavala.com/agentmemory/mcp
+    auth_type: custom_headers
+    custom_headers:
+      Authorization: Bearer ${AGENTMEMORY_MCP_API_KEY}
+    forward_coder_headers: true
+    enabled: true
+    availability: default_on

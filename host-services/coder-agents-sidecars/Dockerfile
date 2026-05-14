@@ -47,6 +47,7 @@ RUN /opt/headroom-venv/bin/pip install --no-cache-dir -r /tmp/dispatcher-require
  && rm -f /tmp/dispatcher-requirements.txt
 COPY host-services/coder-agents-sidecars/dispatcher/dispatcher.py \
      host-services/coder-agents-sidecars/dispatcher/bootstrap_secrets.py \
+     host-services/coder-agents-sidecars/agentmemory-adapter/adapter.py \
      /usr/local/lib/coder-agents-sidecars/
 
 # ── kirocc binary (Kiro Builder ID → Anthropic Messages proxy) ───────────────
@@ -128,7 +129,8 @@ RUN chmod +x \
       /etc/s6-overlay/s6-rc.d/claude-sidecar/run \
       /etc/s6-overlay/s6-rc.d/cliproxy-sidecar/run \
       /etc/s6-overlay/s6-rc.d/dispatcher/run \
-      /etc/s6-overlay/s6-rc.d/kirocc/run
+      /etc/s6-overlay/s6-rc.d/kirocc/run \
+      /etc/s6-overlay/s6-rc.d/agentmemory-adapter/run
 
 # Pre-create auth subdirs so first-start doesn't trip on missing paths.
 RUN mkdir -p /data/auth/cliproxy /data/auth/claude /data/auth/kirocc /run/coder-agents-sidecars
@@ -159,9 +161,10 @@ ENV S6_KEEP_ENV=1 \
 
 VOLUME ["/data/auth"]
 # 8787 is Headroom (Claude/Codex/Gemini). 8788 is the dispatcher (OpenAI-compat
-# direct + Claude fan-out). Both are routed to from Traefik; bind to all
+# direct + Claude fan-out). 8789 is the AgentMemory MCP adapter (Coder-aware
+# project-scope resolver). All three are routed to from Traefik; bind to all
 # interfaces inside the container but never publish to the host.
-EXPOSE 8787 8788
+EXPOSE 8787 8788 8789
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
   CMD curl --fail --silent http://127.0.0.1:8787/readyz || exit 1

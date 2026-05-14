@@ -26,6 +26,7 @@ from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 GCP_PROJECT = os.environ.get("SIDECAR_GCP_PROJECT", "ai-sidecar-nt")
+# Required secrets: any missing / empty / REPLACE_ME value fails the boot.
 SECRETS = [
     "SIDECAR_SHARED_API_KEY",
     "CLAUDE_CODE_OAUTH_TOKEN",
@@ -33,6 +34,16 @@ SECRETS = [
     "CEREBRAS_API_KEY",
     "CODESTRAL_API_KEY",
     "ZEN_API_KEY",
+    "AGENTMEMORY_MCP_API_KEY",
+]
+# Optional secrets: tolerated when missing from Secret Manager or set to
+# REPLACE_ME / empty. Each absent optional secret is still written to
+# secrets.env (as empty) so dependent run scripts can `source` the file
+# without tripping `set -u`. Use this for credentials the operator may not
+# have provisioned yet — the consuming service is responsible for
+# degrading gracefully when its optional secret is empty.
+OPTIONAL_SECRETS = [
+    "CODER_API_TOKEN",
 ]
 OUT_PATH = Path(os.environ.get("SIDECAR_SECRETS_OUT", "/run/coder-agents-sidecars/secrets.env"))
 PLACEHOLDER = "REPLACE_ME"
@@ -76,19 +87,26 @@ def main() -> None:
     client = secretmanager.SecretManagerServiceClient(credentials=creds)
 
     fetched: dict[str, str] = {}
-    for name in SECRETS:
+    for name in SECRETS + OPTIONAL_SECRETS:
+        is_optional = name in OPTIONAL_SECRETS
         resource = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
         try:
             resp = client.access_secret_version(name=resource)
         except Exception as exc:
+            if is_optional:
+                _log(f"optional {name} not retrievable ({exc}); writing empty")
+                fetched[name] = ""
+                continue
             _log(f"failed to fetch {name}: {exc}")
             sys.exit(1)
         value = resp.payload.data.decode("utf-8")
-        if value == PLACEHOLDER:
-            _log(f"{name} is still the {PLACEHOLDER} placeholder — refusing to start")
-            sys.exit(1)
-        if not value:
-            _log(f"{name} is empty — refusing to start")
+        if value == PLACEHOLDER or not value:
+            if is_optional:
+                _log(f"optional {name} is empty or {PLACEHOLDER}; writing empty")
+                fetched[name] = ""
+                continue
+            reason = PLACEHOLDER if value == PLACEHOLDER else "empty"
+            _log(f"{name} is {reason} — refusing to start")
             sys.exit(1)
         fetched[name] = value
 

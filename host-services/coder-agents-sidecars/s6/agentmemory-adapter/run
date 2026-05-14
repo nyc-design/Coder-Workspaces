@@ -1,0 +1,16 @@
+#!/command/with-contenv bash
+# AgentMemory MCP adapter: Coder-aware project-scope resolver on
+# 127.0.0.1:8789. Depends on bootstrap-secrets having written
+# /run/coder-agents-sidecars/secrets.env (contains AGENTMEMORY_MCP_API_KEY
+# and, when populated, CODER_API_TOKEN).
+set -euo pipefail
+
+SECRETS_FILE=/run/coder-agents-sidecars/secrets.env
+if [ ! -r "${SECRETS_FILE}" ]; then
+  echo "[agentmemory-adapter] ${SECRETS_FILE} missing — bootstrap-secrets must run first" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "${SECRETS_FILE}"
+
+exec /opt/headroom-venv/bin/python /usr/local/lib/coder-agents-sidecars/adapter.py
