@@ -1,0 +1,103 @@
+# iii-engine config for agentmemory — Upstash Redis backend.
+#
+# Activated when UPSTASH_REDIS_URL is set in the container env. Picks
+# state, stream, and cron all off file-based defaults onto Redis. Suits
+# multi-host or "memory must outlive the container volume" setups.
+#
+# Verified against iii-engine source at v0.11.2:
+#   engine/src/workers/state/adapters/redis_adapter.rs:222   (single
+#     `redis_url` config key — no pool/timeout/db-number knobs)
+#   engine/src/workers/stream/adapters/redis_adapter.rs:430  (same)
+#   engine/src/workers/cron/adapters/redis_adapter.rs:64     (same)
+#
+# TLS: published iii binary IS built with rustls (verified by inspecting
+# `strings $(which iii)` for rustls-0.23.x symbols), pulled in
+# transitively via the OpenTelemetry exporters even though Cargo.toml
+# doesn't advertise the redis-rs TLS feature explicitly. Upstash
+# `rediss://` URLs work out of the box.
+#
+# Constraints to be aware of (none are showstoppers for solo use):
+#   - Persistent SUBSCRIBE connection from iii-stream burns one of
+#     Upstash's concurrent-connection slots continuously.
+#   - iii-stream uses `KEYS` in list_groups (Upstash discourages but
+#     allows). Low-frequency operation; not a hot path.
+#   - 30s hardcoded cron-lock TTL — fine for agentmemory's lightweight
+#     consolidation jobs.
+#   - All Redis ops serialize through one tokio::Mutex per worker.
+#     Caps throughput; agentmemory is not high-RPS.
+#
+# Free-tier sizing (Upstash 10k commands/day, 256MB):
+#   ~215 commands per typical 30-min coding session → ~45 sessions/day
+#   before paid tier. Multi-agent fan-out (subagents) multiplies; bump
+#   to paid if you regularly hit the cap.
+
+workers:
+  - name: iii-http
+    config:
+      port: 3111
+      host: 0.0.0.0
+      default_timeout: 180000
+      cors:
+        allowed_origins:
+          - "http://localhost:3111"
+          - "http://localhost:3113"
+          - "http://127.0.0.1:3111"
+          - "http://127.0.0.1:3113"
+        allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+
+  # State adapter: stores agentmemory's KV scopes (sessions, memories,
+  # lifecycle timers) as Redis hashes keyed by `state:<scope>`.
+  - name: iii-state
+    config:
+      adapter:
+        name: redis
+        config:
+          redis_url: ${UPSTASH_REDIS_URL}
+
+  - name: iii-queue
+    config:
+      adapter:
+        name: builtin
+
+  - name: iii-pubsub
+    config:
+      adapter:
+        name: local
+
+  # Cron locks: SET NX PX 30000, released via 4-line EVAL script. All
+  # Upstash-supported.
+  - name: iii-cron
+    config:
+      adapter:
+        name: redis
+        config:
+          redis_url: ${UPSTASH_REDIS_URL}
+
+  # Stream stores stream offsets in `stream:<name>:<group_id>` hashes
+  # and fans events out via the hardcoded `stream::events` pub/sub
+  # channel. Persistent SUBSCRIBE connection lives here.
+  - name: iii-stream
+    config:
+      port: 3112
+      host: 0.0.0.0
+      adapter:
+        name: redis
+        config:
+          redis_url: ${UPSTASH_REDIS_URL}
+
+  - name: iii-observability
+    config:
+      enabled: true
+      service_name: agentmemory
+      exporter: memory
+      sampling_ratio: 1.0
+      metrics_enabled: true
+      logs_enabled: true
+      logs_console_output: true
+
+  - name: iii-exec
+    config:
+      watch:
+        - src/**/*.ts
+      exec:
+        - node dist/index.mjs

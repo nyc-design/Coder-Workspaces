@@ -21,7 +21,31 @@ GitHub Releases page. Bundling the binary + our config into one image
 means the bare VM only needs the compose snippet, and watchtower handles
 upstream version bumps the same way it handles upstream image bumps.
 
-## Endpoints
+## Role in the topology
+
+cliproxy is **internal-only** in our stack. Only OmniRoute reaches it —
+no Traefik labels, no public URL. Public traffic flows:
+
+```
+client → headroom → omniroute → cliproxy → chatgpt.com / generativelanguage.googleapis.com
+```
+
+OmniRoute registers cliproxy in two ways (verified in OmniRoute
+`open-sse/services/provider.ts`):
+
+- For Codex: `openai-compatible-cliproxy-resp` provider with
+  `baseUrl=http://cliproxy:8317/v1` and `apiType=responses` — handles
+  `/v1/responses` requests.
+- For Gemini: built-in `cliproxyapi` upstream-proxy mode on the
+  `gemini` provider (`PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"}`),
+  which OmniRoute already wires to `localhost:8317` —
+  see `src/lib/db/upstreamProxy.ts:36`.
+
+The internal-only posture is also defense-in-depth: the OAuth
+credentials in `/data/auth/cliproxy` stay on the docker network and
+never face an inbound public path.
+
+## Endpoints (from inside the docker network)
 
 | Path                                          | Provider             |
 |-----------------------------------------------|----------------------|
@@ -30,6 +54,9 @@ upstream version bumps the same way it handles upstream image bumps.
 | `POST /v1internal:streamGenerateContent`      | Cloud Code Assist    |
 | `GET  /v1beta/models`                         | Model list (Gemini)  |
 | `GET  /health`                                | Liveness             |
+
+Reach via `http://cliproxy:8317` from any other container on the same
+docker network.
 
 ## Auth bootstrap
 
@@ -65,6 +92,8 @@ an open relay if anything else lands on the docker network. The
 entrypoint substitutes `CLIPROXY_API_KEY` from the env var into the baked
 config at startup, so the key can rotate without rebuilding the image.
 Generate with `openssl rand -hex 32` and set it in the host `.env`.
+**Use the same value when registering cliproxy as a provider in the
+OmniRoute dashboard** so OmniRoute can authenticate inbound calls.
 
 ## Multi-account
 

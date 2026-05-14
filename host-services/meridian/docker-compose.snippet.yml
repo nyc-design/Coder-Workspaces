@@ -4,8 +4,14 @@
 # to the standard Anthropic API so any tool that speaks the Anthropic
 # protocol (or OpenAI-compat) can draw on a Claude Pro/Max subscription.
 #
-# Public URL: https://llm.tapiavala.com/meridian/* (Traefik strips prefix)
-# Internal:   http://meridian:3456
+# In our topology meridian is INTERNAL-ONLY: only OmniRoute reaches it.
+# OmniRoute registers meridian as an `anthropic-compatible-cc-meridian`
+# provider pointing at http://meridian:3456/v1 (verified in OmniRoute
+# open-sse/services/provider.ts:18). Public traffic flows
+#   client → headroom → omniroute → meridian → api.anthropic.com
+# No Traefik labels here — meridian is unreachable from outside the
+# Docker network on purpose, which is also a defense-in-depth posture
+# for the Claude Pro/Max OAuth token.
 #
 # Required env in the host .env:
 #   CLAUDE_CODE_OAUTH_TOKEN  — long-lived OAuth token. Generate on a host
@@ -52,15 +58,7 @@ services:
       # session continuity across container restarts and image swaps.
       - meridian-data:/home/claude/.config/meridian
     labels:
-      - "traefik.enable=true"
-
-      - "traefik.http.services.meridian.loadbalancer.server.port=3456"
-      - "traefik.http.routers.meridian.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/meridian`)"
-      - "traefik.http.routers.meridian.entrypoints=websecure"
-      - "traefik.http.routers.meridian.tls.certresolver=le"
-      - "traefik.http.routers.meridian.middlewares=meridian-strip"
-      - "traefik.http.middlewares.meridian-strip.stripprefix.prefixes=/meridian"
-
+      # Watchtower auto-update opt-in (no Traefik labels: internal-only).
       - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:

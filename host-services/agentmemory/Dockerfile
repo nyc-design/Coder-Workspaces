@@ -13,6 +13,10 @@
 # build` so dist/index.mjs exists for iii-exec to spawn. We need a single
 # self-contained image so watchtower can update it like every other backend.
 #
+# Storage backend is chosen at startup by docker-entrypoint.sh based on
+# whether UPSTASH_REDIS_URL is set. Both iii-config variants ship in
+# /opt/agentmemory-config/ — no image rebuild to flip backends.
+#
 # Multi-arch: linux/amd64 + linux/arm64 (matches Coder VM targets).
 
 FROM node:20-bookworm-slim
@@ -29,7 +33,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
 
-# ── iii-engine binary (Rust, statically linked) ──────────────────────────────
+# ── iii-engine binary (Rust, statically linked, includes rustls for TLS) ─────
 RUN set -eux; \
     case "$TARGETARCH" in \
       amd64) IIIBIN=iii-x86_64-unknown-linux-gnu ;; \
@@ -41,14 +45,22 @@ RUN set -eux; \
     chmod +x /usr/local/bin/iii; \
     iii --version
 
-# ── agentmemory CLI + worker (Node, ships its own iii-config.yaml in dist/) ──
+# ── agentmemory CLI + worker (Node, ships its own dist/index.mjs for iii-exec) ──
 RUN npm install -g "@agentmemory/agentmemory@${AGENTMEMORY_VERSION}" \
  && npm cache clean --force
+
+# Both iii-config variants live in /opt/agentmemory-config/. The entrypoint
+# copies the right one to ${HOME}/.agentmemory/iii-config.yaml at startup.
+COPY iii-config.file-based.yaml iii-config.upstash.yaml /opt/agentmemory-config/
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Persistent state lives on the named volume mounted at /data:
 #   /data/state_store.db   — kv (sessions, memories, lifecycle timers)
 #   /data/stream_store/    — pubsub stream offsets
 #   /data/.agentmemory/    — embeddings index, viewer assets cache
+# (When UPSTASH_REDIS_URL is set, state/stream/cron live in Redis instead;
+# only the embeddings index + viewer cache stay on /data.)
 ENV HOME=/data \
     AGENTMEMORY_HOST=0.0.0.0 \
     AGENTMEMORY_VIEWER_HOST=0.0.0.0
@@ -60,7 +72,7 @@ EXPOSE 3111 3112 3113 49134
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl --fail --silent http://127.0.0.1:3111/agentmemory/health || exit 1
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["agentmemory"]
 
 LABEL org.opencontainers.image.title="agentmemory" \

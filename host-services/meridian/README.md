@@ -9,12 +9,33 @@ pay-as-you-go API billing.
 Compose-only service that pulls the upstream image directly from GHCR
 (`ghcr.io/rynfar/meridian:latest`).
 
-## Endpoints
+## Role in the topology
+
+Meridian is **internal-only** in our stack. Only OmniRoute reaches it —
+no Traefik labels, no public URL. Public traffic flows:
+
+```
+client → headroom → omniroute → meridian → api.anthropic.com
+```
+
+OmniRoute registers meridian as `anthropic-compatible-cc-meridian`
+(verified in `open-sse/services/provider.ts:18`) — that prefix uses
+Claude Code-style headers, which is what meridian expects.
+
+The internal-only posture is also defense-in-depth: the long-lived
+`CLAUDE_CODE_OAUTH_TOKEN` only travels over the docker network, never
+through Traefik or out to the internet on the inbound side.
+
+## Endpoints (from inside the docker network)
 
 - `POST /v1/messages` — Anthropic Messages API (streaming SSE supported)
 - `POST /v1/chat/completions` — OpenAI-compat alias
 - `GET  /v1/models` — model list
 - `GET  /health` — liveness with auth status
+
+Reach via `http://meridian:3456` from any other container on the same
+docker network. From the host, `docker exec -it meridian curl ...` works
+for diagnostics.
 
 ## Auth
 
@@ -53,6 +74,7 @@ just a `docker restart`.
 ## Passthrough mode
 
 `MERIDIAN_PASSTHROUGH=1` is set so tool_use blocks flow back to the caller
+(through OmniRoute, then Headroom, then to the originating workspace)
 instead of being executed inside the container. Do not unset — internal
 execution would run tools against the meridian container's filesystem,
 not the calling workspace.

@@ -2,30 +2,58 @@
 
 [Headroom](https://github.com/chopratejas/headroom) — local prompt
 compression proxy for AI agent traffic. Compose-only service that pulls
-the upstream image directly from GHCR. All routing is configured via env
-vars in the compose snippet (no host-side config file).
+the upstream image directly from GHCR.
 
-## Routing
+## Role in the topology
 
-Headroom dispatches per request path to the matching upstream:
+Headroom is the **single, centralized compression layer** for every
+outbound LLM call in the stack. All four protocol shapes hit Headroom,
+get compressed, and forward to OmniRoute, which handles the actual
+provider routing.
 
-| Incoming path                                  | Upstream env var             | Resolves to        |
+```
+client → Traefik /headroom/* → headroom :8787 → omniroute :20128
+                                                    │
+                                                    ├─→ meridian (Claude Pro/Max)
+                                                    ├─→ cliproxy (Codex / Gemini OAuth)
+                                                    ├─→ Kiro (built-in)
+                                                    └─→ direct API providers
+```
+
+OmniRoute's own compression pipeline (RTK + Caveman) is left **disabled**
+on purpose — stacking compressors corrupts Anthropic prompt-cache markers
+and produces diminishing returns. See `host-services/omniroute/README.md`
+for the full rationale.
+
+## Routing (single-upstream)
+
+Headroom dispatches per request path; in our setup all four point at
+OmniRoute. OmniRoute then accepts each path natively and dispatches to
+the right backend internally:
+
+| Incoming path                                  | Headroom env var             | Resolves to        |
 |------------------------------------------------|------------------------------|--------------------|
-| `POST /v1/messages`                            | `ANTHROPIC_TARGET_API_URL`   | `meridian:3456`    |
-| `POST /v1/responses`                           | `OPENAI_TARGET_API_URL`      | `cliproxy:8317`    |
-| `POST /v1beta/models/{model}:generateContent`  | `GEMINI_TARGET_API_URL`      | `cliproxy:8317`    |
-| `POST /v1internal:streamGenerateContent`       | `CLOUDCODE_TARGET_API_URL`   | `cliproxy:8317`    |
+| `POST /v1/messages`                            | `ANTHROPIC_TARGET_API_URL`   | `omniroute:20128`  |
+| `POST /v1/chat/completions` + `/v1/responses`  | `OPENAI_TARGET_API_URL`      | `omniroute:20128`  |
+| `POST /v1beta/models/{model}:generateContent`  | `GEMINI_TARGET_API_URL`      | `omniroute:20128`  |
+| `POST /v1internal:streamGenerateContent`       | `CLOUDCODE_TARGET_API_URL`   | `omniroute:20128`  |
 
-Compression is local: ContentRouter pipeline (SmartCrusher for JSON,
-CodeCompressor for AST, Kompress for prose) plus tool-result
-interceptors. No external LLM key required.
+(All four env vars are real and used; verified in
+`headroom/providers/registry.py:97-106`. The official docs page omits
+`CLOUDCODE_TARGET_API_URL` but the source reads it.)
+
+## Compression details
+
+ContentRouter pipeline (SmartCrusher for JSON, CodeCompressor for AST,
+Kompress for prose) plus tool-result interceptors. No external LLM key
+required.
 
 **RTK clarification:** The full RTK shell-output rewriter only fires in
 `headroom wrap` mode (CLI tool wrapping). In proxy mode (what we run),
 only generic tool-result interceptors run — they can rewrite shell tool
 outputs but don't pull the full RTK pipeline. If you need RTK-grade
 shell compression for an agent, run `headroom wrap` on the client side
-instead of (or in addition to) the proxy.
+in addition to the proxy.
 
 LLMLingua-2 is not included in the upstream `[proxy]` image. Rebuild
 from source with `[proxy,ml]` if you need neural compression (~700 MB).
@@ -33,9 +61,11 @@ from source with `[proxy,ml]` if you need neural compression (~700 MB).
 ## Auth
 
 Headroom does **not** inject credentials — it forwards the client's
-`Authorization` / `x-api-key` / `x-goog-api-key` headers untouched to the
-upstream. Auth is the upstream's responsibility (cliproxy validates the
-local API key; meridian validates against Claude OAuth).
+`Authorization` / `x-api-key` / `x-goog-api-key` headers untouched to
+OmniRoute, which validates them against its own configured providers
+and forwards to the right upstream (which in turn validates against
+its own credentials). Three layers of auth, but only one credential
+boundary that clients see.
 
 ## Optional bypass
 

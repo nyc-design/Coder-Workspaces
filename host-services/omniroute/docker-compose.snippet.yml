@@ -1,22 +1,38 @@
 # Append this service to the host docker-compose on the Coder VM.
 #
 # OmniRoute (https://github.com/diegosouzapw/OmniRoute) — multi-provider
-# AI gateway with smart routing, fallbacks, and Kiro support.
+# AI gateway. In our topology it is the SINGLE provider router for every
+# protocol shape; Headroom forwards all compressed traffic here, and
+# OmniRoute dispatches to meridian, cliproxy, Kiro, or any direct-key
+# provider depending on the requested model.
+#
+# Topology:
+#   headroom → omniroute :20128
+#                  ├─→ meridian :3456                 (claude-* models / Claude Code SDK)
+#                  ├─→ cliproxy :8317  /v1/responses  (gpt-* / Codex subscription)
+#                  ├─→ cliproxy :8317  /v1beta/...    (gemini-* subscription)
+#                  ├─→ Kiro adapter (built-in)        (kiro/* models)
+#                  └─→ Groq, Cerebras, Mistral, etc.  (direct-key providers)
 #
 # Configuration surface (verified against OmniRoute commit 41946c4):
 #   - Direct-key providers (Groq, Cerebras, etc.) → env vars below
-#   - OAuth providers (Claude, Codex, Gemini, etc.) → browser bootstrap,
-#     persisted in encrypted SQLite on the named volume
+#   - Internal upstreams (meridian, cliproxy) → register via dashboard or
+#     POST /api/v1/providers (one-time bootstrap, persisted in SQLite)
 #   - Routing rules ("combos"), models, prompts → dashboard only,
 #     persisted in the same SQLite db
-#   - Per-model payload mutation → optional config/payloadRules.json
-#     (not bind-mounted; add via `configs:` block here if you need it)
+#   - OAuth providers we don't use here (Claude/Codex/Gemini direct) are
+#     redundant — those quotas are reached through cliproxy / meridian
 #
-# OmniRoute is SQLite-only (no Postgres adapter exists). DATA_DIR=/app/data
+# Compression: keep the dashboard compression toggle OFF. Headroom is the
+# single compression layer for the stack — OmniRoute's RTK+Caveman
+# pipeline duplicates Headroom's work and corrupts Anthropic prompt-cache
+# markers (verified in OmniRoute open-sse/services/compression/cachingAware.ts).
+#
+# OmniRoute is SQLite-only (no Postgres adapter). DATA_DIR=/app/data
 # inside the container; the named volume preserves it across image swaps.
 #
 # Public URL: https://llm.tapiavala.com/omniroute/* (Traefik strips prefix)
-# Internal:   http://omniroute:3000
+# Internal:   http://omniroute:20128
 
 services:
   omniroute:
@@ -57,7 +73,9 @@ services:
     labels:
       - "traefik.enable=true"
 
-      - "traefik.http.services.omniroute.loadbalancer.server.port=3000"
+      # NOTE: OmniRoute's default port is 20128, NOT 3000 (verified in
+      # CLAUDE.md). Single port for both API and dashboard.
+      - "traefik.http.services.omniroute.loadbalancer.server.port=20128"
       - "traefik.http.routers.omniroute.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/omniroute`)"
       - "traefik.http.routers.omniroute.entrypoints=websecure"
       - "traefik.http.routers.omniroute.tls.certresolver=le"

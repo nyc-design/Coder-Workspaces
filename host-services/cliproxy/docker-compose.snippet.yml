@@ -5,18 +5,33 @@
 # credentials live on the named volume so they survive image swaps from
 # watchtower.
 #
-# Public URL: https://llm.tapiavala.com/cliproxy/* (Traefik strips prefix)
-# Internal:   http://cliproxy:8317
+# In our topology cliproxy is INTERNAL-ONLY: only OmniRoute reaches it.
+# OmniRoute registers cliproxy as TWO providers (verified in
+# OmniRoute open-sse/services/provider.ts):
 #
-# Bootstrap (one-time, browser-based):
+#   1. openai-compatible-cliproxy-resp  baseUrl=http://cliproxy:8317/v1
+#                                       apiType=responses
+#       → handles /v1/responses traffic (Codex subscription)
+#
+#   2. cliproxyapi upstream-proxy mode for the gemini provider
+#       (PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"})
+#       → handles /v1beta/models/{model}:generateContent (Gemini subscription)
+#
+# Public traffic flows: client → headroom → omniroute → cliproxy.
+# No Traefik labels here — cliproxy is unreachable from outside the
+# Docker network on purpose, which also protects the OAuth credentials
+# in /data/auth from any direct ingress path.
+#
+# Bootstrap (one-time, browser-based; do this AFTER cliproxy is running):
 #   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
 #   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
 #   docker restart cliproxy
 #
 # Required env in the host .env:
 #   CLIPROXY_API_KEY  — generated with `openssl rand -hex 32`. Same value
-#                       goes in any client config (e.g. workspace ANTHROPIC_API_KEY
-#                       when pointing at https://llm.tapiavala.com/cliproxy).
+#                       must be configured in OmniRoute when registering
+#                       cliproxy as a provider, so OmniRoute can authenticate
+#                       inbound calls. Treat as a long-lived shared secret.
 
 services:
   cliproxy:
@@ -28,15 +43,7 @@ services:
     volumes:
       - cliproxy-auth:/data/auth
     labels:
-      - "traefik.enable=true"
-
-      - "traefik.http.services.cliproxy.loadbalancer.server.port=8317"
-      - "traefik.http.routers.cliproxy.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/cliproxy`)"
-      - "traefik.http.routers.cliproxy.entrypoints=websecure"
-      - "traefik.http.routers.cliproxy.tls.certresolver=le"
-      - "traefik.http.routers.cliproxy.middlewares=cliproxy-strip"
-      - "traefik.http.middlewares.cliproxy-strip.stripprefix.prefixes=/cliproxy"
-
+      # Watchtower auto-update opt-in (no Traefik labels: internal-only).
       - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:

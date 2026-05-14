@@ -1,13 +1,23 @@
 # Append this service to the host docker-compose on the Coder VM.
 #
-# headroom (https://github.com/chopratejas/headroom) is a local
-# compression proxy for AI agent traffic. Sits in front of one or more
-# upstreams, compresses prompts/tool outputs/conversation history via the
-# ContentRouter pipeline (SmartCrusher + Kompress + tool-result
-# interceptors), and forwards on. Routing is path-based via env vars.
+# headroom (https://github.com/chopratejas/headroom) is the centralized
+# compression layer for ALL outbound LLM traffic. Sits in front of OmniRoute,
+# compresses prompts/tool outputs/conversation history via the ContentRouter
+# pipeline (SmartCrusher + Kompress + tool-result interceptors), and forwards
+# every protocol shape (Anthropic / OpenAI Chat / OpenAI Responses / Gemini
+# native / Cloud Code Assist) to OmniRoute, which does provider routing.
 #
-# All routing fits inline below — no host-side config file. If routing
-# grows past ~10 lines or needs templating, promote to a file mount.
+# Topology:
+#   client → Traefik /headroom/* → headroom :8787 → omniroute :20128
+#                                                       │
+#                                                       ├─→ meridian (Claude Code SDK; Pro/Max OAuth)
+#                                                       ├─→ cliproxy  (Codex + Gemini OAuth subscriptions)
+#                                                       ├─→ Kiro      (built-in OmniRoute adapter)
+#                                                       └─→ Groq/Cerebras/Mistral/etc. (direct API keys)
+#
+# Compression happens here ONCE. OmniRoute's own compression pipeline
+# (RTK + Caveman) is left disabled — see host-services/omniroute/README.md
+# for the rationale and to confirm the dashboard switch is off.
 #
 # Public URL: https://llm.tapiavala.com/headroom/* (Traefik strips prefix)
 # Internal:   http://headroom:8787
@@ -29,13 +39,19 @@ services:
       HEADROOM_WORKSPACE_DIR: /data
       HEADROOM_CONFIG_DIR: /data/config
 
-      # Path-based dispatch (verified in headroom/providers/registry.py:97-106).
-      # Each request URL determines which upstream gets hit.
-      ANTHROPIC_TARGET_API_URL: http://meridian:3456     # /v1/messages
-      OPENAI_TARGET_API_URL: http://cliproxy:8317        # /v1/responses (Codex)
-      GEMINI_TARGET_API_URL: http://cliproxy:8317        # /v1beta/...:generateContent
-      CLOUDCODE_TARGET_API_URL: http://cliproxy:8317     # /v1internal:streamGenerateContent
-                                                          # (Pi/Antigravity gemini-cli flows)
+      # Single upstream for every protocol shape: OmniRoute. Verified in
+      # headroom/providers/registry.py:97-106 — these four env vars are the
+      # canonical knobs (the docs page is incomplete; CLOUDCODE is real).
+      # OmniRoute accepts all four inbound paths natively at :20128:
+      #   /v1/messages                              (Anthropic)
+      #   /v1/chat/completions                      (OpenAI Chat)
+      #   /v1/responses                             (OpenAI Responses / Codex)
+      #   /v1beta/models/{model}:generateContent    (Gemini native)
+      #   /v1internal:streamGenerateContent         (Cloud Code Assist / Pi)
+      ANTHROPIC_TARGET_API_URL: http://omniroute:20128
+      OPENAI_TARGET_API_URL: http://omniroute:20128
+      GEMINI_TARGET_API_URL: http://omniroute:20128
+      CLOUDCODE_TARGET_API_URL: http://omniroute:20128
     volumes:
       # Persistent savings ledger, TOIN telemetry, subscription state,
       # license cache, optional memory.db. Keeping these on a volume means
