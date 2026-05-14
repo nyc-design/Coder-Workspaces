@@ -17,7 +17,7 @@
 # Required env:
 #   CODER_URL              base URL of the Coder deployment
 #   CODER_SESSION_TOKEN    admin session token (Owner role)
-#   SIDECAR_SHARED_API_KEY shared secret for the host-services sidecars (push only)
+#   LLM_GATEWAY_API_KEY client-facing OmniRoute/Headroom gateway key (push only)
 #   CONTEXT7_API_KEY       Context7 API key (push only)
 #   GITHUB_PAT             GitHub PAT for the github MCP server (push only)
 #
@@ -275,7 +275,7 @@ pull_all() {
   coder_get '/api/experimental/chats/providers' | \
     jq '{providers: [.[] | select(.id != "" and .id != "00000000-0000-0000-0000-000000000000")
                     | {provider, display_name, base_url,
-                       api_key: (if .has_api_key then "${SIDECAR_SHARED_API_KEY}" else null end),
+                       api_key: (if .has_api_key then "${LLM_GATEWAY_API_KEY}" else null end),
                        enabled, central_api_key_enabled, allow_user_api_key,
                        allow_central_api_key_fallback}
                     | with_entries(select(.value != null))]}' | \

@@ -28,7 +28,7 @@ service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
 |---|---|
 | `CODER_URL` | All Coder-API workflows |
 | `CODER_SESSION_TOKEN` | All Coder-API workflows |
-| `SIDECAR_SHARED_API_KEY` | `update-coder-agents-config.yaml` |
+| `LLM_GATEWAY_API_KEY` | `update-coder-agents-config.yaml` |
 | `CONTEXT7_API_KEY` | `update-coder-agents-config.yaml` |
 | `GH_PAT_FOR_MCP` | `update-coder-agents-config.yaml` (mapped to env `GITHUB_PAT` in YAML substitution) |
 | `GCP_PROJECT` | `coder-workspace-launch.yaml` |
@@ -132,12 +132,12 @@ After WIF setup, make sure the GCP secrets in the table above all exist in
 
 ```bash
 # Add a new secret + first version
-echo -n "<value>" | gcloud secrets create SIDECAR_SHARED_API_KEY \
+echo -n "<value>" | gcloud secrets create LLM_GATEWAY_API_KEY \
   --replication-policy=automatic \
   --data-file=- --project=coder-nt
 
 # Update an existing secret to a new version
-echo -n "<new-value>" | gcloud secrets versions add SIDECAR_SHARED_API_KEY \
+echo -n "<new-value>" | gcloud secrets versions add LLM_GATEWAY_API_KEY \
   --data-file=- --project=coder-nt
 ```
 
@@ -149,7 +149,7 @@ deleted (they're now in GCP Secret Manager):
 - `CODER_URL`
 - `CODER_SESSION_TOKEN`
 - `GCP_PROJECT`
-- `SIDECAR_SHARED_API_KEY` (if it was added)
+- `LLM_GATEWAY_API_KEY` (if it was added)
 - `CONTEXT7_API_KEY` (if it was added)
 - `GH_PAT_FOR_MCP` (if it was added)
 

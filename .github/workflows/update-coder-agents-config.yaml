@@ -47,7 +47,7 @@ jobs:
           secrets: |-
             CODER_URL:coder-nt/CODER_URL
             CODER_SESSION_TOKEN:coder-nt/CODER_SESSION_TOKEN
-            SIDECAR_SHARED_API_KEY:coder-nt/SIDECAR_SHARED_API_KEY
+            LLM_GATEWAY_API_KEY:coder-nt/LLM_GATEWAY_API_KEY
             CONTEXT7_API_KEY:coder-nt/CONTEXT7_API_KEY
             GH_PAT_FOR_MCP:coder-nt/GH_PAT_FOR_MCP
 

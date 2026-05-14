@@ -1,0 +1,173 @@
+# Chat model configs for Coder Agents (chatd).
+# Synced to /api/experimental/chats/model-configs by update-coder-agents-config.yaml.
+#
+# Stable identity: `(provider, model)` tuple. This file is declarative: models
+# missing from this YAML are deleted from Coder on sync.
+#
+# Model IDs here are OmniRoute-facing aliases. Create matching OmniRoute models
+# / combos so each alias routes to the intended upstream provider.
+
+models:
+  # ── Claude Code subscription paths ────────────────────────────────────────
+  - provider: anthropic
+    model: claude-sonnet-4.5-omniroute-direct
+    display_name: Claude Sonnet 4.5 — OmniRoute Claude Code direct
+    enabled: true
+    is_default: true
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: anthropic
+    model: claude-sonnet-4.5-meridian
+    display_name: Claude Sonnet 4.5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: anthropic
+    model: claude-sonnet-4.5-cliproxy
+    display_name: Claude Sonnet 4.5 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: anthropic
+    model: claude-opus-4.5-omniroute-direct
+    display_name: Claude Opus 4.5 — OmniRoute Claude Code direct
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: anthropic
+    model: claude-opus-4.5-meridian
+    display_name: Claude Opus 4.5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: anthropic
+    model: claude-opus-4.5-cliproxy
+    display_name: Claude Opus 4.5 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  # ── Codex subscription paths ──────────────────────────────────────────────
+  - provider: openai
+    model: gpt-5.1-codex-cliproxy
+    display_name: GPT-5.1 Codex — CLIProxyAPI
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: gpt-5.1-codex-omniroute-direct
+    display_name: GPT-5.1 Codex — OmniRoute Codex direct
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  # ── Free / bundled OmniRoute routes ───────────────────────────────────────
+  - provider: anthropic
+    model: kiro-sonnet-free
+    display_name: Kiro AWS Builder — Sonnet free tier
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          thinking:
+            budget_tokens: 16000
+
+  - provider: openai
+    model: cerebras-qwen3-coder-free
+    display_name: Cerebras — Qwen3 Coder free tier
+    enabled: true
+    is_default: false
+    context_limit: 131000
+    compression_threshold: 70
+
+  - provider: openai
+    model: groq-qwen3-coder-free
+    display_name: Groq — Qwen3 Coder free tier
+    enabled: true
+    is_default: false
+    context_limit: 131000
+    compression_threshold: 70
+
+  - provider: openai
+    model: codestral-free
+    display_name: Codestral — free tier
+    enabled: true
+    is_default: false
+    context_limit: 32000
+    compression_threshold: 70
+
+  - provider: openai
+    model: opencode-zen-free
+    display_name: OpenCode Zen — free tier
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
