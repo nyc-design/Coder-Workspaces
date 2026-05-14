@@ -60,6 +60,28 @@ proxies it internally.
 
 `HOME=/data` so the npm CLI's `~/.agentmemory` cache also lands on the volume.
 
+### Why volume and not external Postgres?
+
+Verified against iii-engine source: there is no Postgres adapter. iii
+ships exactly three state adapters — `kv` (file/memory), `redis`, and
+`bridge` (forwards to remote iii). The `iii-database` worker the
+agentmemory README hints at does not exist upstream.
+
+**Realistic options if the named volume isn't enough:**
+
+1. **Volume + GCS backups** (current path). Cron `docker exec ... tar` the
+   volume to a GCS bucket nightly. Recovers point-in-time state.
+2. **Redis adapter** (Upstash, Redis Cloud, or self-hosted). Swap the
+   `iii-state`/`iii-stream`/`iii-cron` adapter stanzas in iii-config to
+   `redis` and supply a connection string. Fully supported; ~10 lines
+   of config. Trades local fs latency for managed-service durability.
+3. **Custom Postgres adapter for iii** (Rust, against the trait
+   `kv.rs:195-215` implements). Real work; agentmemory itself needs zero
+   changes once it exists. Even then, embeddings would land as a base64
+   JSON blob in one row — no pgvector for free.
+
+Option 1 is what we ship; option 2 is the realistic upgrade path.
+
 ## Versions
 
 Pinned in the Dockerfile via build args (override at build-time, not deploy-time):

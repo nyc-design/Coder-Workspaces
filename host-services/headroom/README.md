@@ -16,11 +16,19 @@ Headroom dispatches per request path to the matching upstream:
 | `POST /v1beta/models/{model}:generateContent`  | `GEMINI_TARGET_API_URL`      | `cliproxy:8317`    |
 | `POST /v1internal:streamGenerateContent`       | `CLOUDCODE_TARGET_API_URL`   | `cliproxy:8317`    |
 
-Compression is fully local (rule-based + the bundled
-[RTK](https://github.com/rtk-ai/rtk) shell-output rewriter); no extra LLM
-key required. The image we pull (`headroom-ai[proxy]`) does not include
-LLMLingua-2 — rebuild from source with `[proxy,ml]` if you need it
-(~700 MB extra).
+Compression is local: ContentRouter pipeline (SmartCrusher for JSON,
+CodeCompressor for AST, Kompress for prose) plus tool-result
+interceptors. No external LLM key required.
+
+**RTK clarification:** The full RTK shell-output rewriter only fires in
+`headroom wrap` mode (CLI tool wrapping). In proxy mode (what we run),
+only generic tool-result interceptors run — they can rewrite shell tool
+outputs but don't pull the full RTK pipeline. If you need RTK-grade
+shell compression for an agent, run `headroom wrap` on the client side
+instead of (or in addition to) the proxy.
+
+LLMLingua-2 is not included in the upstream `[proxy]` image. Rebuild
+from source with `[proxy,ml]` if you need neural compression (~700 MB).
 
 ## Auth
 
@@ -36,7 +44,26 @@ single request (useful for debugging output diffs). Set
 `HEADROOM_OPTIMIZE: "false"` env to disable compression server-wide while
 keeping the routing proxy.
 
+## State persistence
+
+We deliberately do NOT set `HEADROOM_STATELESS=true` even though the
+rest of the stack is fairly ephemeral. That flag disables all filesystem
+writes — which would mean `proxy_savings.json` (the durable
+compression-savings ledger) vanishes every restart, and `--memory` would
+be useless. Instead we mount `/data` and set `HEADROOM_WORKSPACE_DIR=/data`
+so the savings ledger, TOIN telemetry, subscription state, and license
+cache survive image swaps from watchtower.
+
+Files Headroom writes (verified in `headroom/paths.py:56-66`):
+
+- `/data/proxy_savings.json` — cumulative tokens saved
+- `/data/toin.json` — TOIN telemetry
+- `/data/subscription_state.json` — Anthropic OAuth subscription window
+- `/data/license_cache.json`
+- `/data/memory.db` + `/data/memories/` — only when `--memory` is enabled
+
 ## Telemetry
 
-Off by default. Headroom exposes Prometheus metrics at `/metrics` if you
-flip telemetry on.
+Off by default (`HEADROOM_TELEMETRY=off`). Headroom exposes Prometheus
+metrics at `/metrics` if you flip telemetry on — useful for tracking
+compression ratios and per-route latency.

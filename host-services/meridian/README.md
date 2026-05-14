@@ -18,23 +18,37 @@ Compose-only service that pulls the upstream image directly from GHCR
 
 ## Auth
 
-Headless OAuth via long-lived token from `claude setup-token`. Generate on
-a host with `claude` CLI installed and logged into the **dedicated meridian
-Anthropic account** (keep separate from your dev-machine Claude Code OAuth
-to avoid refresh cycle conflicts):
+Headless OAuth via long-lived token from `claude setup-token`. Generate
+on a host with `claude` CLI installed and logged into the **dedicated
+meridian Anthropic account** (keep separate from your dev-machine Claude
+Code OAuth to avoid refresh cycle conflicts):
 
 ```bash
 claude setup-token
 # → prints sk-ant-oat01-...
 ```
 
-Set in the host `.env` as `CLAUDE_CODE_OAUTH_TOKEN`. ~1 year lifetime;
-refresh by re-running `claude setup-token`, updating `.env`, and
-`docker restart meridian`.
+Set in the host `.env` as `CLAUDE_CODE_OAUTH_TOKEN`. The compose snippet
+wraps it into Meridian's native `MERIDIAN_PROFILES` JSON shape inline,
+which is the supported way per upstream docs:
 
-The named `meridian-data` volume preserves SDK session cache across image
-swaps, so watchtower upgrades don't reset conversation state or trigger
-re-auth.
+```yaml
+MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"${CLAUDE_CODE_OAUTH_TOKEN}"}]'
+MERIDIAN_DEFAULT_PROFILE: default
+```
+
+Not setting `MERIDIAN_PROFILES` and only providing `CLAUDE_CODE_OAUTH_TOKEN`
+is NOT enough — the SDK's 401-recovery would otherwise look at
+`/home/claude/.claude` credentials that don't exist in this image.
+
+~1 year lifetime; refresh by re-running `claude setup-token`, updating
+`.env`, and `docker restart meridian`.
+
+The named `meridian-data` volume preserves per-profile SDK session state
+at `/home/claude/.config/meridian/profiles/default/` across image swaps,
+so watchtower upgrades don't reset conversation continuity. The OAuth
+token itself is delivered via env (never written to disk) so rotation is
+just a `docker restart`.
 
 ## Passthrough mode
 

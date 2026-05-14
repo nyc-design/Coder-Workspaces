@@ -8,19 +8,19 @@
 # Internal:   http://meridian:3456
 #
 # Required env in the host .env:
-#   CLAUDE_CODE_OAUTH_TOKEN  — long-lived OAuth token for Meridian. Generate
-#                              on a host with claude CLI installed and logged
-#                              into the dedicated meridian Anthropic account:
+#   CLAUDE_CODE_OAUTH_TOKEN  — long-lived OAuth token. Generate on a host
+#                              with claude CLI installed and logged into
+#                              the dedicated meridian Anthropic account:
 #                                  claude setup-token
 #                              ~1 year lifetime; refresh by re-running and
 #                              `docker restart meridian`. Keep this account
-#                              SEPARATE from any account used for
-#                              Claude Code CLI on dev machines so refresh
-#                              cycles don't fight each other.
+#                              SEPARATE from any account used for Claude
+#                              Code CLI on dev machines so refresh cycles
+#                              don't fight each other.
 #
-# Note: Meridian's auth is intentionally isolated from cliproxy's. Each owns
-# its own credential surface; named volume keeps SDK session/cache state
-# across image swaps.
+# Note: Meridian's auth is intentionally isolated from cliproxy's. Each
+# owns its own credential surface; named volume keeps SDK session/cache
+# state across image swaps.
 
 services:
   meridian:
@@ -30,16 +30,27 @@ services:
     environment:
       MERIDIAN_HOST: 0.0.0.0
       MERIDIAN_PORT: 3456
-      # Passthrough mode: forward tool_use blocks to the caller (Coder Agents
-      # / OpenCode / etc.) instead of executing tools inside this container.
-      # Internal exec would run tools against the meridian container's
-      # filesystem, not the user's workspace.
+      # Passthrough mode: forward tool_use blocks to the caller (Coder
+      # Agents / OpenCode / etc.) instead of executing tools inside this
+      # container. Internal exec would run tools against the meridian
+      # container's filesystem, not the user's workspace.
       MERIDIAN_PASSTHROUGH: "1"
-      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}
+      # Meridian's profile system (https://github.com/rynfar/meridian#multi-profile-support)
+      # is the supported way to feed credentials. We synthesize a single
+      # oauthToken-style profile inline so the container picks up the
+      # subscription token without any disk-side bootstrap. ${} interpolation
+      # happens at compose-up; the container sees a fully-resolved JSON
+      # array. Bare CLAUDE_CODE_OAUTH_TOKEN env is NOT enough — the SDK's
+      # 401-recovery would otherwise look at /home/claude/.claude credentials
+      # that don't exist here.
+      MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}"}]'
+      MERIDIAN_DEFAULT_PROFILE: default
     volumes:
-      # SDK session cache and Claude config dir. Meridian uses
-      # CLAUDE_CONFIG_DIR=/home/claude/.claude per its upstream Dockerfile.
-      - meridian-data:/home/claude/.claude
+      # Per-profile SDK state lives under ~/.config/meridian/profiles/<id>/
+      # (sessions, settings — never the credential, which is delivered via
+      # MERIDIAN_PROFILES). Mounting the whole meridian config dir keeps
+      # session continuity across container restarts and image swaps.
+      - meridian-data:/home/claude/.config/meridian
     labels:
       - "traefik.enable=true"
 
