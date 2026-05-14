@@ -1,7 +1,8 @@
 # CLIProxyAPI configuration baked into the cliproxy image.
-# Serves BOTH Codex (ChatGPT Plus/Pro OAuth) and Gemini (personal Google
-# OAuth) from one process. The upstream auto-detects which credentials are
-# present in `auth-dir` and serves whichever endpoints have valid auth.
+# Serves Codex (ChatGPT Plus/Pro OAuth), Gemini (personal Google OAuth),
+# and Claude Code (Anthropic OAuth) from one process. The upstream
+# auto-detects which credentials are present in `auth-dir` and serves
+# whichever endpoints have valid auth.
 #
 # `__CLIPROXY_API_KEY__` is substituted at container startup by docker-entrypoint.sh
 # from the CLIPROXY_API_KEY env var (sourced from the host .env). This lets
@@ -10,9 +11,17 @@
 host: "0.0.0.0"
 port: 8317
 
-# OAuth credentials volume. Bootstrap once per provider:
-#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
-#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+# OAuth credentials volume. Bootstrap once per provider. CLIProxyAPI v6.10.9
+# exposes provider-specific flags for Codex/Claude, and generic --login for
+# Gemini:
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --codex-login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --claude-login
+#
+# Claude Code does not need a separate `enable-*` knob here: /v1/messages
+# is registered by CLIProxyAPI whenever the server starts. The presence of
+# a Claude OAuth JSON file in this auth-dir is what makes provider=claude
+# routable.
 auth-dir: "/data/auth/cliproxy"
 
 # Local API key — clients must present on every request so cliproxy isn't an
@@ -20,8 +29,10 @@ auth-dir: "/data/auth/cliproxy"
 api-keys:
   - "__CLIPROXY_API_KEY__"
 
-# Native Gemini endpoint shape — Anthropic-compat tools and Google SDKs hit
-# this path directly.
+# Native Gemini endpoint shape — Google SDKs / Cloud Code Assist hit this
+# path directly. Claude-compatible /v1/messages and Codex /v1/responses
+# are always registered by CLIProxyAPI; no separate enable flag is needed
+# for Claude Code.
 enable-gemini-cli-endpoint: true
 
 # Surface request errors as 4xx/5xx instead of silently retrying so callers

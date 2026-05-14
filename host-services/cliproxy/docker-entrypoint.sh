@@ -14,9 +14,10 @@ sed "s|__CLIPROXY_API_KEY__|${CLIPROXY_API_KEY}|g" \
 
 if [ -z "$(ls -A /data/auth/cliproxy 2>/dev/null)" ]; then
   echo "[cliproxy] no credential files in /data/auth/cliproxy" >&2
-  echo "[cliproxy] bootstrap with one or both of:" >&2
-  echo "  docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex" >&2
-  echo "  docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini" >&2
+  echo "[cliproxy] bootstrap with one or more of:" >&2
+  echo "  docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --codex-login" >&2
+  echo "  docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --login" >&2
+  echo "  docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --claude-login" >&2
 fi
 
 exec cli-proxy-api --config /run/cliproxy/config.yaml

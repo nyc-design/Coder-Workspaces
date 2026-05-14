@@ -36,7 +36,7 @@ client / Coder Agents / workspace CLIs
   omniroute :20128 ← centralized provider router (OmniRoute)
          │
          ├─► meridian :3456    (Claude Pro/Max subscription)
-         ├─► cliproxy :8317    (Codex + Gemini subscriptions)
+         ├─► cliproxy :8317    (Claude Code + Codex + Gemini subscriptions)
          ├─► Kiro adapter      (built-in to OmniRoute)
          └─► Groq, Cerebras, Mistral, etc.  (direct API keys)
 
@@ -71,7 +71,7 @@ compression (small JSON payloads) and doesn't need centralized routing
 | `headroom`     | compose    | `ghcr.io/chopratejas/headroom`         | Yes — `/headroom/*`            | Centralized compression for all LLM traffic          |
 | `omniroute`    | compose    | `diegosouzapw/omniroute`               | Yes — `/omniroute/*` (dashboard) | Centralized provider routing                       |
 | `meridian`     | compose    | `ghcr.io/rynfar/meridian`              | No — internal only             | Claude Pro/Max subscription proxy                    |
-| `cliproxy`     | built      | `ghcr.io/nyc-design/cliproxy`          | No — internal only             | Codex + Gemini OAuth proxy                           |
+| `cliproxy`     | built      | `ghcr.io/nyc-design/cliproxy`          | No — internal only             | Claude Code + Codex + Gemini OAuth proxy             |
 | `agentmemory`  | built      | `ghcr.io/nyc-design/agentmemory`       | No — internal only             | Persistent memory backend (iii-engine + agentmemory) |
 
 All services opt into Watchtower auto-updates via the

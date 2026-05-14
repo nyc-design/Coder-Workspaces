@@ -40,7 +40,7 @@ workspace-modules/         # Reusable Terraform modules for workspace templates
 host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 ├── agentmemory/           # Persistent memory backend (built image, GHCR)
-├── cliproxy/              # Codex + Gemini OAuth proxy (built image, GHCR)
+├── cliproxy/              # Claude Code + Codex + Gemini OAuth proxy (built image, GHCR)
 ├── headroom/              # Local prompt compression proxy (compose-only)
 ├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
 └── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)

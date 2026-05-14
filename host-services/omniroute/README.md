@@ -16,8 +16,11 @@ OmniRoute dispatches based on the requested model:
 client → Traefik /headroom/* → headroom :8787 → omniroute :20128
                                                     │
                                                     ├─→ meridian :3456
-                                                    │   (claude-* models, Claude Code SDK,
+                                                    │   (claude-* primary route, Claude Code SDK,
                                                     │    backed by Pro/Max OAuth)
+                                                    │
+                                                    ├─→ cliproxy :8317 /v1/messages
+                                                    │   (claude-* fallback route, Claude Code OAuth)
                                                     │
                                                     ├─→ cliproxy :8317 /v1/responses
                                                     │   (gpt-* models, Codex subscription)
@@ -88,8 +91,9 @@ purpose-built provider classes for each:
 
 | Backend | OmniRoute provider ID prefix | `provider_specific_data.baseUrl` | apiType / mode |
 |---|---|---|---|
-| meridian (Anthropic Messages) | `anthropic-compatible-cc-meridian` | `http://meridian:3456/v1` | n/a |
+| meridian (Anthropic Messages, primary) | `anthropic-compatible-cc-meridian` | `http://meridian:3456/v1` | n/a |
 | meridian (OpenAI alias)       | `openai-compatible-meridian-oai`   | `http://meridian:3456/v1` | `chat` |
+| cliproxy (Claude Messages, fallback) | `anthropic-compatible-cc-cliproxy-claude` | `http://cliproxy:8317/v1` | n/a |
 | cliproxy (Codex Responses)    | `openai-compatible-cliproxy-resp`  | `http://cliproxy:8317/v1` | `responses` |
 | cliproxy (Gemini)             | use built-in `gemini` provider     | n/a (set upstream-proxy mode) | `cliproxyapi` mode via `PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"}` |
 
@@ -101,8 +105,8 @@ provider at cliproxy on port 8317 (`src/lib/db/upstreamProxy.ts:36`) —
 no separate provider registration needed.
 
 For cliproxy auth, configure the API key as the value of `CLIPROXY_API_KEY`
-when registering each cliproxy-backed provider, so OmniRoute presents it
-on every upstream call.
+when registering each cliproxy-backed provider (Claude fallback, Codex, and
+Gemini upstream-proxy), so OmniRoute presents it on every upstream call.
 
 ## Compression: keep OmniRoute's pipeline OFF
 
@@ -174,15 +178,15 @@ meridian/cliproxy, and re-creating every routing combo.
    — must present. Without it OmniRoute will accept unauthenticated
    traffic from anyone who hits `https://llm.tapiavala.com/omniroute`.
 6. Register internal upstreams: meridian (Anthropic + OpenAI alias) and
-   cliproxy (Responses + Gemini-via-upstream-proxy). See "Wiring recipe"
+   cliproxy (Claude fallback + Responses + Gemini-via-upstream-proxy). See "Wiring recipe"
    above. **For each, configure OmniRoute to present the matching
    per-upstream API key on outbound calls** — `MERIDIAN_API_KEY` on the
    meridian provider, `CLIPROXY_API_KEY` on the cliproxy provider. Same
    values that the upstream services validate inbound.
 7. Confirm Compression Settings master switch is OFF.
 8. Configure model aliases and combos so requests for `claude-*` go to
-   meridian, `gpt-*` go to cliproxy Codex, `gemini-*` go to cliproxy
-   Gemini, etc.
+   meridian primary with cliproxy-Claude fallback, `gpt-*` go to cliproxy
+   Codex, `gemini-*` go to cliproxy Gemini, etc.
 
 ## Auth model
 

@@ -2,8 +2,9 @@
 
 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) built from
 upstream release with our config baked in. Single Go process serves
-**Codex (ChatGPT Plus/Pro OAuth)** and **Gemini (personal Google OAuth)**
-on `127.0.0.1:8317` inside the container.
+**Codex (ChatGPT Plus/Pro OAuth)**, **Gemini (personal Google OAuth)**,
+and **Claude Code (Anthropic OAuth)** on `127.0.0.1:8317` inside the
+container.
 
 Published to GHCR by `.github/workflows/build-cliproxy.yaml`:
 
@@ -27,19 +28,21 @@ cliproxy is **internal-only** in our stack. Only OmniRoute reaches it —
 no Traefik labels, no public URL. Public traffic flows:
 
 ```
-client → headroom → omniroute → cliproxy → chatgpt.com / generativelanguage.googleapis.com
+client → headroom → omniroute → cliproxy → chatgpt.com / generativelanguage.googleapis.com / api.anthropic.com
 ```
 
-OmniRoute registers cliproxy in two ways (verified in OmniRoute
-`open-sse/services/provider.ts`):
+OmniRoute registers cliproxy in three ways:
 
+- For Claude Code: `anthropic-compatible-cc-cliproxy-claude` provider
+  with `baseUrl=http://cliproxy:8317/v1` — handles `/v1/messages` as an
+  alternate/fallback Claude route alongside meridian.
 - For Codex: `openai-compatible-cliproxy-resp` provider with
   `baseUrl=http://cliproxy:8317/v1` and `apiType=responses` — handles
   `/v1/responses` requests.
 - For Gemini: built-in `cliproxyapi` upstream-proxy mode on the
   `gemini` provider (`PUT /api/upstream-proxy/gemini {mode: "cliproxyapi"}`),
-  which OmniRoute already wires to `localhost:8317` —
-  see `src/lib/db/upstreamProxy.ts:36`.
+  which OmniRoute wires to cliproxy's port 8317 — see OmniRoute
+  `src/lib/db/upstreamProxy.ts:36`.
 
 The internal-only posture is also defense-in-depth: the OAuth
 credentials in `/data/auth/cliproxy` stay on the docker network and
@@ -49,11 +52,14 @@ never face an inbound public path.
 
 | Path                                          | Provider             |
 |-----------------------------------------------|----------------------|
+| `POST /v1/messages`                           | Claude Code          |
+| `POST /v1/messages/count_tokens`              | Claude Code          |
 | `POST /v1/responses`                          | Codex (ChatGPT)      |
 | `POST /v1beta/models/{model}:generateContent` | Gemini native        |
 | `POST /v1internal:streamGenerateContent`      | Cloud Code Assist    |
+| `GET  /v1/models`                             | Model list (OpenAI/Claude shape) |
 | `GET  /v1beta/models`                         | Model list (Gemini)  |
-| `GET  /health`                                | Liveness             |
+| `GET  /healthz`                               | Liveness             |
 
 Reach via `http://cliproxy:8317` from any other container on the same
 docker network.
@@ -65,17 +71,29 @@ the image. From your laptop, with the container running:
 
 ```bash
 # Codex (ChatGPT Plus/Pro)
-docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+docker exec -it cliproxy cli-proxy-api \
+  --config /run/cliproxy/config.yaml \
+  --auth-dir /data/auth/cliproxy \
+  --codex-login
 
 # Gemini (personal Google)
-docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+docker exec -it cliproxy cli-proxy-api \
+  --config /run/cliproxy/config.yaml \
+  --auth-dir /data/auth/cliproxy \
+  --login
+
+# Claude Code (Anthropic)
+docker exec -it cliproxy cli-proxy-api \
+  --config /run/cliproxy/config.yaml \
+  --auth-dir /data/auth/cliproxy \
+  --claude-login
 
 docker restart cliproxy
 ```
 
 Credentials land in the `cliproxy-auth` named volume and survive container
 restarts and image upgrades. Run only the providers you need — missing
-auth = 401s for that provider only; the other keeps working.
+auth = 401s for that provider only; the others keep working.
 
 ### Refresh
 
@@ -84,6 +102,9 @@ auth = 401s for that provider only; the other keeps working.
 - **Gemini**: refresh tokens are long-lived (months to years) provided
   they're used at least every 6 months. CLIProxyAPI handles refresh
   transparently.
+- **Claude Code**: refresh behavior follows Anthropic's Claude Code OAuth
+  session rules. Re-run `--claude-login` if cliproxy starts returning 401s
+  on `/v1/messages`.
 
 ## Local API key
 
@@ -109,6 +130,9 @@ but mind each account's ToS on personal-use restrictions.
   Single-user only.
 - **Gemini Advanced** is the most generous of the supported subscriptions —
   but still personal-use per Google's ToS.
+- **Claude Pro/Max via Claude Code** is available here as an alternate route
+  to meridian. Keep each account single-user; do not use one subscription
+  token as a shared team backend.
 
 ## Versions
 

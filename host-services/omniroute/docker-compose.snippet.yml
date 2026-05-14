@@ -8,8 +8,9 @@
 #
 # Topology:
 #   headroom → omniroute :20128
-#                  ├─→ meridian :3456                 (claude-* models / Claude Code SDK)
-#                  ├─→ cliproxy :8317  /v1/responses  (gpt-* / Codex subscription)
+#                  ├─→ meridian :3456                 (claude-* primary / Claude Code SDK)
+#                  ├─→ cliproxy :8317  /v1/messages    (claude-* fallback / Claude Code OAuth)
+#                  ├─→ cliproxy :8317  /v1/responses   (gpt-* / Codex subscription)
 #                  ├─→ cliproxy :8317  /v1beta/...    (gemini-* subscription)
 #                  ├─→ Kiro adapter (built-in)        (kiro/* models)
 #                  └─→ Groq, Cerebras, Mistral, etc.  (direct-key providers)

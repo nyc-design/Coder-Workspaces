@@ -11,7 +11,7 @@
 #   client → Traefik /headroom/* → headroom :8787 → omniroute :20128
 #                                                       │
 #                                                       ├─→ meridian (Claude Code SDK; Pro/Max OAuth)
-#                                                       ├─→ cliproxy  (Codex + Gemini OAuth subscriptions)
+#                                                       ├─→ cliproxy  (Claude Code + Codex + Gemini OAuth subscriptions)
 #                                                       ├─→ Kiro      (built-in OmniRoute adapter)
 #                                                       └─→ Groq/Cerebras/Mistral/etc. (direct API keys)
 #
