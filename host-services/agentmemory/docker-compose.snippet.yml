@@ -1,0 +1,38 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# agentmemory provides persistent memory for AI coding agents. Each agent
+# passes a stable `project` parameter to memory_* tools (e.g. derived from
+# `git remote get-url origin`) so memory survives Coder workspace recreate.
+#
+# Public URL: https://llm.tapiavala.com/agentmemory/* (Traefik strips prefix)
+# Internal:   http://agentmemory:3111 (REST), :3112 (streams), :3113 (viewer)
+#
+# Image is published to GHCR by .github/workflows/build-agentmemory.yaml on
+# every push to main that touches host-services/agentmemory/. Watchtower
+# auto-pulls new versions; the named volume preserves state across upgrades.
+
+services:
+  agentmemory:
+    image: ghcr.io/nyc-design/agentmemory:latest
+    container_name: agentmemory
+    restart: unless-stopped
+    volumes:
+      # Persistent state: kv store, stream offsets, embeddings index, viewer
+      # cache. Survives image swaps so memory isn't wiped on every upgrade.
+      - agentmemory-data:/data
+    labels:
+      - "traefik.enable=true"
+
+      # REST API + MCP HTTP shim (3111). Viewer at /viewer is served from the
+      # same port; we expose it at /agentmemory/viewer publicly.
+      - "traefik.http.services.agentmemory.loadbalancer.server.port=3111"
+      - "traefik.http.routers.agentmemory.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/agentmemory`)"
+      - "traefik.http.routers.agentmemory.entrypoints=websecure"
+      - "traefik.http.routers.agentmemory.tls.certresolver=le"
+      - "traefik.http.routers.agentmemory.middlewares=agentmemory-strip"
+      - "traefik.http.middlewares.agentmemory-strip.stripprefix.prefixes=/agentmemory"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  agentmemory-data:

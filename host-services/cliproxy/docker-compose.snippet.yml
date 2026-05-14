@@ -1,0 +1,43 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# cliproxy fronts ChatGPT Plus/Pro (Codex) and personal-Google (Gemini)
+# OAuth in one Go process. The bundled image bakes our config; OAuth
+# credentials live on the named volume so they survive image swaps from
+# watchtower.
+#
+# Public URL: https://llm.tapiavala.com/cliproxy/* (Traefik strips prefix)
+# Internal:   http://cliproxy:8317
+#
+# Bootstrap (one-time, browser-based):
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+#   docker restart cliproxy
+#
+# Required env in the host .env:
+#   CLIPROXY_API_KEY  — generated with `openssl rand -hex 32`. Same value
+#                       goes in any client config (e.g. workspace ANTHROPIC_API_KEY
+#                       when pointing at https://llm.tapiavala.com/cliproxy).
+
+services:
+  cliproxy:
+    image: ghcr.io/nyc-design/cliproxy:latest
+    container_name: cliproxy
+    restart: unless-stopped
+    environment:
+      CLIPROXY_API_KEY: ${CLIPROXY_API_KEY:?set in .env}
+    volumes:
+      - cliproxy-auth:/data/auth
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.services.cliproxy.loadbalancer.server.port=8317"
+      - "traefik.http.routers.cliproxy.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/cliproxy`)"
+      - "traefik.http.routers.cliproxy.entrypoints=websecure"
+      - "traefik.http.routers.cliproxy.tls.certresolver=le"
+      - "traefik.http.routers.cliproxy.middlewares=cliproxy-strip"
+      - "traefik.http.middlewares.cliproxy-strip.stripprefix.prefixes=/cliproxy"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  cliproxy-auth:

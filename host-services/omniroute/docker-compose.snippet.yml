@@ -1,0 +1,37 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# OmniRoute (https://github.com/diegosouzapw/OmniRoute) — multi-provider
+# AI gateway with smart routing, fallbacks, and Kiro support. Configured
+# entirely through the dashboard at /omniroute (no compose-side env or
+# config file). Provider keys, routing rules, and OAuth tokens persist on
+# the named volume.
+#
+# Public URL: https://llm.tapiavala.com/omniroute/* (Traefik strips prefix)
+# Internal:   http://omniroute:3000
+#
+# Bootstrap (one-time):
+#   1. Visit https://llm.tapiavala.com/omniroute and complete dashboard setup
+#   2. Add upstream providers (Kiro, OpenRouter, Groq, Cerebras, etc.) via UI
+#   3. Configure routing policies; OAuth/login flows happen in the browser
+
+services:
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: omniroute
+    restart: unless-stopped
+    volumes:
+      - omniroute-data:/data
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.services.omniroute.loadbalancer.server.port=3000"
+      - "traefik.http.routers.omniroute.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/omniroute`)"
+      - "traefik.http.routers.omniroute.entrypoints=websecure"
+      - "traefik.http.routers.omniroute.tls.certresolver=le"
+      - "traefik.http.routers.omniroute.middlewares=omniroute-strip"
+      - "traefik.http.middlewares.omniroute-strip.stripprefix.prefixes=/omniroute"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  omniroute-data:

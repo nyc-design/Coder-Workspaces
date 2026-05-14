@@ -1,0 +1,42 @@
+# CLIProxyAPI configuration baked into the cliproxy image.
+# Serves BOTH Codex (ChatGPT Plus/Pro OAuth) and Gemini (personal Google
+# OAuth) from one process. The upstream auto-detects which credentials are
+# present in `auth-dir` and serves whichever endpoints have valid auth.
+#
+# `__CLIPROXY_API_KEY__` is substituted at container startup by docker-entrypoint.sh
+# from the CLIPROXY_API_KEY env var (sourced from the host .env). This lets
+# the key rotate without rebuilding the image.
+
+host: "0.0.0.0"
+port: 8317
+
+# OAuth credentials volume. Bootstrap once per provider:
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login codex
+#   docker exec -it cliproxy cli-proxy-api --auth-dir /data/auth/cliproxy --login gemini
+auth-dir: "/data/auth/cliproxy"
+
+# Local API key — clients must present on every request so cliproxy isn't an
+# open relay if anyone else lands on the container network.
+api-keys:
+  - "__CLIPROXY_API_KEY__"
+
+# Native Gemini endpoint shape — Anthropic-compat tools and Google SDKs hit
+# this path directly.
+enable-gemini-cli-endpoint: true
+
+# Surface request errors as 4xx/5xx instead of silently retrying so callers
+# can react to upstream issues.
+disable-cooling: false
+request-retry: 2
+max-retry-interval: 15
+
+# Don't forward client auth headers upstream; OAuth credential files only.
+passthrough-headers: false
+
+# Restrict the management API to localhost so nothing on the docker network
+# can mutate runtime config.
+remote-management:
+  allow-remote: false
+
+logging-to-file: false
+debug: false

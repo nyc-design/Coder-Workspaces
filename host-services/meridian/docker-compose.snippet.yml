@@ -1,0 +1,56 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# Meridian (https://github.com/rynfar/meridian) bridges the Claude Code SDK
+# to the standard Anthropic API so any tool that speaks the Anthropic
+# protocol (or OpenAI-compat) can draw on a Claude Pro/Max subscription.
+#
+# Public URL: https://llm.tapiavala.com/meridian/* (Traefik strips prefix)
+# Internal:   http://meridian:3456
+#
+# Required env in the host .env:
+#   CLAUDE_CODE_OAUTH_TOKEN  — long-lived OAuth token for Meridian. Generate
+#                              on a host with claude CLI installed and logged
+#                              into the dedicated meridian Anthropic account:
+#                                  claude setup-token
+#                              ~1 year lifetime; refresh by re-running and
+#                              `docker restart meridian`. Keep this account
+#                              SEPARATE from any account used for
+#                              Claude Code CLI on dev machines so refresh
+#                              cycles don't fight each other.
+#
+# Note: Meridian's auth is intentionally isolated from cliproxy's. Each owns
+# its own credential surface; named volume keeps SDK session/cache state
+# across image swaps.
+
+services:
+  meridian:
+    image: ghcr.io/rynfar/meridian:latest
+    container_name: meridian
+    restart: unless-stopped
+    environment:
+      MERIDIAN_HOST: 0.0.0.0
+      MERIDIAN_PORT: 3456
+      # Passthrough mode: forward tool_use blocks to the caller (Coder Agents
+      # / OpenCode / etc.) instead of executing tools inside this container.
+      # Internal exec would run tools against the meridian container's
+      # filesystem, not the user's workspace.
+      MERIDIAN_PASSTHROUGH: "1"
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?set in .env}
+    volumes:
+      # SDK session cache and Claude config dir. Meridian uses
+      # CLAUDE_CONFIG_DIR=/home/claude/.claude per its upstream Dockerfile.
+      - meridian-data:/home/claude/.claude
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.services.meridian.loadbalancer.server.port=3456"
+      - "traefik.http.routers.meridian.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/meridian`)"
+      - "traefik.http.routers.meridian.entrypoints=websecure"
+      - "traefik.http.routers.meridian.tls.certresolver=le"
+      - "traefik.http.routers.meridian.middlewares=meridian-strip"
+      - "traefik.http.middlewares.meridian-strip.stripprefix.prefixes=/meridian"
+
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  meridian-data:

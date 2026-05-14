@@ -39,7 +39,11 @@ workspace-modules/         # Reusable Terraform modules for workspace templates
 
 host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
-└── coder-agents-sidecars/ # subscription-auth sidecars + Headroom for Coder Agents
+├── agentmemory/           # Persistent memory backend (built image, GHCR)
+├── cliproxy/              # Codex + Gemini OAuth proxy (built image, GHCR)
+├── headroom/              # Local prompt compression proxy (compose-only)
+├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
+└── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)
 
 coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ├── providers.yaml         # chat providers (anthropic / openai / google)
