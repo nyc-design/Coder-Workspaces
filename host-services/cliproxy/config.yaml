@@ -12,11 +12,12 @@ host: "0.0.0.0"
 port: 8317
 
 # OAuth credentials volume. Bootstrap once per provider. CLIProxyAPI v6.10.9
-# exposes provider-specific flags for Codex/Claude, and generic --login for
-# Gemini:
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --codex-login
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --login
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --claude-login
+# does NOT expose an --auth-dir flag; pass --config and it reads this
+# auth-dir setting. It exposes provider-specific flags for Codex/Claude,
+# and generic --login for Gemini:
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --codex-login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --claude-login
 #
 # Claude Code does not need a separate `enable-*` knob here: /v1/messages
 # is registered by CLIProxyAPI whenever the server starts. The presence of

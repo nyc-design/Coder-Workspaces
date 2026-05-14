@@ -46,7 +46,7 @@
 #                            meridian service; configure on the meridian
 #                            provider entry in the OmniRoute dashboard.
 #
-# Public URL: https://llm.tapiavala.com/omniroute/* (Traefik strips prefix)
+# Public URL: https://omniroute.tapiavala.com/ (separate host, no prefix)
 # Internal:   http://omniroute:20128
 
 services:
@@ -97,11 +97,12 @@ services:
       # NOTE: OmniRoute's default port is 20128, NOT 3000 (verified in
       # CLAUDE.md). Single port for both API and dashboard.
       - "traefik.http.services.omniroute.loadbalancer.server.port=20128"
-      - "traefik.http.routers.omniroute.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/omniroute`)"
+      # Separate host, not a path prefix. OmniRoute redirects / -> /dashboard
+      # and uses absolute /dashboard, /api, /v1, etc. paths internally; mounting
+      # at /omniroute breaks those redirects and asset/API URLs.
+      - "traefik.http.routers.omniroute.rule=Host(`omniroute.tapiavala.com`)"
       - "traefik.http.routers.omniroute.entrypoints=websecure"
       - "traefik.http.routers.omniroute.tls.certresolver=le"
-      - "traefik.http.routers.omniroute.middlewares=omniroute-strip"
-      - "traefik.http.middlewares.omniroute-strip.stripprefix.prefixes=/omniroute"
 
       - "com.centurylinklabs.watchtower.enable=true"
 

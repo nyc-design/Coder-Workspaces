@@ -26,9 +26,9 @@
 # in /data/auth from any direct ingress path.
 #
 # Bootstrap (one-time, browser-based; do this AFTER cliproxy is running):
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --codex-login
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --login
-#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --auth-dir /data/auth/cliproxy --claude-login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --codex-login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --login
+#   docker exec -it cliproxy cli-proxy-api --config /run/cliproxy/config.yaml --claude-login
 #   docker restart cliproxy
 #
 # Required env in the host .env:
