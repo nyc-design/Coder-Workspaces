@@ -54,7 +54,26 @@ services:
     image: diegosouzapw/omniroute:latest
     container_name: omniroute
     restart: unless-stopped
+    # Upstream Docker docs recommend a 40s stop timeout so SQLite WAL can
+    # checkpoint cleanly before shutdown.
+    stop_grace_period: 40s
     environment:
+      # ── Network / public URL ───────────────────────────────────────────
+      PORT: 20128
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_BASE_URL: https://omniroute.tapiavala.com
+      BASE_URL: http://127.0.0.1:20128
+      AUTH_COOKIE_SECURE: "true"
+
+      # ── Required dashboard/auth secrets ────────────────────────────────
+      # These are required by upstream .env.example. Generate independently:
+      #   openssl rand -base64 48   # OMNIROUTE_JWT_SECRET
+      #   openssl rand -hex 32      # OMNIROUTE_API_KEY_SECRET
+      #   openssl rand -base64 32   # OMNIROUTE_INITIAL_PASSWORD
+      JWT_SECRET: ${OMNIROUTE_JWT_SECRET:?set in .env}
+      API_KEY_SECRET: ${OMNIROUTE_API_KEY_SECRET:?set in .env}
+      INITIAL_PASSWORD: ${OMNIROUTE_INITIAL_PASSWORD:?set in .env}
+
       # ── Storage ────────────────────────────────────────────────────────
       DATA_DIR: /app/data
       # Encrypts the entire SQLite db at rest (provider keys, OAuth tokens,
