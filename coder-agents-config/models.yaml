@@ -437,6 +437,7 @@ models:
       provider_options:
         openai-compat:
           reasoning_effort: medium
+          reasoning_summary: auto
 
   - provider: openai-compat
     model: groq/qwen/qwen3-32b
