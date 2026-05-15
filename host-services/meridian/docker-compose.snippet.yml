@@ -65,15 +65,31 @@ services:
       # network. Defense-in-depth against any other container on the same
       # network accidentally hitting meridian directly.
       MERIDIAN_API_KEY: ${MERIDIAN_API_KEY:?set in .env}
+      # The Claude Code SDK (bundled inside meridian) reads/writes a
+      # persistent credentials file at $CLAUDE_CONFIG_DIR/.credentials.json.
+      # MERIDIAN_PROFILES alone keeps the OAuth token in-memory, which is
+      # enough for short chat-only requests but the tool-loop code path
+      # (long tool surfaces, e.g. opus with 60+ MCP tools attached) re-reads
+      # the credentials file at request time and fails with no file present.
+      # The original s6 sidecar (pre-split) set this explicitly; restore it.
+      CLAUDE_CONFIG_DIR: /home/claude/.claude
     volumes:
       # Per-profile SDK state lives under ~/.config/meridian/profiles/<id>/
       # (sessions, settings — never the credential, which is delivered via
       # MERIDIAN_PROFILES). Mounting the whole meridian config dir keeps
       # session continuity across container restarts and image swaps.
       - meridian-data:/home/claude/.config/meridian
+      # Persistent Claude Code SDK config + credentials directory. Without
+      # this, ~/.claude/.credentials.json never materializes and tool-loop
+      # requests (opus + large tool surfaces) fail with a credentials lookup
+      # error while chat-only requests (haiku, tools=0) still succeed. The
+      # old s6 sidecar mounted /data/auth (covering both cliproxy and the
+      # claude SDK); here we only need the claude SDK dir.
+      - meridian-claude-sdk:/home/claude/.claude
     labels:
       # Watchtower auto-update opt-in (no Traefik labels: internal-only).
       - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:
   meridian-data:
+  meridian-claude-sdk:
