@@ -89,7 +89,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `11-agent-prompts.sh` | Assemble per-image system prompt → write to `~/.coder/AGENTS.md`; symlink `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` to it; symlink `~/.coder/skills` to `~/.claude/skills` |
 
 ### MCP Server Lifecycle Management
-Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
+Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil, agentmemory) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
 
 1. **`mcp-wrap`** (`/usr/local/bin/mcp-wrap`) — Python wrapper that sets `PR_SET_PDEATHSIG(SIGTERM)` before `exec`'ing the real MCP server. The kernel automatically sends SIGTERM when the parent agent process dies. All stdio MCP commands in `mcp.tf` are wrapped: `command = "mcp-wrap"`, `args = ["original-cmd", ...]`. This is the primary defense.
 

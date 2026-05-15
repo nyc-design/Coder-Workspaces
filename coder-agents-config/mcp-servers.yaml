@@ -68,3 +68,13 @@ mcp_servers:
       x-api-key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     availability: default_off
+
+  - slug: agentmemory
+    display_name: AgentMemory
+    description: 'Per-project persistent memory: save observations, recall via smart search, list/audit sessions, manage lessons + sentinels. Always pass `project` derived from the repo (basename of `git remote get-url origin .git`) so memory scopes per repo and survives workspace recreate.'
+    icon_url: /icon/database.svg
+    transport: streamable_http
+    url: http://agentmemory:3114/mcp
+    auth_type: none
+    enabled: true
+    availability: default_on

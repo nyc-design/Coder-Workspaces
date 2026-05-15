@@ -27,3 +27,14 @@ include_default_system_prompt: true
   7. Wait for it to start, then continue the task in it.
 
 Use the `project-workspace` template by default; do not create from any other template unless the user explicitly asks.
+
+## Persistent memory (agentmemory MCP)
+
+The `agentmemory` MCP server holds per-repo durable memory — observations, lessons, sessions, embeddings — that survives workspace recreate. Use it for: corrections the user has given you, project conventions that aren't in the code, references to external systems, and durable context you'd otherwise have to rediscover.
+
+Keying: every `memory_*` call takes a `project` argument that scopes the memory to a repo. Derive it once per session as the basename of the workspace's git remote (`basename $(git remote get-url origin) .git`), e.g. `Coder-Workspaces`. If there is no workspace yet (chat is in the central loop before workspace creation), use the repo name the user referenced or omit `project` only as a last resort.
+
+When to call:
+- `memory_smart_search` early when picking up a task in a known repo — retrieves relevant prior context.
+- `memory_save` when the user corrects you, validates a non-obvious approach, or shares a durable fact about the project.
+- `memory_sessions` / `memory_audit` to investigate prior activity.

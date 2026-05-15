@@ -50,10 +50,13 @@ RUN npm install -g "@agentmemory/agentmemory@${AGENTMEMORY_VERSION}" \
  && npm cache clean --force
 
 # Both iii-config variants live in /opt/agentmemory-config/. The entrypoint
-# copies the right one to ${HOME}/.agentmemory/iii-config.yaml at startup.
+# copies the right one to the npm package's dist/iii-config.yaml at startup,
+# because that is the path findIiiConfig (src/cli.ts:172-175 upstream)
+# resolves first — writing anywhere else is silently ignored.
 COPY iii-config.file-based.yaml iii-config.upstash.yaml /opt/agentmemory-config/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY mcp-http-bridge.mjs /usr/local/bin/mcp-http-bridge.mjs
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/mcp-http-bridge.mjs
 
 # Persistent state lives on the named volume mounted at /data:
 #   /data/state_store.db   — kv (sessions, memories, lifecycle timers)
@@ -66,8 +69,8 @@ ENV HOME=/data \
     AGENTMEMORY_VIEWER_HOST=0.0.0.0
 VOLUME ["/data"]
 
-# 3111 REST API · 3112 streams (WS) · 3113 viewer · 49134 iii bridge (WS)
-EXPOSE 3111 3112 3113 49134
+# 3111 REST API · 3112 streams (WS) · 3113 viewer · 3114 MCP streamable_http bridge · 49134 iii bridge (WS)
+EXPOSE 3111 3112 3113 3114 49134
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl --fail --silent http://127.0.0.1:3111/agentmemory/health || exit 1
