@@ -34,7 +34,7 @@ service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
 | `GCP_PROJECT` | `coder-workspace-launch.yaml` |
 
 Plus the workspace-side secrets unchanged: `GH_PAT`, `DOCKER_CONFIG`,
-`SIGNOZ_URL`, `SIGNOZ_API_KEY`, `HAPI_CLI_API_TOKEN`, etc.
+`SIGNOZ_URL`, `SIGNOZ_API_KEY`, etc.
 
 ## One-time WIF setup
 

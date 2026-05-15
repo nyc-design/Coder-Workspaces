@@ -83,7 +83,6 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
 | `06-code-server.sh` | code-server GitHub auth extension/product metadata patches and Pencil session-cli fallback |
 | `07-vscode-themes.sh` | Installs baked `.vsix` themes from `shared-assets/vscode-themes/` into both code-server and VS Code Web |
-| `08-hapi.sh` | HAPI runner + agent session |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
 | `11-agent-prompts.sh` | Assemble per-image system prompt → write to `~/.coder/AGENTS.md`; symlink `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` to it; symlink `~/.coder/skills` to `~/.claude/skills` |
@@ -104,7 +103,7 @@ RTK automatically optimizes command output to reduce token costs across all AI a
 
 **How it works:**
 - **Claude Code** — PreToolUse hooks transparently rewrite Bash commands before execution
-- **Codex/Gemini/HAPI** — Shell aliases automatically wrap common commands (git, ls, docker, kubectl, npm, pip, etc.)
+- **Codex/Gemini** — Shell aliases automatically wrap common commands (git, ls, docker, kubectl, npm, pip, etc.)
 - **Intelligent summarization** — Recognizes and optimizes output from 20+ common CLI tools
 - **Token savings tracking** — Run `rtk gain` to see cumulative token reduction across all agents
 
@@ -123,7 +122,7 @@ RTK automatically optimizes command output to reduce token costs across all AI a
 **Key files:**
 - `~/.claude/hooks/rtk-rewrite.sh` — PreToolUse hook script (created by rtk init)
 - `~/.claude/settings.json` — Hook registration (backed up to .bak by rtk init)
-- `~/.rtk_aliases` — Shell alias definitions for Codex/Gemini/HAPI
+- `~/.rtk_aliases` — Shell alias definitions for Codex/Gemini
 - `~/.profile` / `~/.bashrc` — Export `BASH_ENV` pointing to aliases file
 - `~/.claude/RTK.md` — Minimal reference documentation (reduces inline token cost)
 
@@ -137,7 +136,7 @@ rtk gain                    # Check token savings
 - Binary installed to `/usr/local/bin/rtk` during Docker build (multi-arch support)
 - Dual configuration runs automatically via `05-rtk.sh` on workspace startup
 - Claude Code: restart required after first init
-- Codex/Gemini/HAPI: active immediately in new shell sessions
+- Codex/Gemini: active immediately in new shell sessions
 
 ### Agent System Prompts (per-workspace)
 

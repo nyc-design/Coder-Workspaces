@@ -30,8 +30,3 @@ data "google_secret_manager_secret_version" "codestral_api_key" {
   project = "ai-sidecar-nt"
   secret  = "CODESTRAL_API_KEY"
 }
-
-data "google_secret_manager_secret_version" "hapi_cli_api_token" {
-  count  = var.include_hapi ? 1 : 0
-  secret = "HAPI_CLI_API_TOKEN"
-}
