@@ -156,13 +156,22 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
   `DefaultInstructionsFile`). It then symlinks `~/.claude/CLAUDE.md`,
   `~/.codex/AGENTS.md`, and `~/.gemini/GEMINI.md` to that canonical file so
   there's a single source of truth with zero content duplication.
+- Layered workspace contributions are standardized across image folders.
+  Each non-base image folder has placeholder `init.d/`, `extensions.d/`,
+  `settings.d/`, `skills.d/`, `skills-install.d/`, and
+  `system_prompt_extension.txt` entries wired in its Dockerfile. Future
+  image-specific contributions can be dropped into those paths without
+  editing the Dockerfile first; Docker layer inheritance stacks base →
+  language/framework → fullstack by copying into the same `/usr/local/share/workspace-*`
+  destinations.
 - Skill catalogs are unified under one canonical at `~/.agents/skills`. The
   canonical is **ephemeral per workspace** — rebuilt on every start by
   `workspace-images/base-dev/init.d/13-agent-skills.sh` from two image-layer
   inputs: `/usr/local/share/workspace-skills.d/` (per-skill SKILL.md
   directories) and `/usr/local/share/workspace-skills-install.d/` (JSON
-  arrays of `skills` CLI package names). Child images contribute by COPYing
-  into the same shared paths so contributions stack additively. After
+  arrays of `skills` CLI package names). Child images contribute by putting
+  files under their placeholder `skills.d/` and `skills-install.d/` paths; the
+  pre-wired Dockerfile COPYs stack those into the shared runtime dirs. After
   building the canonical, the init script publishes **per-skill** symlinks
   into each agent's expected skills dir (`~/.claude/skills/<name>`,
   `~/.codex/skills/<name>`, `~/.gemini/skills/<name>`, `~/.coder/skills/<name>`).

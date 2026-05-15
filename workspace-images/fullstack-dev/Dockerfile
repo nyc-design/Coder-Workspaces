@@ -20,9 +20,16 @@ ENV UV_CACHE_DIR=/home/coder/.cache/uv
 COPY workspace-images/python-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
 COPY workspace-images/python-dev/settings.d/   /usr/local/share/workspace-settings.d/
 
-# Fullstack-specific system prompt extension. Stacks on top of the inherited
-# vite-dev prompt extension (already at 20-vite.txt from the parent image).
+# Layered workspace contributions (all optional; source paths exist so COPYs
+# stay stable as this image grows). Fullstack extends python-dev, so use 30-*
+# prompt ordering to layer after python's 20-* prompt.
+COPY workspace-images/fullstack-dev/init.d/                     /usr/local/share/workspace-init.d/
 COPY workspace-images/fullstack-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/30-fullstack.txt
+COPY workspace-images/fullstack-dev/extensions.d/               /usr/local/share/workspace-extensions.d/
+COPY workspace-images/fullstack-dev/settings.d/                 /usr/local/share/workspace-settings.d/
+COPY workspace-images/fullstack-dev/skills.d/                   /usr/local/share/workspace-skills.d/
+COPY workspace-images/fullstack-dev/skills-install.d/           /usr/local/share/workspace-skills-install.d/
+RUN find /usr/local/share/workspace-init.d -type f -name '*.sh' -exec chmod +x {} +
 
 USER coder
 
