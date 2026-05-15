@@ -6,13 +6,28 @@ Check CLAUDE.md / AGENTS.md for project-specific tools. Available in every works
 - Prefer local CLI tools over MCP when both can do the job. Use MCP for remote services, editor-only workflows, or when the CLI/skill cannot do the needed operation.
 - Core CLI: `git`, `docker`, `gh`, `gcloud`, `python`, `node`, `pnpm`
 - Task CLI: `distill` (compress large non-interactive output), `ctx7` (library docs), `likec4` (architecture), `pencil interactive` (`.pen`), `stitch-mcp <command>` (Stitch), `gitnexus` (run `gitnexus analyze` per repo first)
-- Token efficiency: for non-interactive shell commands with potentially large output, pipe through `distill` unless exact raw output is required.
-- `distill` prompts must be explicit about required output format (e.g., `Return only filenames.` / `Return valid JSON only.`). Avoid vague prompts.
-- Skip `distill` for interactive/TUI commands or when uncompressed output is explicitly needed. Always wait for `distill` to finish before proceeding.
 - Docs/examples: prefer `ctx7`; use Grep MCP for public GitHub code examples.
 - Architecture/design: prefer `likec4`, `pencil interactive`, and `stitch-mcp`; use the matching MCP only when needed. Excalidraw is via VS Code extension.
 - If Pencil MCP fails or returns no response, switch to Pencil CLI headless mode (e.g. `pencil interactive -i input.pen -o output.pen`) and continue there.
 - Observability: SigNoz MCP for OpenTelemetry projects. Start with `list_services`, then `search_traces_by_service` or `get_error_logs`.
+
+-- Tool-output compression with `distill` --
+`distill` is your single most important token-efficiency tool. Tool output (shell, search, file dumps) is the largest token sink in chatd-based agent traffic, and `distill` is the only point where you can compress it before it enters your context. Use it aggressively.
+
+When to pipe through `distill` (any one of these triggers it):
+- The command may emit > ~50 lines or > ~2 KB of stdout. When in doubt, pipe.
+- The command is one of the usual firehose offenders: `grep -r`, `rg`, `find`, `tree`, `ls -R`, `cat <large-file>`, `tail -n +1`, `journalctl`, `docker logs`, `kubectl logs`, build/test runners, package-manager installs, network captures.
+- You only need a summary, count, names, or specific fields — not every line.
+
+When NOT to pipe through `distill`:
+- The downstream step needs exact, byte-for-byte output (diffs, hashes, file content you will pass to an edit tool, fixtures for tests, command-substitution where formatting matters).
+- Interactive / TUI commands (`vim`, `top`, `htop`, `less`, `gh pr view` in pager mode). `distill` only handles non-interactive stdout.
+- Tiny output already (a handful of lines). Overhead isn't worth it.
+
+How to invoke it well:
+- Always give `distill` an explicit, output-shaped prompt. Bad: `... | distill 'summarize'`. Good: `... | distill 'Return only the filenames, one per line.'`, `... | distill 'Return valid JSON: {"errors": [...], "warnings": [...]}'`, `... | distill 'Return the failing test names and their line numbers.'`
+- Wait for `distill` to finish before continuing. Don't background it.
+- If you piped through `distill` and lost something you actually needed, re-run the original command without `distill` rather than guessing.
 
 -- Application Development Process --
 - Project follows a phased architecture-first workflow. You may be brought in at any phase — check the current state of artifacts (CLAUDE.md, .likec4 files, contracts, checklists) to understand where the project stands before proceeding.

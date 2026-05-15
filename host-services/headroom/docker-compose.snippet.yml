@@ -32,6 +32,26 @@ services:
       HEADROOM_PORT: 8787
       HEADROOM_MODE: token
       HEADROOM_TELEMETRY: "off"
+
+      # Turn on tool-result interceptors (default is OFF). In proxy mode this
+      # is what lights up the ast-grep Read outline + other tool-result
+      # rewriters that operate on Anthropic `tool_result` content blocks —
+      # exactly the chunk of every request that chatd-driven agents fill with
+      # shell/search output. Without this flag set, ContentRouter sees most
+      # requests as `router:noop` and compression savings are ~0%.
+      #
+      # Safe to combine with the cache layer: PrefixFreeze is enabled by
+      # default (PrefixFreezeConfig.enabled=True) and will refuse to rewrite
+      # any portion of the request covered by an Anthropic `cache_control`
+      # marker, so the 90% prefix-cache discount is preserved.
+      HEADROOM_INTERCEPT_ENABLED: "1"
+
+      # Default mode is already `optimize` (HeadroomMode.OPTIMIZE). Set
+      # explicitly so a future upstream default change can't silently switch
+      # us to audit mode and drop all compression. To temporarily disable
+      # compression for debugging, set HEADROOM_OPTIMIZE="false" instead —
+      # that's the documented master kill-switch and doesn't fight the mode.
+      HEADROOM_DEFAULT_MODE: optimize
       # NOTE: do NOT set HEADROOM_STATELESS=true — it disables all filesystem
       # writes, which means proxy_savings.json never persists (savings ledger
       # vanishes every restart) and --memory would be useless. We mount
