@@ -56,47 +56,20 @@ which is the supported way per upstream docs:
 ```yaml
 MERIDIAN_PROFILES: '[{"id":"default","oauthToken":"${CLAUDE_CODE_OAUTH_TOKEN}"}]'
 MERIDIAN_DEFAULT_PROFILE: default
-CLAUDE_CONFIG_DIR: /home/claude/.claude
 ```
 
-`MERIDIAN_PROFILES` alone is **not enough**. Meridian reads the OAuth
-token from the profile JSON on startup and keeps it in memory, which is
-fine for short chat-only requests (e.g. haiku, `tools=0`). But the
-Claude Code SDK's tool-loop code path (opus + large tool surfaces, ~60
-MCP tools attached) re-reads `$CLAUDE_CONFIG_DIR/.credentials.json` at
-request time — if that file doesn't exist the request fails silently
-with all client tools "deferred" and an empty SDK response.
+Not setting `MERIDIAN_PROFILES` and only providing `CLAUDE_CODE_OAUTH_TOKEN`
+is NOT enough — the SDK's 401-recovery would otherwise look at
+`/home/claude/.claude` credentials that don't exist in this image.
 
-The fix is two-fold and matches the original s6 sidecar setup:
-
-1. Set `CLAUDE_CONFIG_DIR=/home/claude/.claude` explicitly so the SDK
-   has a well-known location.
-2. Persist that directory via a named volume (`meridian-claude-sdk`) so
-   `.credentials.json` survives container restarts.
-
-For the credentials file itself, one-time bootstrap after first start:
-
-```bash
-docker exec -it meridian claude login
-# browser flow; credentials.json lands in /home/claude/.claude/
-```
-
-This writes `/home/claude/.claude/.credentials.json` once and the SDK
-refreshes it in-place on its ~8h cycle thereafter. If you'd rather
-avoid the browser flow, the `MERIDIAN_PROFILES` token still works for
-the chat path; the volume + `CLAUDE_CONFIG_DIR` are required for the
-tool-loop path.
-
-~1 year lifetime on the setup-token; refresh by re-running
-`claude setup-token`, updating `.env`, and `docker restart meridian`.
-If using `claude login`, refreshes are automatic until the underlying
-Claude account session expires (months).
+~1 year lifetime; refresh by re-running `claude setup-token`, updating
+`.env`, and `docker restart meridian`.
 
 The named `meridian-data` volume preserves per-profile SDK session state
-at `/home/claude/.config/meridian/profiles/default/` across image swaps.
-The `meridian-claude-sdk` volume preserves SDK credentials and config
-at `/home/claude/.claude/`. Together, watchtower upgrades don't reset
-conversation continuity or force re-auth.
+at `/home/claude/.config/meridian/profiles/default/` across image swaps,
+so watchtower upgrades don't reset conversation continuity. The OAuth
+token itself is delivered via env (never written to disk) so rotation is
+just a `docker restart`.
 
 ## Inbound auth (`MERIDIAN_API_KEY`)
 
