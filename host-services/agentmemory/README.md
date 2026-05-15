@@ -46,13 +46,28 @@ adapter container, no UUID resolution.
 | 3111  | REST API + `/agentmemory/health`                   |
 | 3112  | WebSocket stream (live observation feed)           |
 | 3113  | Real-time viewer (web UI)                          |
+| 3114  | MCP streamable_http bridge (`/mcp`)                |
 | 49134 | iii bridge (WebSocket — programmatic SDK access)   |
 
-agentmemory is **internal-only**: workspaces reach it directly over the
-docker network at `http://agentmemory:3111`. No Traefik labels, nothing
-public on the internet — the memory store doesn't need to be reachable
-from outside the host VM. The viewer (3113) is reachable from a laptop
-via SSH port-forward (`ssh -L 3113:agentmemory:3113 vm`) when needed.
+agentmemory is **internal-only**: other host services (chatd, workspaces
+on `ubuntu_default`) reach it directly over the docker network at
+`http://agentmemory:3111` (REST) or `http://agentmemory:3114/mcp` (MCP).
+No Traefik labels, nothing public on the internet — the memory store
+doesn't need to be reachable from outside the host VM. The viewer (3113)
+is reachable from a laptop via SSH port-forward (`ssh -L 3113:agentmemory:3113 vm`)
+when needed.
+
+### Bind quirk (and why our entrypoint writes where it does)
+
+The `@agentmemory/agentmemory` CLI's `findIiiConfig` (`src/cli.ts:172-175`
+upstream) resolves the iii-engine config from `__dirname` first — i.e.
+`dist/iii-config.yaml` inside the installed npm package. The bundled
+default has `host: 127.0.0.1` and a file-based KV adapter, which is why
+out-of-the-box installs bind localhost-only and silently ignore
+`UPSTASH_REDIS_URL`. Our `docker-entrypoint.sh` writes the selected
+config (`iii-config.upstash.yaml` or `iii-config.file-based.yaml`) to
+*that* path at startup. Writing to `${HOME}/.agentmemory/iii-config.yaml`
+or anywhere else has no effect.
 
 ## Storage backend (file-based vs Upstash)
 
@@ -138,9 +153,27 @@ docker exec -it agentmemory curl -fsS http://127.0.0.1:3111/agentmemory/health
 
 ## Wiring agents
 
-Per-agent MCP config (`~/.cursor/mcp.json`, `~/.claude/mcp.json`,
-`~/.codex/config.toml`, etc.) — pointed at the **internal** docker
-network endpoint, since the agent runs on the same VM:
+Two paths exist depending on what the agent's MCP client supports.
+
+### Coder Agents (chatd) — streamable_http MCP via the bridge
+
+chatd only supports HTTP MCP transports. Upstream agentmemory only ships
+stdio MCP + custom REST endpoints, so a small Node bridge (`mcp-http-bridge.mjs`)
+baked into this image translates JSON-RPC → the upstream REST endpoints
+and exposes them on `:3114/mcp`.
+
+Wired into Coder Agents via `coder-agents-config/mcp-servers.yaml`:
+
+```yaml
+- slug: agentmemory
+  transport: streamable_http
+  url: http://agentmemory:3114/mcp
+  auth_type: none
+```
+
+### Stdio MCP clients (Claude Desktop, Cursor, Codex, in-workspace CLIs)
+
+Use the upstream stdio shim, pointed at the REST API:
 
 ```json
 {
@@ -156,5 +189,6 @@ network endpoint, since the agent runs on the same VM:
 }
 ```
 
-Each call to `memory_save`, `memory_smart_search`, etc. should include
-`project` derived from the workspace's git remote.
+Either way, every `memory_*` call should include `project` derived from
+the workspace's git remote so memory is scoped per repo and survives
+workspace recreate.
