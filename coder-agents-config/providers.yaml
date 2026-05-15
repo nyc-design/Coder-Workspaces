@@ -17,18 +17,32 @@ providers:
   #   - CLIProxyAPI Claude Code OAuth fallback
   - provider: anthropic
     display_name: OmniRoute Anthropic Gateway
-    base_url: https://llm.tapiavala.com/headroom
+    base_url: https://llm.tapiavala.com
     api_key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     central_api_key_enabled: true
     allow_user_api_key: false
     allow_central_api_key_fallback: false
 
-  # Canonical OpenAI-compatible entrypoint. Codex and OpenAI-compatible free-tier
-  # providers are distinguished by model alias in OmniRoute.
+  # Canonical OpenAI Responses-API entrypoint. Codex models use `/v1/responses`
+  # end-to-end through Headroom and OmniRoute.
   - provider: openai
     display_name: OmniRoute OpenAI Gateway
-    base_url: https://llm.tapiavala.com/headroom/v1
+    base_url: https://llm.tapiavala.com/v1
+    api_key: ${LLM_GATEWAY_API_KEY}
+    enabled: true
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false
+
+  # Chat-Completions-only entrypoint. Fantasy `openaicompat` does NOT call
+  # WithUseResponsesAPI(), so this provider talks `/v1/chat/completions` end-to-end.
+  # Used for upstreams that only speak Chat Completions: Cerebras, Groq, Codestral,
+  # OpenCode Zen, and any other non-Responses OpenAI-shaped provider routed through
+  # OmniRoute combos.
+  - provider: openaicompat
+    display_name: OmniRoute OpenAI-Compatible Gateway
+    base_url: https://llm.tapiavala.com/v1
     api_key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     central_api_key_enabled: true
@@ -39,7 +53,7 @@ providers:
   # route Gemini / Cloud Code Assist through OmniRoute for Coder Agents.
   - provider: google
     display_name: OmniRoute Gemini Gateway
-    base_url: https://llm.tapiavala.com/headroom
+    base_url: https://llm.tapiavala.com
     api_key: ${LLM_GATEWAY_API_KEY}
     enabled: false
     central_api_key_enabled: true
