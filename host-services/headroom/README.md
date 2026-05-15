@@ -48,15 +48,39 @@ ContentRouter pipeline (SmartCrusher for JSON, CodeCompressor for AST,
 Kompress for prose) plus tool-result interceptors. No external LLM key
 required.
 
+**Tool-result interceptors must be explicitly enabled.** Upstream
+default is `intercept_tool_results: bool = False` (see
+`headroom/config.py`). We set `HEADROOM_INTERCEPT_ENABLED="1"` in the
+compose snippet to turn them on. Without that flag, ContentRouter
+selects the no-op pipeline for nearly every tool-result content block —
+which is the dominant content type in chatd-driven agent traffic.
+Observed effect of leaving it default: 8/36 requests compressed, 0.2%
+average savings, $0.00 compression dollar savings vs $0.55 prompt-cache
+savings. The fix is one env var, not a behavior tradeoff.
+
+**Prompt cache stays safe.** `PrefixFreezeConfig.enabled` is `True` by
+default, so Headroom refuses to rewrite any portion of the request
+covered by an Anthropic `cache_control` marker. Turning on tool-result
+interceptors only widens what gets compressed in the *non-cached*
+suffix (new user turns, fresh tool results). The 90% prefix-cache
+discount is untouched.
+
 **RTK clarification:** The full RTK shell-output rewriter only fires in
 `headroom wrap` mode (CLI tool wrapping). In proxy mode (what we run),
 only generic tool-result interceptors run — they can rewrite shell tool
-outputs but don't pull the full RTK pipeline. If you need RTK-grade
-shell compression for an agent, run `headroom wrap` on the client side
-in addition to the proxy.
+outputs but don't pull the full RTK pipeline. `headroom wrap` is not
+usable in our topology anyway, because chatd-based agents invoke tools
+over MCP (the `execute` MCP tool) rather than shelling out to a
+wrappable CLI. The chatd-architecture analogue of `headroom wrap` is
+`distill` running inside the workspace — see
+`workspace-images/base-dev/system_prompt.txt` for the agent-facing
+guidance.
 
 LLMLingua-2 is not included in the upstream `[proxy]` image. Rebuild
 from source with `[proxy,ml]` if you need neural compression (~700 MB).
+Not recommended on the shared Oracle VM (4 vCPU / 24 GB RAM): CPU
+inference would contend with active workspaces, and prompt cache is
+already capturing the bulk of available savings.
 
 ## Auth
 

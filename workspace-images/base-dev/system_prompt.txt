@@ -6,13 +6,13 @@ Check CLAUDE.md / AGENTS.md for project-specific tools. Available in every works
 - Prefer local CLI tools over MCP when both can do the job. Use MCP for remote services, editor-only workflows, or when the CLI/skill cannot do the needed operation.
 - Core CLI: `git`, `docker`, `gh`, `gcloud`, `python`, `node`, `pnpm`
 - Task CLI: `distill` (compress large non-interactive output), `ctx7` (library docs), `likec4` (architecture), `pencil interactive` (`.pen`), `stitch-mcp <command>` (Stitch), `gitnexus` (run `gitnexus analyze` per repo first)
-- Token efficiency: for non-interactive shell commands with potentially large output, pipe through `distill` unless exact raw output is required.
-- `distill` prompts must be explicit about required output format (e.g., `Return only filenames.` / `Return valid JSON only.`). Avoid vague prompts.
-- Skip `distill` for interactive/TUI commands or when uncompressed output is explicitly needed. Always wait for `distill` to finish before proceeding.
 - Docs/examples: prefer `ctx7`; use Grep MCP for public GitHub code examples.
 - Architecture/design: prefer `likec4`, `pencil interactive`, and `stitch-mcp`; use the matching MCP only when needed. Excalidraw is via VS Code extension.
 - If Pencil MCP fails or returns no response, switch to Pencil CLI headless mode (e.g. `pencil interactive -i input.pen -o output.pen`) and continue there.
 - Observability: SigNoz MCP for OpenTelemetry projects. Start with `list_services`, then `search_traces_by_service` or `get_error_logs`.
+
+- Token efficiency: pipe non-interactive shell output through `distill` when output may exceed ~50 lines / ~2 KB or comes from firehose commands (`grep -r`, `rg`, `find`, `tree`, `ls -R`, `cat <large>`, `journalctl`, `docker logs`, `kubectl logs`, build/test runners, installers). Skip for byte-exact needs (diffs, hashes, file content for edits), interactive/TUI commands, and already-tiny output.
+- `distill` prompts must be output-shaped: `'Return only filenames, one per line.'`, `'Return valid JSON: {"errors": [...]}'`, `'Return failing test names and line numbers.'` — never `'summarize'`. Wait for it to finish; if it dropped something you needed, re-run without it.
 
 -- Application Development Process --
 - Project follows a phased architecture-first workflow. You may be brought in at any phase — check the current state of artifacts (CLAUDE.md, .likec4 files, contracts, checklists) to understand where the project stands before proceeding.
