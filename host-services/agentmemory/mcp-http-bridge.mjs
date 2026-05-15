@@ -21,6 +21,11 @@
 //   prompts/list                   → GET  /agentmemory/mcp/prompts
 //   prompts/get                    → POST /agentmemory/mcp/prompts/get      {name, arguments}
 //
+// Auth: the inbound Authorization header is forwarded verbatim to every upstream
+// REST call. When AGENTMEMORY_SECRET is set on the upstream agentmemory process,
+// its middleware::api-auth validates `Authorization: Bearer <secret>` via
+// timingSafeCompare. The bridge does no auth itself; it is purely a translator.
+//
 // Streamable HTTP transport per spec rev 2025-03-26: a single POST to /mcp
 // returns either application/json (single response) or text/event-stream
 // (server-streamed responses). We only ever return single responses since
@@ -42,20 +47,21 @@ function log(...args) {
   process.stderr.write(`[mcp-http-bridge] ${args.join(" ")}\n`);
 }
 
-async function upstream(path, init = {}) {
-  const res = await fetch(`${UPSTREAM}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", ...(init.headers || {}) },
-  });
+async function upstream(path, init = {}, authHeader) {
+  const headers = { "content-type": "application/json", ...(init.headers || {}) };
+  if (authHeader) headers.authorization = authHeader;
+  const res = await fetch(`${UPSTREAM}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`upstream ${path} ${res.status}: ${body.slice(0, 200)}`);
+    const err = new Error(`upstream ${path} ${res.status}: ${body.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
-async function dispatch(method, params) {
+async function dispatch(method, params, authHeader) {
   switch (method) {
     case "initialize":
       return {
@@ -76,7 +82,7 @@ async function dispatch(method, params) {
       return {};
 
     case "tools/list": {
-      const r = await upstream("/agentmemory/mcp/tools", { method: "GET" });
+      const r = await upstream("/agentmemory/mcp/tools", { method: "GET" }, authHeader);
       return { tools: Array.isArray(r?.tools) ? r.tools : [] };
     }
 
@@ -87,13 +93,13 @@ async function dispatch(method, params) {
           name: params?.name,
           arguments: params?.arguments || {},
         }),
-      });
+      }, authHeader);
       if (r && Array.isArray(r.content)) return { content: r.content, isError: !!r.isError };
       return { content: [{ type: "text", text: JSON.stringify(r) }] };
     }
 
     case "resources/list": {
-      const r = await upstream("/agentmemory/mcp/resources", { method: "GET" });
+      const r = await upstream("/agentmemory/mcp/resources", { method: "GET" }, authHeader);
       return { resources: Array.isArray(r?.resources) ? r.resources : [] };
     }
 
@@ -101,12 +107,12 @@ async function dispatch(method, params) {
       const r = await upstream("/agentmemory/mcp/resources/read", {
         method: "POST",
         body: JSON.stringify({ uri: params?.uri }),
-      });
+      }, authHeader);
       return { contents: Array.isArray(r?.contents) ? r.contents : [] };
     }
 
     case "prompts/list": {
-      const r = await upstream("/agentmemory/mcp/prompts", { method: "GET" });
+      const r = await upstream("/agentmemory/mcp/prompts", { method: "GET" }, authHeader);
       return { prompts: Array.isArray(r?.prompts) ? r.prompts : [] };
     }
 
@@ -117,7 +123,7 @@ async function dispatch(method, params) {
           name: params?.name,
           arguments: params?.arguments || {},
         }),
-      });
+      }, authHeader);
       return r;
     }
 
@@ -130,7 +136,7 @@ function isNotification(req) {
   return req.id === undefined || req.id === null;
 }
 
-async function handleMessage(req) {
+async function handleMessage(req, authHeader) {
   if (!req || typeof req !== "object" || req.jsonrpc !== "2.0" || typeof req.method !== "string") {
     return {
       jsonrpc: "2.0",
@@ -139,7 +145,7 @@ async function handleMessage(req) {
     };
   }
   try {
-    const result = await dispatch(req.method, req.params || {});
+    const result = await dispatch(req.method, req.params || {}, authHeader);
     if (isNotification(req)) return null;
     return { jsonrpc: "2.0", id: req.id, result };
   } catch (err) {
@@ -147,7 +153,7 @@ async function handleMessage(req) {
       log(`notification handler error for ${req.method}: ${err?.message || err}`);
       return null;
     }
-    const code = err?.code || -32603;
+    const code = err?.code || (err?.status === 401 ? -32001 : -32603);
     return {
       jsonrpc: "2.0",
       id: req.id,
@@ -190,6 +196,7 @@ const server = createServer(async (req, res) => {
       req.destroy();
     }
   });
+  const authHeader = req.headers.authorization || req.headers.Authorization;
   req.on("end", async () => {
     let parsed;
     try {
@@ -200,7 +207,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     const messages = Array.isArray(parsed) ? parsed : [parsed];
-    const responses = (await Promise.all(messages.map(handleMessage))).filter(Boolean);
+    const responses = (await Promise.all(messages.map((m) => handleMessage(m, authHeader)))).filter(Boolean);
     if (responses.length === 0) {
       res.writeHead(202).end();
       return;

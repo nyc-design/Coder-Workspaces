@@ -1,18 +1,27 @@
 # Append this service to the host docker-compose on the Coder VM.
 #
-# agentmemory is the persistent memory backend that workspaces talk to via
-# the @agentmemory/mcp MCP server. Holds session observations, embeddings,
-# and lifecycle metadata across workspace recreate.
+# agentmemory is the persistent memory backend that any MCP client — chatd
+# inside workspaces, Claude Desktop, Cursor, in-workspace CLIs, etc. — can
+# talk to. Holds session observations, embeddings, and lifecycle metadata
+# across workspace recreate.
 #
 # Storage backend is chosen at startup by the bundled docker-entrypoint.sh:
 #   UPSTASH_REDIS_URL set in .env → Redis (state/stream/cron all on Upstash)
 #   UPSTASH_REDIS_URL unset       → file-based on /data named volume
 #
-# In our topology agentmemory is INTERNAL-ONLY: workspaces reach it over
-# the docker network at http://agentmemory:3111. No Traefik labels —
-# nothing on the public internet should be hitting the memory store
-# directly. If you need the viewer (3113) from a laptop, port-forward
-# via SSH or expose behind Traefik with auth.
+# Public access: the MCP streamable_http bridge (port 3114) is exposed via
+# Traefik at https://memory.tapiavala.com/mcp, gated by Bearer auth using
+# AGENTMEMORY_SECRET. ALL clients (including chatd inside workspaces) go
+# through this public URL with the same Bearer — one auth boundary, one
+# threat model. The raw REST API on 3111 and the streams/viewer ports stay
+# docker-network-only since no off-the-shelf client speaks those shapes.
+#
+# Required env in the host .env:
+#   AGENTMEMORY_SECRET  — Bearer token for every REST + MCP endpoint.
+#                         Generate with `openssl rand -hex 32` and pull
+#                         from GCP Secret Manager. Same value must be
+#                         configured on every MCP client
+#                         (`Authorization: Bearer <secret>`).
 #
 # Optional env in the host .env:
 #   UPSTASH_REDIS_URL  — full rediss:// URL from your Upstash console.
@@ -27,6 +36,12 @@ services:
     container_name: agentmemory
     restart: unless-stopped
     environment:
+      # Bearer secret. Setting this turns on upstream agentmemory's
+      # middleware::api-auth across every REST + MCP endpoint (verified in
+      # rohitg00/agentmemory src/triggers/api.ts + src/mcp/server.ts).
+      # The mcp-http-bridge forwards inbound Authorization headers verbatim,
+      # so the same secret protects port 3114 too.
+      AGENTMEMORY_SECRET: ${AGENTMEMORY_SECRET:?set in .env}
       # Empty default = file-based fallback. Set in .env to switch to Upstash.
       UPSTASH_REDIS_URL: ${UPSTASH_REDIS_URL:-}
     volumes:
@@ -36,7 +51,18 @@ services:
       # Redis paths just don't write there.
       - agentmemory-data:/data
     labels:
-      # Watchtower auto-update opt-in (no Traefik labels: internal-only).
+      - "traefik.enable=true"
+
+      # Only the MCP streamable_http bridge (3114) is exposed publicly.
+      # The REST API (3111), stream WS (3112), viewer (3113), and iii
+      # bridge (49134) stay docker-network-only — no off-the-shelf client
+      # speaks those shapes, and the viewer is reachable via SSH port
+      # forward when needed.
+      - "traefik.http.services.agentmemory.loadbalancer.server.port=3114"
+      - "traefik.http.routers.agentmemory.rule=Host(`memory.tapiavala.com`)"
+      - "traefik.http.routers.agentmemory.entrypoints=websecure"
+      - "traefik.http.routers.agentmemory.tls.certresolver=le"
+
       - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:
