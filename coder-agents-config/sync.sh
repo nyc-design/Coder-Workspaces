@@ -49,10 +49,29 @@ AUTH_HEADER="Coder-Session-Token: ${CODER_SESSION_TOKEN}"
 
 expand_yaml() { envsubst < "$1" | yq -o=json '.'; }
 
-coder_get()    { curl -sS --fail-with-body -H "$AUTH_HEADER" "${CODER_URL}$1"; }
-coder_post()   { curl -sS --fail-with-body -X POST   -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
-coder_patch()  { curl -sS --fail-with-body -X PATCH  -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$2" "${CODER_URL}$1"; }
-coder_delete() { curl -sS --fail-with-body -X DELETE -H "$AUTH_HEADER"                                              "${CODER_URL}$1"; }
+# Wrappers: print response body on HTTP error so 4xx/5xx aren't opaque.
+_curl() {
+  local method="$1" path="$2" data="${3-}"
+  local out status
+  if [ -n "$data" ]; then
+    out="$(curl -sS -w $'\n%{http_code}' -X "$method" -H "$AUTH_HEADER" -H 'Content-Type: application/json' -d "$data" "${CODER_URL}${path}")"
+  else
+    out="$(curl -sS -w $'\n%{http_code}' -X "$method" -H "$AUTH_HEADER" "${CODER_URL}${path}")"
+  fi
+  status="${out##*$'\n'}"
+  body="${out%$'\n'*}"
+  if [ "$status" -ge 400 ]; then
+    echo "    HTTP $status on $method $path" >&2
+    echo "    request:  $(printf '%s' "$data" | head -c 500)" >&2
+    echo "    response: $(printf '%s' "$body" | head -c 1000)" >&2
+    return 22
+  fi
+  printf '%s' "$body"
+}
+coder_get()    { _curl GET    "$1"; }
+coder_post()   { _curl POST   "$1" "$2"; }
+coder_patch()  { _curl PATCH  "$1" "$2"; }
+coder_delete() { _curl DELETE "$1"; }
 
 # ───────── PROVIDERS (additive) ─────────────────────────────────────────────
 push_providers() {
