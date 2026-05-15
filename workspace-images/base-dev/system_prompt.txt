@@ -11,23 +11,8 @@ Check CLAUDE.md / AGENTS.md for project-specific tools. Available in every works
 - If Pencil MCP fails or returns no response, switch to Pencil CLI headless mode (e.g. `pencil interactive -i input.pen -o output.pen`) and continue there.
 - Observability: SigNoz MCP for OpenTelemetry projects. Start with `list_services`, then `search_traces_by_service` or `get_error_logs`.
 
--- Tool-output compression with `distill` --
-`distill` is your single most important token-efficiency tool. Tool output (shell, search, file dumps) is the largest token sink in chatd-based agent traffic, and `distill` is the only point where you can compress it before it enters your context. Use it aggressively.
-
-When to pipe through `distill` (any one of these triggers it):
-- The command may emit > ~50 lines or > ~2 KB of stdout. When in doubt, pipe.
-- The command is one of the usual firehose offenders: `grep -r`, `rg`, `find`, `tree`, `ls -R`, `cat <large-file>`, `tail -n +1`, `journalctl`, `docker logs`, `kubectl logs`, build/test runners, package-manager installs, network captures.
-- You only need a summary, count, names, or specific fields — not every line.
-
-When NOT to pipe through `distill`:
-- The downstream step needs exact, byte-for-byte output (diffs, hashes, file content you will pass to an edit tool, fixtures for tests, command-substitution where formatting matters).
-- Interactive / TUI commands (`vim`, `top`, `htop`, `less`, `gh pr view` in pager mode). `distill` only handles non-interactive stdout.
-- Tiny output already (a handful of lines). Overhead isn't worth it.
-
-How to invoke it well:
-- Always give `distill` an explicit, output-shaped prompt. Bad: `... | distill 'summarize'`. Good: `... | distill 'Return only the filenames, one per line.'`, `... | distill 'Return valid JSON: {"errors": [...], "warnings": [...]}'`, `... | distill 'Return the failing test names and their line numbers.'`
-- Wait for `distill` to finish before continuing. Don't background it.
-- If you piped through `distill` and lost something you actually needed, re-run the original command without `distill` rather than guessing.
+- Token efficiency: pipe non-interactive shell output through `distill` when output may exceed ~50 lines / ~2 KB or comes from firehose commands (`grep -r`, `rg`, `find`, `tree`, `ls -R`, `cat <large>`, `journalctl`, `docker logs`, `kubectl logs`, build/test runners, installers). Skip for byte-exact needs (diffs, hashes, file content for edits), interactive/TUI commands, and already-tiny output.
+- `distill` prompts must be output-shaped: `'Return only filenames, one per line.'`, `'Return valid JSON: {"errors": [...]}'`, `'Return failing test names and line numbers.'` — never `'summarize'`. Wait for it to finish; if it dropped something you needed, re-run without it.
 
 -- Application Development Process --
 - Project follows a phased architecture-first workflow. You may be brought in at any phase — check the current state of artifacts (CLAUDE.md, .likec4 files, contracts, checklists) to understand where the project stands before proceeding.
