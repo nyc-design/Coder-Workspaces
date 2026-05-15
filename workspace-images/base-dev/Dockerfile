@@ -127,12 +127,15 @@ COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
 RUN chmod +x /usr/local/share/workspace-init.d/*.sh
 
-# Pre-baked Anthropic Skills for agentmemory (recall, remember,
-# session-history, forget). 11-agent-prompts.sh seeds these into the
-# canonical ~/.agents/skills/ on first workspace start, idempotent. Each
-# subdir contains a SKILL.md and is consumed verbatim by every agent in
-# the workspace via the existing symlink scheme.
-COPY workspace-images/base-dev/agentmemory-skills/ /usr/local/share/agentmemory-skills/
+# Image-bundled Anthropic Skills. Each subdir under skills.d/ contains a
+# SKILL.md and is consumed verbatim by every agent in the workspace via
+# the canonical ~/.agents/skills/ catalog (folder-level symlinks set up
+# by 13-agent-skills.sh on first workspace start, confirmatory seeding).
+# Child images can append their own by adding workspace-images/<child>/
+# skills.d/ plus a parallel COPY into /usr/local/share/workspace-skills.d/.
+# base-dev currently ships the four agentmemory skills (recall, remember,
+# session-history, forget).
+COPY workspace-images/base-dev/skills.d/ /usr/local/share/workspace-skills.d/
 
 # Tier 1 (global) extension/settings manifests consumed by
 # 25-extensions-install.sh and 26-settings-apply.sh. Child images add Tier 2
