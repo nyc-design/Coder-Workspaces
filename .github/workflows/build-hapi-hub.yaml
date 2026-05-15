@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "workspace-images/hapi-hub/**"
+      - "host-services/hapi-hub/**"
       - ".github/workflows/build-hapi-hub.yaml"
   workflow_dispatch:
 
@@ -15,7 +15,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: workspace-images
   IMAGE_NAME: hapi-hub
 
 jobs:
@@ -43,7 +42,7 @@ jobs:
 
       - name: Compute image coords
         run: |
-          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
@@ -55,7 +54,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: workspace-images/hapi-hub/Dockerfile
+          file: host-services/hapi-hub/Dockerfile
           platforms: ${{ matrix.platform }}
           tags: ${{ env.IMG }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
@@ -94,7 +93,7 @@ jobs:
 
       - name: Compute image coords
         run: |
-          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+          echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
@@ -144,8 +143,8 @@ jobs:
           account: user
           # Ephemeral GITHUB_TOKEN with packages:write perms is enough
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This is the GHCR package name, e.g. "workspace-images/hapi-hub"
-          image-names: "${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}"
+          # This is the GHCR package name, e.g. "hapi-hub"
+          image-names: "${{ env.IMAGE_NAME }}"
           # Look at both tagged and untagged versions
           tag-selection: both
           # Keep only the newest tagged multi-arch manifest
