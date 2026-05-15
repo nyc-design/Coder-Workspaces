@@ -36,6 +36,20 @@
 # any other docker-network caller without the key is rejected. Generate
 # with `openssl rand -hex 32` and configure the SAME value on the
 # meridian provider entry in the OmniRoute dashboard.
+#
+# One-time manual step after `docker compose up -d` on a fresh VM:
+# the upstream image creates /home/claude/.config/meridian as root, so a
+# freshly-initialized meridian-data named volume inherits root:root
+# ownership. Meridian runs as user `claude` (uid 1000) and can't create
+# profiles/<id>/ under a root-owned parent, so the profile resolver
+# silently no-ops and SDK calls that need the profile dir (opus +
+# tool-loop requests; haiku chat path is unaffected) fail to authenticate.
+# Symptom: meridian log shows `deferred=N/N tools (...)` for an opus
+# request with no following `usage:` line. Fix:
+#   docker exec -u 0 meridian chown -R claude:claude /home/claude/.config/meridian
+#   docker restart meridian
+# Only needed once per volume — survives image swaps and container
+# restarts after that.
 
 services:
   meridian:
