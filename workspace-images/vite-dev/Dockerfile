@@ -20,10 +20,6 @@ RUN npm install -g \
     tailwindcss postcss autoprefixer \
  && chown -R coder:coder /usr/local/share/npm-global
 
-# Vite-specific init script
-COPY workspace-images/vite-dev/vite-init.sh /usr/local/share/workspace-init.d/20-vite-init.sh
-RUN chmod +x /usr/local/share/workspace-init.d/20-vite-init.sh
-
 # Layered workspace contributions (all optional; source paths exist so COPYs
 # stay stable as this image grows).
 COPY workspace-images/vite-dev/init.d/                     /usr/local/share/workspace-init.d/
