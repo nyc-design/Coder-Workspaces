@@ -39,17 +39,15 @@ data "coder_external_auth" "github" {
 }
 
 module "workspace_secrets" {
-  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
-  include_hapi = local.is_agent_mode
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
 }
 
 module "workspace_startup" {
   source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-startup?ref=main"
 }
 
-locals{
+locals {
   github_username = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  is_agent_mode   = data.coder_parameter.workspace_mode.value == "agent"
 }
 
 data "coder_parameter" "workspace_mode" {
@@ -57,7 +55,7 @@ data "coder_parameter" "workspace_mode" {
   display_name = "Workspace Mode"
   type         = "string"
   default      = "self"
-  description  = "self = personal IDE workspace. agent = AI-agent-managed workspace (starts the in-workspace HAPI runner and pre-wires AI CLIs). Coder Agents creating a workspace on behalf of a user should set this to 'agent'."
+  description  = "self = personal IDE workspace. agent = AI-agent-managed workspace. Coder Agents creating a workspace on behalf of a user should set this to 'agent'."
   order        = -1
 
   option {
@@ -207,17 +205,6 @@ resource "coder_agent" "main" {
   os             = "linux"
   startup_script = local.startup_script
 
-  # Shutdown cleanup is safe in both modes — commands no-op if nothing's running
-  shutdown_script = <<-EOT
-    #!/bin/bash
-    if command -v hapi &>/dev/null; then
-      echo "[shutdown] stopping HAPI runner..."
-      hapi runner stop 2>/dev/null || true
-      sleep 2
-      hapi doctor clean 2>/dev/null || true
-    fi
-  EOT
-
   dir = "/workspaces/${local.project_name}"
 
   env = {
@@ -266,12 +253,6 @@ module "workspace_runtime" {
       "SIGNOZ_API_KEY=${module.workspace_secrets.signoz_api_key}",
       "CODESTRAL_API_KEY=${module.workspace_secrets.codestral_api_key}",
     ],
-    local.is_agent_mode ? [
-      "HAPI_HUB_URL=http://host.docker.internal:3006",
-      "HAPI_CLI_API_TOKEN=${module.workspace_secrets.hapi_cli_api_token}",
-      "HAPI_HOSTNAME=${data.coder_workspace.me.name}",
-      "HAPI_AGENT=claude",
-    ] : [],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
       "NEW_PROJECT_TYPE=${local.project_type}",
@@ -299,17 +280,5 @@ module "workspace_apps" {
   enable_apps        = true
   enable_vscode_web  = false
   enable_neovim      = false
-}
-
-# HAPI dashboard link — only in agent mode
-resource "coder_app" "hapi" {
-  count        = local.is_agent_mode ? 1 : 0
-  agent_id     = coder_agent.main.id
-  slug         = "hapi"
-  display_name = "HAPI"
-  icon         = "/icon/terminal.svg"
-  url          = "https://hapi.tapiavala.com"
-  external     = true
-  order        = 10
 }
 

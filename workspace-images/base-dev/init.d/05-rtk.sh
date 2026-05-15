@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # RTK (Reducer ToolKit) — Auto-initialize hooks for all AI agents
-# Configures Claude Code hooks + shell aliases for Codex/Gemini/HAPI
+# Configures Claude Code hooks + shell aliases for Codex/Gemini
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ else
   fi
 fi
 
-# 2. Create shell aliases for Codex, Gemini, and HAPI agents
+# 2. Create shell aliases for Codex and Gemini agents
 # Since RTK's PreToolUse hooks only work in Claude Code, we need shell-level
 # aliases to make common commands automatically use rtk for other agents.
 #
@@ -46,7 +46,7 @@ fi
 #   - .bashrc: Fallback for interactive shells that source it.
 #   - The alias file itself guards with [[ $- != *i* ]] so aliases
 #     only activate in non-interactive shells (AI agent execution).
-echo "[RTK] Configuring shell aliases for Codex/Gemini/HAPI..."
+echo "[RTK] Configuring shell aliases for Codex/Gemini..."
 
 RTK_ALIASES="$HOME/.rtk_aliases"
 cat > "$RTK_ALIASES" << 'EOF'
@@ -126,7 +126,7 @@ cat > "$CLAUDE_DIR/RTK.md" << 'EOF'
 RTK (Reducer ToolKit) optimizes LLM context by intelligently summarizing command output.
 
 **Claude Code**: Auto-active via PreToolUse hook — Bash commands are automatically rewritten.
-**Codex/Gemini/HAPI**: Auto-active via shell aliases — Common commands use rtk automatically.
+**Codex/Gemini**: Auto-active via shell aliases — Common commands use rtk automatically.
 **Manual usage**: `rtk <command>` for any shell command
 **Check savings**: `rtk gain` shows cumulative token reduction
 
@@ -137,5 +137,5 @@ echo "[RTK] ✓ Created reference document at $CLAUDE_DIR/RTK.md"
 echo ""
 echo "[RTK] Initialization complete! Configuration summary:"
 echo "  • Claude Code: PreToolUse hooks (restart Claude Code to activate)"
-echo "  • Codex/Gemini/HAPI: Shell aliases via BASH_ENV (active in new shells)"
+echo "  • Codex/Gemini: Shell aliases via BASH_ENV (active in new shells)"
 echo "  • Token savings tracked automatically with: rtk gain"
