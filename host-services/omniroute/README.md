@@ -16,8 +16,9 @@ initial `/omniroute`, but it cannot safely rewrite every root-relative
 redirect, asset, API, and websocket URL emitted by the app. A dedicated
 subdomain is the clean fix.
 
-`https://llm.tapiavala.com/headroom/*` remains the client LLM entrypoint;
-`omniroute.tapiavala.com` is just the dashboard/direct gateway host.
+`https://llm.tapiavala.com/*` remains the client LLM entrypoint (root-mounted
+Headroom, which forwards to this OmniRoute on the internal docker network);
+`omniroute.tapiavala.com` is just the dashboard host.
 
 ## Role in the topology
 
@@ -26,7 +27,7 @@ hits the stack. Headroom forwards all compressed traffic here, and
 OmniRoute dispatches based on the requested model:
 
 ```
-client → Traefik /headroom/* → headroom :8787 → omniroute :20128
+client → Traefik :443 (Host=llm.tapiavala.com) → headroom :8787 → omniroute :20128
                                                     │
                                                     ├─→ meridian :3456
                                                     │   (claude-* primary route, Claude Code SDK,

@@ -27,8 +27,8 @@ client / Coder Agents / workspace CLIs
          │
          ▼
     Traefik :443
-   /headroom/*     ← single public entry for all LLM traffic
-         │
+   Host=llm.tapiavala.com  ← single public entry for all LLM traffic
+         │                  (root-mounted; no path prefix)
          ▼
    headroom :8787  ← centralized compression layer (Headroom)
          │
@@ -68,7 +68,7 @@ compression (small JSON payloads) and doesn't need centralized routing
 
 | Service        | Type       | Image                                  | Public via Traefik?            | Purpose                                              |
 |----------------|------------|----------------------------------------|--------------------------------|------------------------------------------------------|
-| `headroom`     | compose    | `ghcr.io/chopratejas/headroom`         | Yes — `/headroom/*`            | Centralized compression for all LLM traffic          |
+| `headroom`     | compose    | `ghcr.io/chopratejas/headroom`         | Yes — root of `llm.tapiavala.com` | Centralized compression for all LLM traffic       |
 | `omniroute`    | compose    | `diegosouzapw/omniroute`               | Yes — `omniroute.tapiavala.com` (dashboard) | Centralized provider routing                       |
 | `meridian`     | compose    | `ghcr.io/rynfar/meridian`              | No — internal only             | Claude Pro/Max subscription proxy                    |
 | `cliproxy`     | built      | `ghcr.io/nyc-design/cliproxy`          | No — internal only             | Claude Code + Codex + Gemini OAuth proxy             |
@@ -80,10 +80,11 @@ rebuilt and pushed by their per-service workflow on push to `main`.
 
 ## Public URLs (what clients actually use)
 
-- **LLM traffic**: `https://llm.tapiavala.com/headroom/v1/messages` (and
+- **LLM traffic**: `https://llm.tapiavala.com/v1/messages` (and
   `/v1/responses`, `/v1/chat/completions`, `/v1beta/models/.../generateContent`,
   `/v1internal:streamGenerateContent`). All four protocol shapes work
-  through this single base URL.
+  through this single root-mounted base URL — Anthropic, OpenAI, Gemini
+  SDKs all just need `base_url=https://llm.tapiavala.com`.
 - **OmniRoute dashboard**: `https://omniroute.tapiavala.com/` — for
   configuring providers, OAuth flows, and routing combos. Use a dedicated
   host, not `/omniroute`, because OmniRoute redirects to root-relative

@@ -1,7 +1,9 @@
 #!/bin/bash
 # 11-agent-prompts.sh — Assemble the workspace system prompt and wire it
-# into every agent's expected read path. Also normalize skill catalogs so
-# every agent sees the same skills from one canonical folder.
+# into every agent's expected read path.
+#
+# Skill-catalog canonicalization and image-bundled skill seeding live in
+# 13-agent-skills.sh, not here.
 #
 # How it works:
 #   1. Concatenate /usr/local/share/workspace-prompts/*.txt in sorted order.
@@ -14,15 +16,6 @@
 #      same content is seen by Claude Code, Codex, and Gemini CLIs running
 #      in-workspace. Symlinks are idempotent and preserve any user-edited
 #      regular files (we never overwrite a non-link).
-#   4. Make ~/.agents/skills the single canonical skill catalog (where the
-#      `skills` npm CLI installs natively) and turn each per-agent skills
-#      directory into a folder-level symlink to it. First run migrates any
-#      pre-existing real-dir contents into the canonical (skills with
-#      SKILL.md not already there are adopted; everything else is moved
-#      under ~/.agents/skills-migration-backup/). Coder Agents must be
-#      told to look at ~/.agents/skills via CODER_AGENT_EXP_SKILLS_DIRS
-#      in the workspace template's coder_agent env (its built-in default
-#      resolves .agents/skills relative to the project dir, not $HOME).
 
 set -u
 
@@ -65,67 +58,5 @@ maybe_link() {
 maybe_link "$CANONICAL" "$HOME/.claude/CLAUDE.md"     # Claude Code
 maybe_link "$CANONICAL" "$HOME/.codex/AGENTS.md"      # Codex CLI
 maybe_link "$CANONICAL" "$HOME/.gemini/GEMINI.md"     # Gemini CLI
-
-# 4. Single canonical skill catalog at ~/.agents/skills (where the `skills`
-#    CLI installs natively + persistent across workspaces via the host bind
-#    mount on /home/ubuntu/secrets/.agents). Every agent's skills/ path
-#    becomes a folder-level symlink to it. Migration of any pre-existing
-#    real-dir contents is idempotent — skill subdirs with SKILL.md are
-#    adopted into the canonical if not already present; everything else
-#    (loose files, duplicate skill dirs, agent-specific subfolders like
-#    Codex's .system/) lands in ~/.agents/skills-migration-backup/<agent>/
-#    for manual reconciliation.
-mkdir -p "$HOME/.agents/skills"
-
-migrate_skills_dir_to_link() {
-  local link="$1"
-  local canonical="$HOME/.agents/skills"
-
-  if [ -L "$link" ]; then
-    ln -snf "$canonical" "$link"
-    printf "[agent-prompts] refreshed symlink %s -> %s\n" "$link" "$canonical"
-    return
-  fi
-  if [ ! -e "$link" ]; then
-    mkdir -p "$(dirname "$link")"
-    ln -s "$canonical" "$link"
-    printf "[agent-prompts] linked %s -> %s\n" "$link" "$canonical"
-    return
-  fi
-
-  # Real directory present — migrate contents before converting to symlink.
-  local agent_name backup_root
-  agent_name="$(basename "$(dirname "$link")")"
-  backup_root="$HOME/.agents/skills-migration-backup/${agent_name#.}-$(date +%Y%m%d-%H%M%S)"
-
-  shopt -s nullglob dotglob
-  local entry name
-  for entry in "$link"/*; do
-    name="$(basename "$entry")"
-    case "$name" in .|..) continue ;; esac
-
-    if [ -L "$entry" ]; then
-      # Stale per-skill symlink (skills CLI managed) — already in canonical.
-      rm "$entry"
-    elif [ -d "$entry" ] && [ -f "$entry/SKILL.md" ] && [ ! -e "$canonical/$name" ]; then
-      mv "$entry" "$canonical/"
-      printf "[agent-prompts] adopted %s/%s into canonical\n" "$agent_name" "$name"
-    else
-      mkdir -p "$backup_root"
-      mv "$entry" "$backup_root/"
-      printf "[agent-prompts] backed up %s/%s -> %s\n" "$agent_name" "$name" "$backup_root"
-    fi
-  done
-  shopt -u nullglob dotglob
-
-  rmdir "$link" 2>/dev/null || rm -rf "$link"
-  ln -s "$canonical" "$link"
-  printf "[agent-prompts] linked %s -> %s\n" "$link" "$canonical"
-}
-
-migrate_skills_dir_to_link "$HOME/.claude/skills"
-migrate_skills_dir_to_link "$HOME/.codex/skills"
-migrate_skills_dir_to_link "$HOME/.gemini/skills"
-migrate_skills_dir_to_link "$HOME/.coder/skills"
 
 printf "[agent-prompts] Done.\n"

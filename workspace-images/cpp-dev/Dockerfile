@@ -23,12 +23,15 @@ RUN git clone --depth 1 https://github.com/Microsoft/vcpkg.git /opt/vcpkg \
  && ln -s /opt/vcpkg/vcpkg /usr/local/bin/vcpkg \
  && chown -R coder:coder /opt/vcpkg
 
-# Tier 2 (cpp) extension manifest, merged with the inherited Tier 1 manifest
-# at workspace start by 25-extensions-install.sh and 26-settings-apply.sh.
-COPY workspace-images/cpp-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
-
-# Tier 2 (cpp) settings manifest
-COPY workspace-images/cpp-dev/settings.d/ /usr/local/share/workspace-settings.d/
+# Layered workspace contributions (all optional; source paths exist so COPYs
+# stay stable as this image grows).
+COPY workspace-images/cpp-dev/init.d/                     /usr/local/share/workspace-init.d/
+COPY workspace-images/cpp-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/20-cpp.txt
+COPY workspace-images/cpp-dev/extensions.d/               /usr/local/share/workspace-extensions.d/
+COPY workspace-images/cpp-dev/settings.d/                 /usr/local/share/workspace-settings.d/
+COPY workspace-images/cpp-dev/skills.d/                   /usr/local/share/workspace-skills.d/
+COPY workspace-images/cpp-dev/skills-install.d/           /usr/local/share/workspace-skills-install.d/
+RUN find /usr/local/share/workspace-init.d -type f -name '*.sh' -exec chmod +x {} +
 
 # C++ environment. ccache is on PATH so CMake picks it up as the compiler
 # launcher automatically; CMAKE_GENERATOR=Ninja matches the cmake-tools

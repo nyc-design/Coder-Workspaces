@@ -24,7 +24,13 @@ locals {
     { container_path = "/home/coder/.pencil", host_path = "/home/ubuntu/secrets/.pencil", read_only = false },
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
     { container_path = "/home/coder/.codex", host_path = "/home/ubuntu/secrets/.codex", read_only = false },
-    { container_path = "/home/coder/.agents", host_path = "/home/ubuntu/secrets/.agents", read_only = false },
+    # ~/.agents is intentionally NOT bind-mounted. The skills catalog is
+    # rebuilt per-workspace by workspace-images/base-dev/init.d/13-agent-skills.sh
+    # from the image's /usr/local/share/workspace-skills.d/ (SKILL.md dirs)
+    # and /usr/local/share/workspace-skills-install.d/ (`skills` CLI packages),
+    # so skills always match the running image. Anything previously persisted
+    # under /home/ubuntu/secrets/.agents on the host remains there for manual
+    # reference but is no longer reachable from inside the workspace.
     { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
     { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
     { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },

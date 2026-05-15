@@ -8,7 +8,7 @@ USER root
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates curl git bash-completion \
     python3 python3-pip python3-venv build-essential \
-    tree ripgrep fd-find \
+    tree ripgrep fd-find jq \
     bubblewrap uidmap \
     pre-commit httpie direnv \
  && rm -rf /var/lib/apt/lists/*
@@ -115,7 +115,13 @@ RUN git config --global credential.helper "store --file=/home/coder/.git-credent
  && gh config set git_protocol https || true
 
 USER root
-RUN install -d -m 0755 /usr/local/share/workspace-init.d /usr/local/share/workspace-prompts /usr/local/share/workspace-extensions.d /usr/local/share/workspace-settings.d
+RUN install -d -m 0755 \
+      /usr/local/share/workspace-init.d \
+      /usr/local/share/workspace-prompts \
+      /usr/local/share/workspace-extensions.d \
+      /usr/local/share/workspace-settings.d \
+      /usr/local/share/workspace-skills.d \
+      /usr/local/share/workspace-skills-install.d
 
 # Base workspace system prompt. Child images add their own extensions to
 # /usr/local/share/workspace-prompts/ — 11-agent-prompts.sh concatenates
@@ -126,6 +132,25 @@ COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
 RUN chmod +x /usr/local/share/workspace-init.d/*.sh
+
+# Image-bundled skills, in two flavors. Both are consumed by
+# 13-agent-skills.sh on every workspace start: it copies the SKILL.md dirs
+# into ~/.agents/skills/ (confirmatory), runs `skills add` for each CLI
+# package, then publishes per-skill symlinks into every agent's expected
+# skills dir. ~/.agents is NOT bind-mounted, so the catalog is rebuilt
+# from these layers on every workspace start and never drifts from the
+# image.
+#
+# Child images stack additively — each child Dockerfile contains its own
+#   COPY workspace-images/<child>/skills.d/         /usr/local/share/workspace-skills.d/
+#   COPY workspace-images/<child>/skills-install.d/ /usr/local/share/workspace-skills-install.d/
+# pair. Docker layer inheritance merges them with base-dev's contents at
+# the same shared path.
+#
+# base-dev currently ships the four agentmemory skills (recall, remember,
+# session-history, forget) as SKILL.md dirs and an empty CLI install list.
+COPY workspace-images/base-dev/skills.d/          /usr/local/share/workspace-skills.d/
+COPY workspace-images/base-dev/skills-install.d/  /usr/local/share/workspace-skills-install.d/
 
 # Tier 1 (global) extension/settings manifests consumed by
 # 25-extensions-install.sh and 26-settings-apply.sh. Child images add Tier 2

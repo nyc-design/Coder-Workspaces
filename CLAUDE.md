@@ -156,12 +156,28 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
   `DefaultInstructionsFile`). It then symlinks `~/.claude/CLAUDE.md`,
   `~/.codex/AGENTS.md`, and `~/.gemini/GEMINI.md` to that canonical file so
   there's a single source of truth with zero content duplication.
-- Skill catalogs are unified under one canonical at `~/.agents/skills` (where
-  the `skills` npm CLI installs natively — persistent across workspaces via
-  the host bind mount on `/home/ubuntu/secrets/.agents`). Each agent's
-  skills/ path is a folder-level symlink to the canonical:
-  `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills`, and
-  `~/.coder/skills` all resolve to the same directory. Coder Agents (chatd)
+- Layered workspace contributions are standardized across image folders.
+  Each non-base image folder has placeholder `init.d/`, `extensions.d/`,
+  `settings.d/`, `skills.d/`, `skills-install.d/`, and
+  `system_prompt_extension.txt` entries wired in its Dockerfile. Future
+  image-specific contributions can be dropped into those paths without
+  editing the Dockerfile first; Docker layer inheritance stacks base →
+  language/framework → fullstack by copying into the same `/usr/local/share/workspace-*`
+  destinations.
+- Skill catalogs are unified under one canonical at `~/.agents/skills`. The
+  canonical is **ephemeral per workspace** — rebuilt on every start by
+  `workspace-images/base-dev/init.d/13-agent-skills.sh` from two image-layer
+  inputs: `/usr/local/share/workspace-skills.d/` (per-skill SKILL.md
+  directories) and `/usr/local/share/workspace-skills-install.d/` (JSON
+  arrays of `skills` CLI package names). Child images contribute by putting
+  files under their placeholder `skills.d/` and `skills-install.d/` paths; the
+  pre-wired Dockerfile COPYs stack those into the shared runtime dirs. After
+  building the canonical, the init script publishes **per-skill** symlinks
+  into each agent's expected skills dir (`~/.claude/skills/<name>`,
+  `~/.codex/skills/<name>`, `~/.gemini/skills/<name>`, `~/.coder/skills/<name>`).
+  Provider dirs are still bind-mounted from the host, so stale per-skill
+  symlinks are cleaned each run before the canonical is republished.
+  Coder Agents (chatd)
   doesn't auto-discover `~/.agents/skills` — its built-in `SkillsDir`
   default is `.agents/skills` resolved relative to the project dir. The
   `coder_agent` env in `workspace-templates/project-workspace/main.tf`
@@ -208,11 +224,11 @@ per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
 **OpenAI sidecar base URL gotcha:** Coder's OpenAI provider path handling comes
 from `fantasy/providers/openai`, which treats a custom base URL as the full API
-root and appends `/responses` directly. We keep the public provider base URL at
-`https://llm.tapiavala.com/headroom/v1` while the Anthropic/Google providers use
-`https://llm.tapiavala.com/headroom`. Coder's OpenAI provider appends `/responses`
-directly, so including `/v1` in the OpenAI base URL is required until Headroom is
-root-mounted on `llm.tapiavala.com`.
+root and appends `/responses` directly. Headroom is root-mounted on
+`llm.tapiavala.com`, so the public provider base URLs are
+`https://llm.tapiavala.com` for Anthropic/Google and `https://llm.tapiavala.com/v1`
+for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
+`/responses` directly to the configured base).
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

@@ -8,7 +8,7 @@
 # native / Cloud Code Assist) to OmniRoute, which does provider routing.
 #
 # Topology:
-#   client → Traefik /headroom/* → headroom :8787 → omniroute :20128
+#   client → Traefik :443 (Host=llm.tapiavala.com) → headroom :8787 → omniroute :20128
 #                                                       │
 #                                                       ├─→ meridian (Claude Code SDK; Pro/Max OAuth)
 #                                                       ├─→ cliproxy  (Claude Code + Codex + Gemini OAuth subscriptions)
@@ -19,7 +19,10 @@
 # (RTK + Caveman) is left disabled — see host-services/omniroute/README.md
 # for the rationale and to confirm the dashboard switch is off.
 #
-# Public URL: https://llm.tapiavala.com/headroom/* (Traefik strips prefix)
+# Public URL: https://llm.tapiavala.com/* (Traefik routes the whole host to
+#             headroom — no path prefix). Headroom dispatches per request
+#             path internally: /v1/messages, /v1/chat/completions,
+#             /v1/responses, /v1beta/models/..., /v1internal:streamGenerateContent.
 # Internal:   http://headroom:8787
 
 services:
@@ -81,11 +84,11 @@ services:
       - "traefik.enable=true"
 
       - "traefik.http.services.headroom.loadbalancer.server.port=8787"
-      - "traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`) && PathPrefix(`/headroom`)"
+      # Root-mounted: every path on llm.tapiavala.com goes to headroom, which
+      # then dispatches per request path to its OmniRoute upstreams.
+      - "traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`)"
       - "traefik.http.routers.headroom.entrypoints=websecure"
       - "traefik.http.routers.headroom.tls.certresolver=le"
-      - "traefik.http.routers.headroom.middlewares=headroom-strip"
-      - "traefik.http.middlewares.headroom-strip.stripprefix.prefixes=/headroom"
 
       - "com.centurylinklabs.watchtower.enable=true"
 

@@ -18,12 +18,15 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
             -c clippy -c rustfmt -c rust-src \
  && chown -R coder:coder /usr/local/cargo /usr/local/rustup
 
-# Tier 2 (rust) extension manifest, merged with the inherited Tier 1 manifest
-# at workspace start by 25-extensions-install.sh and 26-settings-apply.sh.
-COPY workspace-images/rust-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
-
-# Tier 2 (rust) settings manifest
-COPY workspace-images/rust-dev/settings.d/ /usr/local/share/workspace-settings.d/
+# Layered workspace contributions (all optional; source paths exist so COPYs
+# stay stable as this image grows).
+COPY workspace-images/rust-dev/init.d/                     /usr/local/share/workspace-init.d/
+COPY workspace-images/rust-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/20-rust.txt
+COPY workspace-images/rust-dev/extensions.d/               /usr/local/share/workspace-extensions.d/
+COPY workspace-images/rust-dev/settings.d/                 /usr/local/share/workspace-settings.d/
+COPY workspace-images/rust-dev/skills.d/                   /usr/local/share/workspace-skills.d/
+COPY workspace-images/rust-dev/skills-install.d/           /usr/local/share/workspace-skills-install.d/
+RUN find /usr/local/share/workspace-init.d -type f -name '*.sh' -exec chmod +x {} +
 
 USER coder
 

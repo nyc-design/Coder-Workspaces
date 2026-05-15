@@ -49,6 +49,67 @@ adapter container, no UUID resolution.
 | 3114  | MCP streamable_http bridge (`/mcp`)                |
 | 49134 | iii bridge (WebSocket — programmatic SDK access)   |
 
+## Features enabled
+
+This image runs with the full agentmemory feature surface on. Set in
+`docker-compose.snippet.yml`; verified flags in upstream
+`rohitg00/agentmemory` source.
+
+### Local embeddings + reranking + image embeddings (free)
+
+| Flag | What it enables |
+|---|---|
+| `EMBEDDING_PROVIDER=local` | Semantic search via `all-MiniLM-L6-v2` (no API key, no network egress per call). |
+| `RERANK_ENABLED=true` | Second-stage local reranker (`ms-marco-MiniLM-L-6-v2`). Big jump in result quality. |
+| `AGENTMEMORY_IMAGE_EMBEDDINGS=true` | CLIP-based image embeddings for screenshots saved alongside text observations. |
+
+Powered by `@xenova/transformers` baked into the image. Model weights
+(~300 MB total) download lazily on first use into
+`/data/.cache/huggingface` and survive image swaps via the named volume.
+
+**Resource footprint on a 4-vCPU / 24-GB Oracle VM** (shared with Coder,
+Headroom, OmniRoute, agentmemory, and active workspaces):
+
+- Idle RAM: +300-500 MB resident (models held in memory).
+- Recall spike: +100-200 MB transient.
+- CPU: ~0% idle; ~50-100 ms on one vCPU per `memory_save` embed;
+  ~1-2 s on one vCPU per `memory_recall` with reranking enabled.
+- Disk: +~350 MB image (transformers + onnxruntime). One-time ~300 MB
+  model download into `/data` on first MCP call after a fresh volume.
+
+### LLM-bound phase (routed through Headroom → OmniRoute)
+
+| Flag | What it enables |
+|---|---|
+| `AGENTMEMORY_AUTO_COMPRESS=true` | Each `memory_save` summarized by the LLM before indexing. |
+| `CONSOLIDATION_ENABLED=true` | Periodic 4-tier pipeline: working → episodic → semantic → procedural. Also runs skill extraction (`src/skill-extract.ts`) as a free byproduct. |
+| `GRAPH_EXTRACTION_ENABLED=true` | Entities + relationships extracted from each compressed observation into a knowledge graph. |
+| `AGENTMEMORY_SLOTS=true` | High-importance / curated memory partitioning. Prereq for reflection. |
+| `AGENTMEMORY_REFLECT=true` | Periodic LLM synthesis of cross-cutting insights across clusters of related memories. Only meaningful once memory volume builds up. |
+
+All five share one provider config:
+
+```yaml
+ANTHROPIC_API_KEY: ${LLM_GATEWAY_API_KEY}     # same key chatd uses
+ANTHROPIC_BASE_URL: https://llm.tapiavala.com  # root-mounted Headroom
+ANTHROPIC_MODEL: meridian/claude-haiku-4-5
+```
+
+The Anthropic SDK posts to `${ANTHROPIC_BASE_URL}/v1/messages`. Headroom
+is root-mounted on `llm.tapiavala.com`, so agentmemory's traffic flows
+through the same compression → routing → metering pipeline as user-
+facing chatd traffic. Haiku 4.5 is the right tier for these calls —
+short fixed-shape summarize / extract / cluster-synthesize prompts —
+resolved via OmniRoute's `meridian/` alias to the Claude Code SDK
+(Pro/Max OAuth-backed). No new secret to provision.
+
+### Already on by default (no config needed)
+
+Lessons, sentinels, sketches, crystallize, facets, auto-forget,
+lesson-decay sweep — visible in startup logs, configured upstream.
+
+## Public MCP endpoint
+
 The MCP streamable_http bridge (3114) is exposed publicly at
 `https://memory.tapiavala.com/mcp` via Traefik, gated by Bearer auth.
 All clients — including chatd inside workspaces — use this URL with

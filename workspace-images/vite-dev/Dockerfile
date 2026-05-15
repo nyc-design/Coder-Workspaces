@@ -20,19 +20,15 @@ RUN npm install -g \
     tailwindcss postcss autoprefixer \
  && chown -R coder:coder /usr/local/share/npm-global
 
-# Vite-specific init script
-COPY workspace-images/vite-dev/vite-init.sh /usr/local/share/workspace-init.d/20-vite-init.sh
-RUN chmod +x /usr/local/share/workspace-init.d/20-vite-init.sh
-
-# Frontend-specific system prompt extension. Concatenated into ~/.coder/AGENTS.md
-# by 11-agent-prompts.sh alongside the base prompt.
+# Layered workspace contributions (all optional; source paths exist so COPYs
+# stay stable as this image grows).
+COPY workspace-images/vite-dev/init.d/                     /usr/local/share/workspace-init.d/
 COPY workspace-images/vite-dev/system_prompt_extension.txt /usr/local/share/workspace-prompts/20-vite.txt
-
-# Tier 2 (frontend) extension + settings manifests, merged with the inherited
-# Tier 1 manifests at workspace start. fullstack-dev FROM vite-dev inherits
-# both manifests transitively via the image layer.
-COPY workspace-images/vite-dev/extensions.d/ /usr/local/share/workspace-extensions.d/
-COPY workspace-images/vite-dev/settings.d/   /usr/local/share/workspace-settings.d/
+COPY workspace-images/vite-dev/extensions.d/               /usr/local/share/workspace-extensions.d/
+COPY workspace-images/vite-dev/settings.d/                 /usr/local/share/workspace-settings.d/
+COPY workspace-images/vite-dev/skills.d/                   /usr/local/share/workspace-skills.d/
+COPY workspace-images/vite-dev/skills-install.d/           /usr/local/share/workspace-skills-install.d/
+RUN find /usr/local/share/workspace-init.d -type f -name '*.sh' -exec chmod +x {} +
 
 # Default Biome config baked into the image. Settings point at this path so
 # any project without its own biome.json picks up the workspace defaults.
