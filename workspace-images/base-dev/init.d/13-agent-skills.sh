@@ -1,26 +1,51 @@
 #!/bin/bash
-# 13-agent-skills.sh — Normalize skill catalogs so every agent reads from
-# the same canonical folder, and seed image-bundled skills into it.
+# 13-agent-skills.sh — Build the canonical skills catalog at ~/.agents/skills
+# from image-bundled SKILL.md directories plus skills installed via the
+# `skills` CLI, then publish per-skill symlinks into every agent's expected
+# skills directory.
 #
-# Skills are persistent across workspace recreates via the host bind mount
-# on /home/ubuntu/secrets/.agents → ~/.agents. The `skills` npm CLI also
-# installs natively into ~/.agents/skills, so making that the single source
-# of truth means everything (image-bundled, CLI-installed, user-edited)
-# lives in one place.
+# Persistence: ~/.agents is NOT bind-mounted from the host. The canonical
+# catalog is rebuilt from scratch on every workspace start, sourced entirely
+# from the immutable image layers below. This keeps per-workspace state in
+# step with the running image — no drift across recreates, no manual cleanup
+# of stale skills — and means skill updates ride alongside image updates.
+# User-installed-at-runtime additions are NOT persisted (use the JSON
+# install list below if you want a skill on every workspace).
 #
-# What this script does:
-#   1. Make ~/.agents/skills the canonical catalog. Each agent's expected
-#      skills directory (~/.claude/skills, ~/.codex/skills, ~/.gemini/skills,
-#      ~/.coder/skills) becomes a folder-level symlink to it. First run
-#      migrates any pre-existing real-dir contents — skill subdirs with
-#      SKILL.md are adopted into the canonical if not already present;
-#      everything else lands in ~/.agents/skills-migration-backup/ for
-#      manual reconciliation.
-#   2. Seed image-bundled skills from /usr/local/share/workspace-skills.d/
-#      into the canonical, with strictly confirmatory semantics:
-#        - skill in skills.d AND in canonical    → SKIP   (never overwrites)
-#        - skill in skills.d AND NOT in canonical → ADD
-#        - skill in canonical AND NOT in skills.d → LEAVE (never subtractive)
+# Inputs (populated by image-layer COPY directives; child images stack
+# additively because each child's COPY targets the same shared directory):
+#
+#   /usr/local/share/workspace-skills.d/<name>/SKILL.md
+#     Per-skill subdirectories shipped inside the image. Each must contain
+#     SKILL.md. base-dev contributes the four agentmemory skills (recall,
+#     remember, session-history, forget). Child images can ship their own —
+#     e.g. workspace-images/python-dev/skills.d/python-lint/SKILL.md COPYs
+#     to /usr/local/share/workspace-skills.d/python-lint/.
+#
+#   /usr/local/share/workspace-skills-install.d/<NN>-<name>.json
+#     JSON arrays of `skills` CLI package names. The CLI fetches the
+#     package and installs it under ~/.agents/skills. Sorted-prefix
+#     filenames so child images can stack on top of base. Example
+#     contents: ["vercel-labs/agent-skills"].
+#
+# Pipeline:
+#   1. Reset ~/.agents/skills to a known-good state seeded from the image.
+#      Confirmatory copy: skill-in-image AND skill-in-canonical → SKIP
+#      (preserves anything we've already placed); skill-in-image AND NOT
+#      in-canonical → ADD; skill-in-canonical only → LEAVE (never
+#      subtractive, so a CLI install from earlier in this same run is not
+#      clobbered when we re-enter on the next image-skills.d/ folder).
+#   2. For each package listed in /usr/local/share/workspace-skills-install.d/
+#      JSON files, invoke `skills add` to install it into the canonical.
+#      Skipped if the package is already present (idempotent across runs).
+#   3. Publish per-skill symlinks into each provider's expected location:
+#        ~/.claude/skills/<name>   → ~/.agents/skills/<name>
+#        ~/.codex/skills/<name>    → ~/.agents/skills/<name>
+#        ~/.gemini/skills/<name>   → ~/.agents/skills/<name>
+#        ~/.coder/skills/<name>    → ~/.agents/skills/<name>
+#      Stale symlinks (pointing at ~/.agents/skills/<gone>) are cleaned up
+#      first. Non-symlink entries (user-authored or hand-edited skills) are
+#      left untouched.
 #
 # Coder Agents must be told to look at ~/.agents/skills via
 # CODER_AGENT_EXP_SKILLS_DIRS in the workspace template's coder_agent env
@@ -31,100 +56,140 @@ set -u
 
 CANONICAL_SKILLS="$HOME/.agents/skills"
 IMAGE_SKILLS_DIR="/usr/local/share/workspace-skills.d"
+INSTALL_LIST_DIR="/usr/local/share/workspace-skills-install.d"
 
 mkdir -p "$CANONICAL_SKILLS"
 
-# 1. Canonicalize each agent's skills directory as a symlink to ~/.agents/skills.
-#    Idempotent: existing symlinks are refreshed; missing dirs are created;
-#    real dirs have their contents migrated before being replaced with a link.
-migrate_skills_dir_to_link() {
-  local link="$1"
-  local canonical="$CANONICAL_SKILLS"
-
-  if [ -L "$link" ]; then
-    ln -snf "$canonical" "$link"
-    printf "[agent-skills] refreshed symlink %s -> %s\n" "$link" "$canonical"
-    return
-  fi
-  if [ ! -e "$link" ]; then
-    mkdir -p "$(dirname "$link")"
-    ln -s "$canonical" "$link"
-    printf "[agent-skills] linked %s -> %s\n" "$link" "$canonical"
-    return
-  fi
-
-  # Real directory present — migrate contents before converting to symlink.
-  local agent_name backup_root
-  agent_name="$(basename "$(dirname "$link")")"
-  backup_root="$HOME/.agents/skills-migration-backup/${agent_name#.}-$(date +%Y%m%d-%H%M%S)"
-
-  shopt -s nullglob dotglob
-  local entry name
-  for entry in "$link"/*; do
-    name="$(basename "$entry")"
-    case "$name" in .|..) continue ;; esac
-
-    if [ -L "$entry" ]; then
-      # Stale per-skill symlink (skills CLI managed) — already in canonical.
-      rm "$entry"
-    elif [ -d "$entry" ] && [ -f "$entry/SKILL.md" ] && [ ! -e "$canonical/$name" ]; then
-      mv "$entry" "$canonical/"
-      printf "[agent-skills] adopted %s/%s into canonical\n" "$agent_name" "$name"
-    else
-      mkdir -p "$backup_root"
-      mv "$entry" "$backup_root/"
-      printf "[agent-skills] backed up %s/%s -> %s\n" "$agent_name" "$name" "$backup_root"
-    fi
-  done
-  shopt -u nullglob dotglob
-
-  rmdir "$link" 2>/dev/null || rm -rf "$link"
-  ln -s "$canonical" "$link"
-  printf "[agent-skills] linked %s -> %s\n" "$link" "$canonical"
-}
-
-migrate_skills_dir_to_link "$HOME/.claude/skills"
-migrate_skills_dir_to_link "$HOME/.codex/skills"
-migrate_skills_dir_to_link "$HOME/.gemini/skills"
-migrate_skills_dir_to_link "$HOME/.coder/skills"
-
-# 2. Seed image-bundled skills into the canonical catalog (confirmatory).
-#    Each subdir of /usr/local/share/workspace-skills.d/ is one skill
-#    (must contain SKILL.md). The base-dev image installs the four
-#    agentmemory skills there; child images can layer their own by
-#    adding workspace-images/<child>/skills.d/ and a parallel COPY into
-#    /usr/local/share/workspace-skills.d/ in their Dockerfile.
-#
-# Three-state behavior (confirmatory, not duplicative, never subtractive):
-#   - skill present in skills.d AND in canonical → SKIP
-#       Persisted catalog wins. Image updates do NOT overwrite skills the
-#       user may have edited in place. To force-refresh a skill after a
-#       base-image update, `rm -rf ~/.agents/skills/<name>` and restart.
-#   - skill present in skills.d AND NOT in canonical → ADD
-#       Fresh workspace, or a new skill introduced by an image bump.
-#   - skill in canonical AND NOT in skills.d → LEAVE
-#       User-installed (via `skills` CLI) or hand-authored. Never removed
-#       by this script — it is purely additive against the catalog.
+# 1. Seed image-bundled skills into the canonical catalog.
+#    Three-state behavior (confirmatory, not duplicative, never subtractive):
+#      - skill in image AND in canonical → SKIP
+#      - skill in image AND NOT in canonical → ADD
+#      - skill in canonical AND NOT in image → LEAVE
 seed_image_skills() {
   local src_root="$1"
   local dst_root="$CANONICAL_SKILLS"
   [ -d "$src_root" ] || return 0
 
+  shopt -s nullglob
   local src name dst
   for src in "$src_root"/*/; do
-    [ -d "$src" ] || continue
     [ -f "$src/SKILL.md" ] || continue
     name="$(basename "$src")"
     dst="$dst_root/$name"
     if [ -e "$dst" ]; then
-      printf "[agent-skills] skill %s already present, skipping\n" "$name"
+      printf "[agent-skills] skill %s already present, skipping seed\n" "$name"
       continue
     fi
     cp -R "$src" "$dst"
     printf "[agent-skills] seeded skill %s -> %s\n" "$name" "$dst"
   done
+  shopt -u nullglob
 }
 
 seed_image_skills "$IMAGE_SKILLS_DIR"
+
+# 2. Install CLI-managed skills listed in the *.json files.
+#    Each file is a JSON array of strings — skills CLI package names. Sorted
+#    order so child-image files (20-*.json, 30-*.json) run after base
+#    (10-*.json). `skills add --global` installs into ~/.agents/skills; we
+#    pre-check with `skills list` so reruns are no-ops.
+install_cli_skills() {
+  local list_dir="$1"
+  [ -d "$list_dir" ] || return 0
+
+  if ! command -v skills >/dev/null 2>&1; then
+    printf "[agent-skills] skills CLI not on PATH, skipping CLI installs\n"
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    printf "[agent-skills] jq not on PATH, skipping CLI installs\n"
+    return 0
+  fi
+
+  # Snapshot currently-installed packages once so we can cheaply skip duplicates.
+  # `skills list` output shape is intentionally not parsed strictly; we just
+  # grep for the package string. False positives here just mean we skip an
+  # install — re-running with a deleted entry will install correctly.
+  local installed
+  installed="$(skills list 2>/dev/null || true)"
+
+  shopt -s nullglob
+  local list pkg
+  for list in "$list_dir"/*.json; do
+    while IFS= read -r pkg; do
+      [ -n "$pkg" ] || continue
+      if printf "%s" "$installed" | grep -qF -- "$pkg"; then
+        printf "[agent-skills] CLI skill %s already installed, skipping\n" "$pkg"
+        continue
+      fi
+      printf "[agent-skills] installing CLI skill %s\n" "$pkg"
+      # --global → ~/.agents/skills, --skill '*' → take everything the package
+      # ships, --yes → no prompts. Step 3 normalizes provider symlinks, so we
+      # don't care what (if anything) the CLI does to ~/.claude/skills etc.
+      if ! skills add "$pkg" --global --skill '*' --yes; then
+        printf "[agent-skills] WARNING: skills add %s failed (continuing)\n" "$pkg"
+      fi
+    done < <(jq -r 'if type=="array" then .[] else empty end' "$list" 2>/dev/null)
+  done
+  shopt -u nullglob
+}
+
+install_cli_skills "$INSTALL_LIST_DIR"
+
+# 3. Publish per-skill symlinks into each agent's expected skills directory.
+#    Provider dirs (~/.claude/, ~/.codex/, ~/.gemini/) are bind-mounted from
+#    the host, so symlinks placed inside their skills/ subdir persist across
+#    workspace recreates. That means we must (a) clean up dangling symlinks
+#    pointing at canonical entries we no longer ship, and (b) refresh every
+#    live symlink so it points at the current workspace's canonical path.
+publish_provider_symlinks() {
+  local provider_skills="$1"
+  local canonical="$CANONICAL_SKILLS"
+
+  # Old scheme used to symlink the whole skills/ dir to the canonical.
+  # Detect that and convert to a real dir so we can place per-skill links.
+  if [ -L "$provider_skills" ]; then
+    rm "$provider_skills"
+  fi
+  mkdir -p "$provider_skills"
+
+  # Clean stale per-skill symlinks. A symlink whose target lives under
+  # canonical but no longer resolves to an existing file is stale.
+  shopt -s nullglob
+  local entry target
+  for entry in "$provider_skills"/*; do
+    [ -L "$entry" ] || continue
+    target="$(readlink -- "$entry")"
+    case "$target" in
+      "$canonical"/*)
+        if [ ! -e "$entry" ]; then
+          rm -- "$entry"
+          printf "[agent-skills] cleaned stale symlink %s\n" "$entry"
+        fi
+        ;;
+    esac
+  done
+  shopt -u nullglob
+
+  # Re-publish a symlink for every current canonical skill.
+  shopt -s nullglob
+  local src name link
+  for src in "$canonical"/*/; do
+    [ -f "$src/SKILL.md" ] || continue
+    name="$(basename "$src")"
+    link="$provider_skills/$name"
+    if [ -e "$link" ] && [ ! -L "$link" ]; then
+      printf "[agent-skills] %s is a regular file/dir, not relinking\n" "$link"
+      continue
+    fi
+    ln -snf "$canonical/$name" "$link"
+  done
+  shopt -u nullglob
+}
+
+publish_provider_symlinks "$HOME/.claude/skills"
+publish_provider_symlinks "$HOME/.codex/skills"
+publish_provider_symlinks "$HOME/.gemini/skills"
+publish_provider_symlinks "$HOME/.coder/skills"
 
 printf "[agent-skills] Done.\n"

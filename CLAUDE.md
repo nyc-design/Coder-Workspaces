@@ -156,12 +156,19 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
   `DefaultInstructionsFile`). It then symlinks `~/.claude/CLAUDE.md`,
   `~/.codex/AGENTS.md`, and `~/.gemini/GEMINI.md` to that canonical file so
   there's a single source of truth with zero content duplication.
-- Skill catalogs are unified under one canonical at `~/.agents/skills` (where
-  the `skills` npm CLI installs natively — persistent across workspaces via
-  the host bind mount on `/home/ubuntu/secrets/.agents`). Each agent's
-  skills/ path is a folder-level symlink to the canonical:
-  `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills`, and
-  `~/.coder/skills` all resolve to the same directory. Coder Agents (chatd)
+- Skill catalogs are unified under one canonical at `~/.agents/skills`. The
+  canonical is **ephemeral per workspace** — rebuilt on every start by
+  `workspace-images/base-dev/init.d/13-agent-skills.sh` from two image-layer
+  inputs: `/usr/local/share/workspace-skills.d/` (per-skill SKILL.md
+  directories) and `/usr/local/share/workspace-skills-install.d/` (JSON
+  arrays of `skills` CLI package names). Child images contribute by COPYing
+  into the same shared paths so contributions stack additively. After
+  building the canonical, the init script publishes **per-skill** symlinks
+  into each agent's expected skills dir (`~/.claude/skills/<name>`,
+  `~/.codex/skills/<name>`, `~/.gemini/skills/<name>`, `~/.coder/skills/<name>`).
+  Provider dirs are still bind-mounted from the host, so stale per-skill
+  symlinks are cleaned each run before the canonical is republished.
+  Coder Agents (chatd)
   doesn't auto-discover `~/.agents/skills` — its built-in `SkillsDir`
   default is `.agents/skills` resolved relative to the project dir. The
   `coder_agent` env in `workspace-templates/project-workspace/main.tf`
