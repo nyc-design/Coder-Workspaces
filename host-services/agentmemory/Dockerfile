@@ -29,8 +29,13 @@ ARG TARGETARCH
 ARG III_VERSION=v0.11.2
 ARG AGENTMEMORY_VERSION=latest
 
+# stunnel4 terminates TLS for `rediss://` Upstash endpoints. iii's vendored
+# redis crate (v1.0.1) is built without `tls-rustls` / `tls-native-tls`, so
+# it cannot dial `rediss://` directly. The entrypoint starts stunnel
+# listening on 127.0.0.1:6379 and rewrites UPSTASH_REDIS_URL to a plain
+# `redis://...@127.0.0.1:6379` before iii reads its config.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates tini \
+ && apt-get install -y --no-install-recommends curl ca-certificates tini stunnel4 \
  && rm -rf /var/lib/apt/lists/*
 
 # ── iii-engine binary (Rust, statically linked, includes rustls for TLS) ─────
