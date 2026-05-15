@@ -12,13 +12,19 @@ get compressed, and forward to OmniRoute, which handles the actual
 provider routing.
 
 ```
-client → Traefik /headroom/* → headroom :8787 → omniroute :20128
-                                                    │
-                                                    ├─→ meridian (Claude Pro/Max)
-                                                    ├─→ cliproxy (Claude Code / Codex / Gemini OAuth)
-                                                    ├─→ Kiro (built-in)
-                                                    └─→ direct API providers
+client → Traefik :443 (Host=llm.tapiavala.com) → headroom :8787 → omniroute :20128
+                                                                      │
+                                                                      ├─→ meridian (Claude Pro/Max)
+                                                                      ├─→ cliproxy (Claude Code / Codex / Gemini OAuth)
+                                                                      ├─→ Kiro (built-in)
+                                                                      └─→ direct API providers
 ```
+
+Headroom is **root-mounted** on `llm.tapiavala.com` — every protocol path
+(`/v1/messages`, `/v1/chat/completions`, `/v1/responses`,
+`/v1beta/models/{model}:generateContent`, `/v1internal:streamGenerateContent`)
+hits Headroom first, gets compressed, and is forwarded to OmniRoute on the
+internal docker network.
 
 OmniRoute's own compression pipeline (RTK + Caveman) is left **disabled**
 on purpose — stacking compressors corrupts Anthropic prompt-cache markers

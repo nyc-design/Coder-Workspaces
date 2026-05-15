@@ -44,6 +44,53 @@ services:
       AGENTMEMORY_SECRET: ${AGENTMEMORY_SECRET:?set in .env}
       # Empty default = file-based fallback. Set in .env to switch to Upstash.
       UPSTASH_REDIS_URL: ${UPSTASH_REDIS_URL:-}
+
+      # Local embeddings, reranking, image embeddings.
+      # Free (no LLM calls). Powered by @xenova/transformers baked into the
+      # image. ~300-500 MB resident RAM total; models download on first use
+      # into /data/.cache/huggingface and survive image swaps via the volume.
+      # Verified flags in upstream rohitg00/agentmemory:
+      #   EMBEDDING_PROVIDER             src/embeddings/factory.ts
+      #   RERANK_ENABLED                 src/rerank/index.ts
+      #   AGENTMEMORY_IMAGE_EMBEDDINGS   src/embeddings/clip.ts
+      EMBEDDING_PROVIDER: local
+      RERANK_ENABLED: "true"
+      AGENTMEMORY_IMAGE_EMBEDDINGS: "true"
+
+      # LLM-bound phase: auto-compress, consolidation, graph extraction,
+      # slots, reflection. All read the ANTHROPIC_* config block below.
+      # Per-observation LLM cost is small (Haiku 4.5 on short fixed-shape
+      # summarize / extract prompts). Skill extraction during consolidation
+      # is automatic once CONSOLIDATION_ENABLED is on — no separate flag.
+      #
+      # Verified flags in upstream:
+      #   AGENTMEMORY_AUTO_COMPRESS      src/auto-compress.ts
+      #   CONSOLIDATION_ENABLED          src/consolidation-pipeline.ts
+      #   GRAPH_EXTRACTION_ENABLED       src/graph-extraction.ts
+      #   AGENTMEMORY_SLOTS              src/functions/slots.ts:99
+      #   AGENTMEMORY_REFLECT            src/functions/reflect.ts (gated on SLOTS)
+      AGENTMEMORY_AUTO_COMPRESS: "true"
+      CONSOLIDATION_ENABLED: "true"
+      GRAPH_EXTRACTION_ENABLED: "true"
+      AGENTMEMORY_SLOTS: "true"
+      AGENTMEMORY_REFLECT: "true"
+
+      # LLM provider routing.
+      # Agentmemory's internal LLM calls flow through the existing
+      # Headroom (compression) -> OmniRoute (routing) gateway, root-mounted
+      # on llm.tapiavala.com. Same LLM_GATEWAY_API_KEY chatd uses, so no
+      # new secret to provision. Anthropic SDK posts to
+      # ${ANTHROPIC_BASE_URL}/v1/messages; Headroom is the first hop and
+      # inherits the same compression / metering / fallback policy as
+      # user-facing traffic.
+      #
+      # Model: meridian/claude-haiku-4-5 — OmniRoute resolves the alias
+      # to its meridian provider (Claude Code SDK, Pro/Max OAuth-backed).
+      # Haiku 4.5 is the right tier for these calls (short, fixed-shape
+      # summarize / extract / cluster-synthesize prompts).
+      ANTHROPIC_API_KEY: ${LLM_GATEWAY_API_KEY:?set in .env}
+      ANTHROPIC_BASE_URL: https://llm.tapiavala.com
+      ANTHROPIC_MODEL: meridian/claude-haiku-4-5
     volumes:
       # Always mounted. Holds embeddings index + viewer cache, plus
       # state_store.db and stream_store/ when running in file-based mode.

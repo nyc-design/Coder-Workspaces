@@ -88,16 +88,11 @@ Create matching OmniRoute models / combos for every alias in `models.yaml`:
 | `openai` | `codestral-free` | OmniRoute Codestral/Mistral route |
 | `openai` | `opencode-zen-free` | OmniRoute OpenCode Zen route |
 
-While Headroom is still path-mounted, Coder provider base URLs are:
-
-- Anthropic/Google: `https://llm.tapiavala.com/headroom`
-- OpenAI: `https://llm.tapiavala.com/headroom/v1` because Coder's OpenAI
-  provider appends `/responses` directly.
-
-After Headroom is root-mounted on `llm.tapiavala.com`, update these to:
+Coder provider base URLs (Headroom is root-mounted on `llm.tapiavala.com`):
 
 - Anthropic/Google: `https://llm.tapiavala.com`
-- OpenAI: `https://llm.tapiavala.com/v1`
+- OpenAI: `https://llm.tapiavala.com/v1` — Coder's OpenAI provider treats
+  the base URL as the full API root and appends `/responses` directly.
 
 ## Workflow secrets
 

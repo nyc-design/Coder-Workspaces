@@ -128,4 +128,34 @@ migrate_skills_dir_to_link "$HOME/.codex/skills"
 migrate_skills_dir_to_link "$HOME/.gemini/skills"
 migrate_skills_dir_to_link "$HOME/.coder/skills"
 
+# 5. Seed image-bundled skills into the canonical catalog.
+#    Each subdir of /usr/local/share/agentmemory-skills/ contains a SKILL.md
+#    that wraps an agentmemory MCP tool flow (recall, remember,
+#    session-history, forget). We copy each into ~/.agents/skills/<name>/
+#    only if absent — idempotent on every workspace start, never overwrites
+#    user-modified copies. To force-refresh after a base-image update,
+#    delete the target subdir and the next workspace start will re-seed it.
+seed_image_skills() {
+  local src_root="$1"
+  local dst_root="$HOME/.agents/skills"
+  [ -d "$src_root" ] || return 0
+  mkdir -p "$dst_root"
+
+  local src name dst
+  for src in "$src_root"/*/; do
+    [ -d "$src" ] || continue
+    [ -f "$src/SKILL.md" ] || continue
+    name="$(basename "$src")"
+    dst="$dst_root/$name"
+    if [ -e "$dst" ]; then
+      printf "[agent-prompts] skill %s already present, leaving alone\n" "$name"
+      continue
+    fi
+    cp -R "$src" "$dst"
+    printf "[agent-prompts] seeded skill %s -> %s\n" "$name" "$dst"
+  done
+}
+
+seed_image_skills "/usr/local/share/agentmemory-skills"
+
 printf "[agent-prompts] Done.\n"

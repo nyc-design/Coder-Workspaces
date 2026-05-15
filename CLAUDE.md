@@ -208,11 +208,11 @@ per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
 **OpenAI sidecar base URL gotcha:** Coder's OpenAI provider path handling comes
 from `fantasy/providers/openai`, which treats a custom base URL as the full API
-root and appends `/responses` directly. We keep the public provider base URL at
-`https://llm.tapiavala.com/headroom/v1` while the Anthropic/Google providers use
-`https://llm.tapiavala.com/headroom`. Coder's OpenAI provider appends `/responses`
-directly, so including `/v1` in the OpenAI base URL is required until Headroom is
-root-mounted on `llm.tapiavala.com`.
+root and appends `/responses` directly. Headroom is root-mounted on
+`llm.tapiavala.com`, so the public provider base URLs are
+`https://llm.tapiavala.com` for Anthropic/Google and `https://llm.tapiavala.com/v1`
+for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
+`/responses` directly to the configured base).
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

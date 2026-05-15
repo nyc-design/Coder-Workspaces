@@ -51,7 +51,17 @@ RUN set -eux; \
     iii --version
 
 # ── agentmemory CLI + worker (Node, ships its own dist/index.mjs for iii-exec) ──
-RUN npm install -g "@agentmemory/agentmemory@${AGENTMEMORY_VERSION}" \
+# @xenova/transformers is an optional peer dep that powers local semantic
+# embeddings (all-MiniLM-L6-v2), the second-stage reranker
+# (ms-marco-MiniLM-L-6-v2), and CLIP-based image embeddings. Installing it
+# alongside agentmemory in the global node_modules tree lets the dynamic
+# `await import("@xenova/transformers")` calls in upstream/src/embeddings/*.ts
+# resolve at runtime. Model weights (~300 MB across the three models) download
+# lazily on first use into HF_HOME (pinned to /data below so they survive
+# image swaps via the named volume).
+RUN npm install -g \
+      "@agentmemory/agentmemory@${AGENTMEMORY_VERSION}" \
+      @xenova/transformers \
  && npm cache clean --force
 
 # Both iii-config variants live in /opt/agentmemory-config/. The entrypoint
@@ -69,9 +79,16 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/mcp-http-bridge.
 #   /data/.agentmemory/    — embeddings index, viewer assets cache
 # (When UPSTASH_REDIS_URL is set, state/stream/cron live in Redis instead;
 # only the embeddings index + viewer cache stay on /data.)
+# HF_HOME / TRANSFORMERS_CACHE point @xenova/transformers at the persistent
+# /data volume so HuggingFace model weights download once and survive image
+# swaps. (Defaults derived from HOME=/data would land under /data/.cache
+# anyway, but pinning them explicitly makes the contract loud — see
+# host-services/agentmemory/README.md "Features enabled".)
 ENV HOME=/data \
     AGENTMEMORY_HOST=0.0.0.0 \
-    AGENTMEMORY_VIEWER_HOST=0.0.0.0
+    AGENTMEMORY_VIEWER_HOST=0.0.0.0 \
+    HF_HOME=/data/.cache/huggingface \
+    TRANSFORMERS_CACHE=/data/.cache/huggingface
 VOLUME ["/data"]
 
 # 3111 REST API · 3112 streams (WS) · 3113 viewer · 3114 MCP streamable_http bridge · 49134 iii bridge (WS)
