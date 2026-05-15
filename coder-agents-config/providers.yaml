@@ -2,7 +2,7 @@
 # Synced to /api/experimental/chats/providers by update-coder-agents-config.yaml.
 #
 # Stable identity: `provider` field (anthropic / openai / google / azure /
-# bedrock / openaicompat / openrouter / vercel — see fantasy.SupportedProviders).
+# bedrock / openai-compat / openrouter / vercel — see fantasy.SupportedProviders).
 # This file is additive: providers in here get created/updated; manually-added
 # providers in the Coder UI are NOT removed by sync.
 #
@@ -35,12 +35,12 @@ providers:
     allow_user_api_key: false
     allow_central_api_key_fallback: false
 
-  # Chat-Completions-only entrypoint. Fantasy `openaicompat` does NOT call
+  # Chat-Completions-only entrypoint. Fantasy `openai-compat` does NOT call
   # WithUseResponsesAPI(), so this provider talks `/v1/chat/completions` end-to-end.
   # Used for upstreams that only speak Chat Completions: Cerebras, Groq, Codestral,
   # OpenCode Zen, and any other non-Responses OpenAI-shaped provider routed through
   # OmniRoute combos.
-  - provider: openaicompat
+  - provider: openai-compat
     display_name: OmniRoute OpenAI-Compatible Gateway
     base_url: https://llm.tapiavala.com/v1
     api_key: ${LLM_GATEWAY_API_KEY}

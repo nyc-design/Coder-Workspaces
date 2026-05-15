@@ -404,7 +404,7 @@ models:
           reasoning_summary: auto
 
   # ── Free / bundled OpenAI-compatible routes (Chat Completions API) ─────────
-  - provider: openaicompat
+  - provider: openai-compat
     model: free-tier
     display_name: OmniRoute Free Tier Combo
     enabled: true
@@ -412,7 +412,7 @@ models:
     context_limit: 200000
     compression_threshold: 70
 
-  - provider: openaicompat
+  - provider: openai-compat
     model: groq/qwen/qwen3-32b
     display_name: Groq — Qwen3 32B
     enabled: true
@@ -424,10 +424,10 @@ models:
         input_price_per_million_tokens: "0.29"
         output_price_per_million_tokens: "0.59"
       provider_options:
-        openaicompat:
+        openai-compat:
           reasoning_effort: medium
 
-  - provider: openaicompat
+  - provider: openai-compat
     model: cerebras/gpt-oss-120b
     display_name: Cerebras — GPT-OSS 120B
     enabled: true
@@ -439,10 +439,10 @@ models:
         input_price_per_million_tokens: "0.35"
         output_price_per_million_tokens: "0.75"
       provider_options:
-        openaicompat:
+        openai-compat:
           reasoning_effort: medium
 
-  - provider: openaicompat
+  - provider: openai-compat
     model: codestral/codestral-latest
     display_name: Codestral — Latest
     enabled: true
@@ -454,7 +454,7 @@ models:
         input_price_per_million_tokens: "0"
         output_price_per_million_tokens: "0"
 
-  - provider: openaicompat
+  - provider: openai-compat
     model: opencode-zen/minimax-m2.5-free
     display_name: OpenCode Zen — MiniMax M2.5 Free
     enabled: true
@@ -468,5 +468,5 @@ models:
         cache_read_price_per_million_tokens: "0.03"
         cache_write_price_per_million_tokens: "0.375"
       provider_options:
-        openaicompat:
+        openai-compat:
           reasoning_effort: medium
