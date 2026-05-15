@@ -52,8 +52,8 @@ models:
             budget_tokens: 16000
 
   - provider: anthropic
-    model: claude-opus-4.5-omniroute-direct
-    display_name: Claude Opus 4.5 — OmniRoute Claude Code direct
+    model: claude-opus-4.7-omniroute-direct
+    display_name: Claude Opus 4.7 — OmniRoute Claude Code direct
     enabled: true
     is_default: false
     context_limit: 200000
@@ -66,8 +66,8 @@ models:
             budget_tokens: 16000
 
   - provider: anthropic
-    model: claude-opus-4.5-meridian
-    display_name: Claude Opus 4.5 — Meridian
+    model: claude-opus-4.7-meridian
+    display_name: Claude Opus 4.7 — Meridian
     enabled: true
     is_default: false
     context_limit: 200000
@@ -80,8 +80,8 @@ models:
             budget_tokens: 16000
 
   - provider: anthropic
-    model: claude-opus-4.5-cliproxy
-    display_name: Claude Opus 4.5 — CLIProxyAPI Claude Code
+    model: claude-opus-4.7-cliproxy
+    display_name: Claude Opus 4.7 — CLIProxyAPI Claude Code
     enabled: true
     is_default: false
     context_limit: 200000

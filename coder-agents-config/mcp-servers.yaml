@@ -56,3 +56,15 @@ mcp_servers:
       Authorization: Bearer ${GH_PAT_FOR_MCP}
     enabled: true
     availability: default_on
+
+  - slug: omniroute
+    display_name: OmniRoute
+    description: 'OmniRoute: manage providers, combos, model aliases, API keys, policies, rate limits, and routing strategies. Read audit logs, inspect usage/cost, run evals, and trigger compression engines (Caveman/RTK). Read/write OmniRoute memory + skills.'
+    icon_url: /icon/widgets.svg
+    transport: streamable_http
+    url: https://omniroute.tapiavala.com/api/mcp/stream
+    auth_type: custom_headers
+    custom_headers:
+      x-api-key: ${LLM_GATEWAY_API_KEY}
+    enabled: true
+    availability: default_off
