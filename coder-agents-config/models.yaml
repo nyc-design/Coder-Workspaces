@@ -147,6 +147,24 @@ models:
         anthropic:
           send_reasoning: true
 
+  # ── Kiro (OmniRoute Anthropic-Compatible) ───────────────────────────────
+  - provider: anthropic
+    model: kiro/claude-sonnet-4.5
+    display_name: Kiro — Claude Sonnet 4.5 (Free)
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0"
+        output_price_per_million_tokens: "0"
+        cache_read_price_per_million_tokens: "0"
+        cache_write_price_per_million_tokens: "0"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
   # ── Codex subscription paths (OpenAI Responses API) ───────────────────────
   - provider: openai
     model: codex/gpt-5.5-xhigh
@@ -406,11 +424,19 @@ models:
   # ── Free / bundled OpenAI-compatible routes (Chat Completions API) ─────────
   - provider: openai-compat
     model: free-tier
-    display_name: OmniRoute Free Tier Combo
+    display_name: OmniRoute Combo - Free Tier
     enabled: true
     is_default: false
     context_limit: 200000
     compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0"
+        output_price_per_million_tokens: "0"
+        cache_read_price_per_million_tokens: "0"
+      provider_options:
+        openai-compat:
+          reasoning_effort: medium
 
   - provider: openai-compat
     model: groq/qwen/qwen3-32b
@@ -428,7 +454,7 @@ models:
           reasoning_effort: medium
 
   - provider: openai-compat
-    model: cerebras/gpt-oss-120b
+    model: cerebras/zai-glm-4.7
     display_name: Cerebras — GPT-OSS 120B
     enabled: true
     is_default: false
