@@ -74,7 +74,9 @@ mcp_servers:
     description: 'Per-project persistent memory: save observations, recall via smart search, list/audit sessions, manage lessons + sentinels. Always pass `project` derived from the repo (basename of `git remote get-url origin .git`) so memory scopes per repo and survives workspace recreate.'
     icon_url: /icon/database.svg
     transport: streamable_http
-    url: http://agentmemory:3114/mcp
-    auth_type: none
+    url: https://memory.tapiavala.com/mcp
+    auth_type: custom_headers
+    custom_headers:
+      Authorization: Bearer ${AGENTMEMORY_SECRET}
     enabled: true
     availability: default_on

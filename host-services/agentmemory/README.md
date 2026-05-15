@@ -49,13 +49,14 @@ adapter container, no UUID resolution.
 | 3114  | MCP streamable_http bridge (`/mcp`)                |
 | 49134 | iii bridge (WebSocket — programmatic SDK access)   |
 
-agentmemory is **internal-only**: other host services (chatd, workspaces
-on `ubuntu_default`) reach it directly over the docker network at
-`http://agentmemory:3111` (REST) or `http://agentmemory:3114/mcp` (MCP).
-No Traefik labels, nothing public on the internet — the memory store
-doesn't need to be reachable from outside the host VM. The viewer (3113)
-is reachable from a laptop via SSH port-forward (`ssh -L 3113:agentmemory:3113 vm`)
-when needed.
+The MCP streamable_http bridge (3114) is exposed publicly at
+`https://memory.tapiavala.com/mcp` via Traefik, gated by Bearer auth.
+All clients — including chatd inside workspaces — use this URL with
+`Authorization: Bearer ${AGENTMEMORY_SECRET}`. One auth boundary, one
+threat model. The raw REST API (3111), stream WS (3112), viewer (3113),
+and iii bridge (49134) stay docker-network-only since no off-the-shelf
+client speaks those shapes. Viewer is reachable from a laptop via SSH
+port-forward (`ssh -L 3113:agentmemory:3113 vm`) when needed.
 
 ### Bind quirk (and why our entrypoint writes where it does)
 
@@ -153,41 +154,80 @@ docker exec -it agentmemory curl -fsS http://127.0.0.1:3111/agentmemory/health
 
 ## Wiring agents
 
-Two paths exist depending on what the agent's MCP client supports.
+Every MCP client — chatd, Claude Desktop, Cursor, in-workspace CLIs —
+uses the same public URL with the same Bearer token.
 
-### Coder Agents (chatd) — streamable_http MCP via the bridge
+### Authentication
 
-chatd only supports HTTP MCP transports. Upstream agentmemory only ships
-stdio MCP + custom REST endpoints, so a small Node bridge (`mcp-http-bridge.mjs`)
-baked into this image translates JSON-RPC → the upstream REST endpoints
-and exposes them on `:3114/mcp`.
+`AGENTMEMORY_SECRET` (set on the agentmemory container via host `.env`,
+pulled from GCP Secret Manager) gates every REST and MCP endpoint with
+`Authorization: Bearer <secret>`. Validated upstream via timing-safe
+HMAC comparison (`src/auth.ts`). The bridge on 3114 forwards inbound
+Authorization headers verbatim to the upstream REST calls, so the same
+secret protects both transports.
 
-Wired into Coder Agents via `coder-agents-config/mcp-servers.yaml`:
+Generate:
+
+```bash
+openssl rand -hex 32
+```
+
+Store in GCP Secret Manager (`coder-nt/AGENTMEMORY_SECRET`), reference
+from the host `.env`, and distribute the same value to every MCP client
+config that needs to call it.
+
+### Coder Agents (chatd) — streamable_http MCP
+
+Wired via `coder-agents-config/mcp-servers.yaml`:
 
 ```yaml
 - slug: agentmemory
   transport: streamable_http
-  url: http://agentmemory:3114/mcp
-  auth_type: none
+  url: https://memory.tapiavala.com/mcp
+  auth_type: custom_headers
+  custom_headers:
+    Authorization: Bearer ${AGENTMEMORY_SECRET}
 ```
 
-### Stdio MCP clients (Claude Desktop, Cursor, Codex, in-workspace CLIs)
+The `${AGENTMEMORY_SECRET}` placeholder is substituted at sync time by
+`coder-agents-config/sync.sh`, reading from the workflow env populated
+from GCP Secret Manager.
 
-Use the upstream stdio shim, pointed at the REST API:
+### Streamable-http MCP clients (any conforming client)
+
+Point at `https://memory.tapiavala.com/mcp`, add the Bearer header.
+Example for an MCP client that supports custom headers:
 
 ```json
 {
   "mcpServers": {
     "agentmemory": {
-      "command": "npx",
-      "args": ["-y", "@agentmemory/mcp"],
-      "env": {
-        "AGENTMEMORY_URL": "http://agentmemory:3111"
+      "transport": "streamable_http",
+      "url": "https://memory.tapiavala.com/mcp",
+      "headers": {
+        "Authorization": "Bearer <AGENTMEMORY_SECRET>"
       }
     }
   }
 }
 ```
+
+### Stdio MCP clients (Claude Desktop, Cursor, Codex)
+
+The upstream stdio shim (`@agentmemory/mcp`) calls the raw REST API on
+port 3111, which is **not** exposed publicly (only the streamable_http
+bridge on 3114 is). Two options:
+
+1. **Switch to streamable_http** (recommended) if the client supports
+   it — use the example above pointing at `https://memory.tapiavala.com/mcp`.
+2. **SSH tunnel** to port 3111 if you must use the stdio shim:
+
+   ```bash
+   ssh -L 3111:agentmemory:3111 vm
+   ```
+
+   then run the shim with `AGENTMEMORY_URL=http://127.0.0.1:3111` and
+   `AGENTMEMORY_SECRET=<secret>`.
 
 Either way, every `memory_*` call should include `project` derived from
 the workspace's git remote so memory is scoped per repo and survives
