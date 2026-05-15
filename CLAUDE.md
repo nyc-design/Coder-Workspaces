@@ -196,7 +196,7 @@ applies four resources idempotently:
 
 `${VAR}` placeholders in YAML are substituted from the workflow's env at sync
 time — secrets live in GitHub Actions secrets (`CODER_URL`,
-`CODER_SESSION_TOKEN`, `SIDECAR_SHARED_API_KEY`, `CONTEXT7_API_KEY`,
+`CODER_SESSION_TOKEN`, `LLM_GATEWAY_API_KEY`, `CONTEXT7_API_KEY`,
 `GH_PAT_FOR_MCP`).
 
 Sync is **additive** — items only present in Coder admin (manually added
@@ -210,9 +210,10 @@ per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 **OpenAI sidecar base URL gotcha:** Coder's OpenAI provider path handling comes
 from `fantasy/providers/openai`, which treats a custom base URL as the full API
 root and appends `/responses` directly. We keep the public provider base URL at
-`https://llm.tapiavala.com/codex` by having Traefik rewrite `/codex/*` to
-`/codex/v1/*` before stripping the `/codex` prefix, so the underlying Codex
-sidecar still receives the `/v1/*` paths it expects.
+`https://llm.tapiavala.com/headroom/v1` while the Anthropic/Google providers use
+`https://llm.tapiavala.com/headroom`. Coder's OpenAI provider appends `/responses`
+directly, so including `/v1` in the OpenAI base URL is required until Headroom is
+root-mounted on `llm.tapiavala.com`.
 
 ### Shared Install Scripts
 - `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev

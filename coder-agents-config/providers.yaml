@@ -10,28 +10,51 @@
 # workflow from GitHub repo secrets / GCP Secret Manager).
 
 providers:
+  # Canonical Anthropic-compatible entrypoint. Every claude-* model below is
+  # routed by OmniRoute combos to one of:
+  #   - Claude Code direct OAuth in OmniRoute
+  #   - Meridian (Claude Code SDK / Pro-Max OAuth)
+  #   - CLIProxyAPI Claude Code OAuth fallback
   - provider: anthropic
-    display_name: Anthropic (Pro/Max via Sidecar)
-    base_url: https://llm.tapiavala.com/claude
-    api_key: ${SIDECAR_SHARED_API_KEY}
+    display_name: OmniRoute Anthropic Gateway
+    base_url: https://llm.tapiavala.com
+    api_key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     central_api_key_enabled: true
     allow_user_api_key: false
     allow_central_api_key_fallback: false
 
+  # Canonical OpenAI Responses-API entrypoint. Codex models use `/v1/responses`
+  # end-to-end through Headroom and OmniRoute.
   - provider: openai
-    display_name: OpenAI Codex (ChatGPT Plus via Sidecar)
-    base_url: https://llm.tapiavala.com/codex
-    api_key: ${SIDECAR_SHARED_API_KEY}
+    display_name: OmniRoute OpenAI Gateway
+    base_url: https://llm.tapiavala.com/v1
+    api_key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     central_api_key_enabled: true
     allow_user_api_key: false
     allow_central_api_key_fallback: false
 
+  # Chat-Completions-only entrypoint. Fantasy `openaicompat` does NOT call
+  # WithUseResponsesAPI(), so this provider talks `/v1/chat/completions` end-to-end.
+  # Used for upstreams that only speak Chat Completions: Cerebras, Groq, Codestral,
+  # OpenCode Zen, and any other non-Responses OpenAI-shaped provider routed through
+  # OmniRoute combos.
+  - provider: openaicompat
+    display_name: OmniRoute OpenAI-Compatible Gateway
+    base_url: https://llm.tapiavala.com/v1
+    api_key: ${LLM_GATEWAY_API_KEY}
+    enabled: true
+    central_api_key_enabled: true
+    allow_user_api_key: false
+    allow_central_api_key_fallback: false
+
+  # Gemini/native Google-shaped entrypoint. Leave disabled until we explicitly
+  # route Gemini / Cloud Code Assist through OmniRoute for Coder Agents.
   - provider: google
-    display_name: Google Gemini (Subscription via Sidecar)
-    base_url: https://llm.tapiavala.com/gemini
-    api_key: ${SIDECAR_SHARED_API_KEY}
+    display_name: OmniRoute Gemini Gateway
+    base_url: https://llm.tapiavala.com
+    api_key: ${LLM_GATEWAY_API_KEY}
     enabled: false
     central_api_key_enabled: true
     allow_user_api_key: false

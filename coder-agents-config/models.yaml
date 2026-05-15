@@ -1,0 +1,472 @@
+# Chat model configs for Coder Agents (chatd).
+# Synced to /api/experimental/chats/model-configs by update-coder-agents-config.yaml.
+#
+# Stable identity: `(provider, model)` tuple. This file is declarative: models
+# missing from this YAML are deleted from Coder on sync.
+#
+# Model IDs here are live OmniRoute model IDs from `GET /v1/models`.
+# Cost values are USD per 1M tokens in Coder's model_config.cost schema.
+# Most values are from OmniRoute's LiteLLM pricing sync source; dashboard-only
+# overrides require an OmniRoute manage/admin token to inspect.
+
+models:
+  # ── Claude Code subscription paths (Anthropic Messages API) ────────────────
+  - provider: anthropic
+    model: meridian/claude-opus-4-7
+    display_name: Claude Opus 4.7 — Meridian
+    enabled: true
+    is_default: true
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "25"
+        cache_read_price_per_million_tokens: "0.5"
+        cache_write_price_per_million_tokens: "6.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: meridian/claude-opus-4-6
+    display_name: Claude Opus 4.6 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "25"
+        cache_read_price_per_million_tokens: "0.5"
+        cache_write_price_per_million_tokens: "6.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: meridian/claude-sonnet-4-6
+    display_name: Claude Sonnet 4.6 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "3"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.3"
+        cache_write_price_per_million_tokens: "3.75"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: meridian/claude-haiku-4-5
+    display_name: Claude Haiku 4.5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1"
+        output_price_per_million_tokens: "5"
+        cache_read_price_per_million_tokens: "0.1"
+        cache_write_price_per_million_tokens: "1.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: cliproxy-claude/claude-opus-4-7
+    display_name: Claude Opus 4.7 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "25"
+        cache_read_price_per_million_tokens: "0.5"
+        cache_write_price_per_million_tokens: "6.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: cliproxy-claude/claude-opus-4-6
+    display_name: Claude Opus 4.6 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "25"
+        cache_read_price_per_million_tokens: "0.5"
+        cache_write_price_per_million_tokens: "6.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: cliproxy-claude/claude-sonnet-4-6
+    display_name: Claude Sonnet 4.6 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "3"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.3"
+        cache_write_price_per_million_tokens: "3.75"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  - provider: anthropic
+    model: cliproxy-claude/claude-haiku-4-5-20251001
+    display_name: Claude Haiku 4.5 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1"
+        output_price_per_million_tokens: "5"
+        cache_read_price_per_million_tokens: "0.1"
+        cache_write_price_per_million_tokens: "1.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+
+  # ── Codex subscription paths (OpenAI Responses API) ───────────────────────
+  - provider: openai
+    model: codex/gpt-5.5-xhigh
+    display_name: GPT-5.5 Codex — OmniRoute direct (xhigh)
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "30"
+        cache_read_price_per_million_tokens: "0.5"
+      provider_options:
+        openai:
+          reasoning_effort: xhigh
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.5-high
+    display_name: GPT-5.5 Codex — OmniRoute direct (high)
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "30"
+        cache_read_price_per_million_tokens: "0.5"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.5-medium
+    display_name: GPT-5.5 Codex — OmniRoute direct (medium)
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "30"
+        cache_read_price_per_million_tokens: "0.5"
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.5-low
+    display_name: GPT-5.5 Codex — OmniRoute direct (low)
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "30"
+        cache_read_price_per_million_tokens: "0.5"
+      provider_options:
+        openai:
+          reasoning_effort: low
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.4
+    display_name: GPT-5.4 Codex — OmniRoute direct
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "2.5"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.25"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.4-mini
+    display_name: GPT-5.4 Mini Codex — OmniRoute direct
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0.75"
+        output_price_per_million_tokens: "4.5"
+        cache_read_price_per_million_tokens: "0.075"
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.3-codex
+    display_name: GPT-5.3 Codex — OmniRoute direct
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.3-codex-spark
+    display_name: GPT-5.3 Codex Spark — OmniRoute direct
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
+
+  - provider: openai
+    model: codex/gpt-5.2
+    display_name: GPT-5.2 — OmniRoute direct
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.5
+    display_name: GPT-5.5 — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 20
+    model_config:
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "30"
+        cache_read_price_per_million_tokens: "0.5"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.4
+    display_name: GPT-5.4 — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "2.5"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.25"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.4-mini
+    display_name: GPT-5.4 Mini — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0.75"
+        output_price_per_million_tokens: "4.5"
+        cache_read_price_per_million_tokens: "0.075"
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.3-codex
+    display_name: GPT-5.3 Codex — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.3-codex-spark
+    display_name: GPT-5.3 Codex Spark — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: medium
+          reasoning_summary: auto
+
+  - provider: openai
+    model: cliproxy-codex/gpt-5.2
+    display_name: GPT-5.2 — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 400000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "1.75"
+        output_price_per_million_tokens: "14"
+        cache_read_price_per_million_tokens: "0.175"
+      provider_options:
+        openai:
+          reasoning_effort: high
+          reasoning_summary: auto
+
+  # ── Free / bundled OpenAI-compatible routes (Chat Completions API) ─────────
+  - provider: openaicompat
+    model: free-tier
+    display_name: OmniRoute Free Tier Combo
+    enabled: true
+    is_default: false
+    context_limit: 200000
+    compression_threshold: 70
+
+  - provider: openaicompat
+    model: groq/qwen/qwen3-32b
+    display_name: Groq — Qwen3 32B
+    enabled: true
+    is_default: false
+    context_limit: 131072
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0.29"
+        output_price_per_million_tokens: "0.59"
+      provider_options:
+        openaicompat:
+          reasoning_effort: medium
+
+  - provider: openaicompat
+    model: cerebras/gpt-oss-120b
+    display_name: Cerebras — GPT-OSS 120B
+    enabled: true
+    is_default: false
+    context_limit: 131072
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0.35"
+        output_price_per_million_tokens: "0.75"
+      provider_options:
+        openaicompat:
+          reasoning_effort: medium
+
+  - provider: openaicompat
+    model: codestral/codestral-latest
+    display_name: Codestral — Latest
+    enabled: true
+    is_default: false
+    context_limit: 32000
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0"
+        output_price_per_million_tokens: "0"
+
+  - provider: openaicompat
+    model: opencode-zen/minimax-m2.5-free
+    display_name: OpenCode Zen — MiniMax M2.5 Free
+    enabled: true
+    is_default: false
+    context_limit: 204800
+    compression_threshold: 70
+    model_config:
+      cost:
+        input_price_per_million_tokens: "0.3"
+        output_price_per_million_tokens: "1.2"
+        cache_read_price_per_million_tokens: "0.03"
+        cache_write_price_per_million_tokens: "0.375"
+      provider_options:
+        openaicompat:
+          reasoning_effort: medium

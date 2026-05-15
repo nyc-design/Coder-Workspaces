@@ -63,6 +63,42 @@ and rename. After pulling, manually restore any `${VAR}` placeholders for
 secrets — the API only returns `has_api_key: true|false`, never the value,
 so secrets come out as opaque placeholders.
 
+
+## OmniRoute model aliases
+
+Coder Agents sees three provider entries (`anthropic`, `openai`, and disabled
+`google`) that all point at the Headroom → OmniRoute gateway. Distinct backends
+are selected by OmniRoute model aliases, not by separate Coder providers.
+
+Create matching OmniRoute models / combos for every alias in `models.yaml`:
+
+| Coder provider | Coder model alias | Intended OmniRoute route |
+|---|---|---|
+| `anthropic` | `claude-sonnet-4.5-omniroute-direct` | OmniRoute Claude Code OAuth provider directly |
+| `anthropic` | `claude-opus-4.5-omniroute-direct` | OmniRoute Claude Code OAuth provider directly |
+| `anthropic` | `claude-sonnet-4.5-meridian` | `anthropic-compatible-cc-meridian` → `http://meridian:3456/v1` |
+| `anthropic` | `claude-opus-4.5-meridian` | `anthropic-compatible-cc-meridian` → `http://meridian:3456/v1` |
+| `anthropic` | `claude-sonnet-4.5-cliproxy` | `anthropic-compatible-cc-cliproxy-claude` → `http://cliproxy:8317/v1` |
+| `anthropic` | `claude-opus-4.5-cliproxy` | `anthropic-compatible-cc-cliproxy-claude` → `http://cliproxy:8317/v1` |
+| `openai` | `gpt-5.1-codex-cliproxy` | `openai-compatible-cliproxy-resp` → `http://cliproxy:8317/v1`, `apiType=responses` |
+| `openai` | `gpt-5.1-codex-omniroute-direct` | OmniRoute Codex OAuth provider directly |
+| `anthropic` | `kiro-sonnet-free` | OmniRoute Kiro / AWS Builder ID route |
+| `openai` | `cerebras-qwen3-coder-free` | OmniRoute Cerebras route |
+| `openai` | `groq-qwen3-coder-free` | OmniRoute Groq route |
+| `openai` | `codestral-free` | OmniRoute Codestral/Mistral route |
+| `openai` | `opencode-zen-free` | OmniRoute OpenCode Zen route |
+
+While Headroom is still path-mounted, Coder provider base URLs are:
+
+- Anthropic/Google: `https://llm.tapiavala.com/headroom`
+- OpenAI: `https://llm.tapiavala.com/headroom/v1` because Coder's OpenAI
+  provider appends `/responses` directly.
+
+After Headroom is root-mounted on `llm.tapiavala.com`, update these to:
+
+- Anthropic/Google: `https://llm.tapiavala.com`
+- OpenAI: `https://llm.tapiavala.com/v1`
+
 ## Workflow secrets
 
 All five secrets live in **GCP Secret Manager** (project `coder-nt`) and are
@@ -74,7 +110,7 @@ fetched at workflow runtime via Workload Identity Federation. See
 |---|---|
 | `CODER_URL` | Base URL of the Coder deployment |
 | `CODER_SESSION_TOKEN` | Admin session token (Owner role) |
-| `SIDECAR_SHARED_API_KEY` | Substituted into `providers.yaml` (all 3 providers' `api_key`) |
+| `LLM_GATEWAY_API_KEY` | Substituted into `providers.yaml` for OmniRoute/Headroom gateway providers |
 | `CONTEXT7_API_KEY` | Substituted into `mcp-servers.yaml` (Context7 header) |
 | `GH_PAT_FOR_MCP` | Substituted into `mcp-servers.yaml` (GitHub MCP bearer; mapped to env `GITHUB_PAT` to match the YAML placeholder) |
 
@@ -100,7 +136,7 @@ and `GCP_WIF_SERVICE_ACCOUNT`) for the WIF auth path.
 ```bash
 export CODER_URL=https://coder.tapiavala.com
 export CODER_SESSION_TOKEN=$(coder token create --scope all 2>/dev/null | tail -1)
-export SIDECAR_SHARED_API_KEY=...   # same value used by host-services sidecars
+export LLM_GATEWAY_API_KEY=...       # client-facing OmniRoute/Headroom gateway key
 export CONTEXT7_API_KEY=...
 export GITHUB_PAT=...
 
