@@ -10,11 +10,21 @@
 #   engine/src/workers/stream/adapters/redis_adapter.rs:430  (same)
 #   engine/src/workers/cron/adapters/redis_adapter.rs:64     (same)
 #
-# TLS: published iii binary IS built with rustls (verified by inspecting
-# `strings $(which iii)` for rustls-0.23.x symbols), pulled in
-# transitively via the OpenTelemetry exporters even though Cargo.toml
-# doesn't advertise the redis-rs TLS feature explicitly. Upstash
-# `rediss://` URLs work out of the box.
+# TLS: the published iii binary is NOT linked against TLS for the redis
+# crate. Verified in iii-hq/iii engine/Cargo.toml across every release
+# (v0.11.2 → v0.11.7-next.2):
+#   redis = { version = "1.0.1", features = ["tokio-comp", "connection-manager"] }
+# No `tls-rustls` / `tls-native-tls`. rustls symbols in the binary come
+# from reqwest + opentelemetry-otlp, which don't help the redis client.
+# Symptom if iii hits a `rediss://` directly: worker iii-state fails
+# with `can't connect with TLS, the feature is not enabled - InvalidClientConfig`.
+#
+# Workaround: docker-entrypoint.sh runs an in-container stunnel that
+# accepts plain TCP on 127.0.0.1:6379 and forwards to the Upstash host
+# with TLS. It rewrites UPSTASH_REDIS_URL to `redis://...@127.0.0.1:6379`
+# before iii reads this file, so `${UPSTASH_REDIS_URL}` below resolves
+# to the local plain-text endpoint. The Upstash AUTH password rides
+# inside the stunnel TLS tunnel — never on the public network in clear.
 #
 # Constraints to be aware of (none are showstoppers for solo use):
 #   - Persistent SUBSCRIBE connection from iii-stream burns one of

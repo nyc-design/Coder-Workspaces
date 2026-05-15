@@ -99,11 +99,19 @@ image rebuild.
 
 ### Verified constraints
 
-Probed against iii v0.11.2 source:
+Probed against iii source (v0.11.2 → v0.11.7-next.2 — all current releases):
 
-- TLS works out of the box. The published iii binary is built with `rustls`
-  (pulled in transitively by OpenTelemetry exporters even though
-  `engine/Cargo.toml` doesn't advertise the redis-rs TLS feature).
+- **TLS does NOT work out of the box.** iii's vendored `redis = "1.0.1"`
+  is declared with features `["tokio-comp", "connection-manager"]` — no
+  `tls-rustls` or `tls-native-tls`. The release binary physically cannot
+  dial `rediss://`. (My earlier note that the binary was built with
+  rustls was wrong: rustls symbols come from `reqwest` + `opentelemetry`,
+  not from the redis crate.) Upstash is TLS-only, so this image runs
+  `stunnel4` internally to bridge the gap (entrypoint listens on
+  `127.0.0.1:6379` and forwards to Upstash with TLS, then rewrites
+  `UPSTASH_REDIS_URL` to the plain-tcp local endpoint before iii starts).
+  No host-side change required — just set `UPSTASH_REDIS_URL` to the
+  `rediss://` URL from your Upstash console.
 - All three workers (state, stream, cron) accept exactly one config key:
   `redis_url`. No pool/timeout/db-number knobs.
 - iii-stream holds a persistent SUBSCRIBE connection — counts against
