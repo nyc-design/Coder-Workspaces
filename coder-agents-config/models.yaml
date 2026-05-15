@@ -453,6 +453,7 @@ models:
       provider_options:
         openai-compat:
           reasoning_effort: medium
+          reasoning_summary: auto
 
   - provider: openai-compat
     model: cerebras/zai-glm-4.7
@@ -468,6 +469,7 @@ models:
       provider_options:
         openai-compat:
           reasoning_effort: medium
+          reasoning_summary: auto
 
   - provider: openai-compat
     model: codestral/codestral-latest
@@ -480,6 +482,10 @@ models:
       cost:
         input_price_per_million_tokens: "0"
         output_price_per_million_tokens: "0"
+      provider_options:
+        openai-compat:
+          reasoning_effort: medium
+          reasoning_summary: auto
 
   - provider: openai-compat
     model: opencode-zen/minimax-m2.5-free
@@ -497,3 +503,4 @@ models:
       provider_options:
         openai-compat:
           reasoning_effort: medium
+          reasoning_summary: auto
