@@ -10,31 +10,25 @@ include_default_system_prompt: true
 ---
 ## Workspace creation policy
 
-- The user's primary GitHub account is `nyc-design`.
-- If a Coder workspace is already attached to this chat, work in that workspace. Do not create a new one.
-- If no workspace is attached and the task requires one:
-  1. Use the `github` MCP server to identify the repo the user is referring to (search by name, description, or whatever context the user gave). Ask only if the match is genuinely ambiguous.
-  2. Derive the base workspace name from the project/repo name: PascalCase it and replace any spaces with `-` (workspace names cannot contain spaces).
-  3. Determine the workspace mode the user wants (`agent` or `self`). Default to `agent` if not specified.
-  4. For `agent` mode, append `-Agents` to the base name (e.g. `My-Project-Agents`). For `self` mode, use the base name as-is (e.g. `My-Project`).
-  5. Check existing workspaces for that computed name. If it exists, use it.
-  6. Otherwise create a workspace from the `project-workspace` template with parameters:
-     - `workspace_mode` = `"agent"` or `"self"` per above
-     - `is_existing_project = "existing"` and `repo_name = <bare repo name, no owner>` for an existing GitHub repo
-     - or `is_existing_project = "new"` and `new_project_type` ∈ {`base`, `python`, `nextjs`, `cpp`, `fullstack`} matching the stack the user described, plus `project_name`
-     - `gcp_project_name` — leave empty unless the user mentions GCP or you've confirmed the project uses GCP secrets
-     - Workspace name = computed name from step 4
-  7. Wait for it to start, then continue the task in it.
-
-Use the `project-workspace` template by default; do not create from any other template unless the user explicitly asks.
+- User's primary GitHub account: `nyc-design`.
+- If a workspace is already attached to this chat, work in it. Do not create another.
+- If none is attached and the task needs one:
+  1. Identify the repo via the `github` MCP (search by name/desc/context). Ask only if genuinely ambiguous.
+  2. Workspace name = PascalCase(repo), spaces → `-`. Append `-Agents` for `agent` mode; bare name for `self` mode. Default mode: `agent`.
+  3. If a workspace with that computed name exists, reuse it. Otherwise create from the `project-workspace` template (do not use other templates unless asked) with:
+     - `workspace_mode` = `"agent"` | `"self"`
+     - existing repo: `is_existing_project="existing"`, `repo_name=<bare repo, no owner>`
+     - new project: `is_existing_project="new"`, `new_project_type` ∈ {`base`,`python`,`nextjs`,`cpp`,`fullstack`}, `project_name`
+     - `gcp_project_name` — empty unless the user mentions GCP or it's confirmed to use GCP secrets
+  4. Wait for it to start, then continue the task in it.
 
 ## Persistent memory (agentmemory MCP)
 
-The `agentmemory` MCP server holds per-repo durable memory — observations, lessons, sessions, embeddings — that survives workspace recreate. Use it for: corrections the user has given you, project conventions that aren't in the code, references to external systems, and durable context you'd otherwise have to rediscover.
+The `agentmemory` MCP holds per-repo durable memory (observations, lessons, sessions, embeddings) that survives workspace recreate. Use it for user corrections, project conventions not in code, references to external systems, and durable context you'd otherwise rediscover.
 
-Keying: every `memory_*` call takes a `project` argument that scopes the memory to a repo. Derive it once per session as the basename of the workspace's git remote (`basename $(git remote get-url origin) .git`), e.g. `Coder-Workspaces`. If there is no workspace yet (chat is in the central loop before workspace creation), use the repo name the user referenced or omit `project` only as a last resort.
+Keying: every `memory_*` call takes a `project` arg scoping the memory to a repo. Derive it once per session as `basename $(git remote get-url origin) .git` (e.g. `Coder-Workspaces`). If there's no workspace yet (central loop before workspace creation), use the repo name the user referenced; omit `project` only as a last resort.
 
-When to call:
-- `memory_smart_search` early when picking up a task in a known repo — retrieves relevant prior context.
-- `memory_save` when the user corrects you, validates a non-obvious approach, or shares a durable fact about the project.
+For the full when/why/how — including signal heuristics, type values, and lesson confidence — see the `agentmemory-remember`, `agentmemory-recall`, `agentmemory-forget`, and `agentmemory-session-history` skills. Quick triggers:
+- `memory_smart_search` early when picking up a task in a known repo.
+- `memory_save` when the user corrects you, validates a non-obvious approach, or shares a durable project fact.
 - `memory_sessions` / `memory_audit` to investigate prior activity.
