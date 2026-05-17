@@ -1,36 +1,49 @@
 #!/usr/bin/env bash
 # Install (or refresh) extensions declared in any /usr/local/share/workspace-extensions.d/*.json
-# manifest. Two install targets:
-#   - "shared"          -> both /home/coder/.vscode-extensions/code-server
-#                              and /home/coder/.vscode-extensions/vscode-web
-#                         (OpenVSX for code-server, Marketplace for vscode-web)
-#   - "vscode_web_only" -> /home/coder/.vscode-extensions/vscode-web only
-#                         (Marketplace-only: Copilot, Gemini)
+# manifest into a host-bound shared cache. Per-editor extension dirs that are
+# passed to the editor binaries are populated separately by
+# 30-extensions-activate.sh, which symlinks the active manifest set out of this
+# cache so each workspace sees only the extensions its manifest requested.
 #
-# Manifest entries are either:
-#   "publisher.name"             - latest version, but never downgrades a newer
-#                                  version already installed (e.g. from UI update)
-#   "publisher.name@1.2.3"       - pin exact version (force-installs if missing or
-#                                  if a different version is on disk)
+# Manifest entries:
+#   "publisher.name"             - track latest. On every workspace start we query
+#                                  the registry for the current latest version and
+#                                  install it into the shared cache if missing.
+#   "publisher.name@1.2.3"       - pin exact version. Installed once into the
+#                                  shared cache, noop on subsequent runs.
 #
-# History / why this design:
-#   The previous layout installed every extension into a shared dir and symlinked
-#   into per-editor dirs. That broke (a) code-server UI updates (which write a real
-#   dir and rimraf'd through symlinks) and (b) version pinning (--install-extension
-#   no-ops on any matching id-* dir). The per-editor dirs are now writable and
-#   authoritative; the shared host mount is repurposed as a VSIX blob cache so we
-#   still only download each (id, version) once across both editors.
+# Layout:
+#   shared/                      - extracted OpenVSX extensions (code-server source)
+#   shared/_cache/               - VSIX blobs fetched from OpenVSX
+#   shared/_marketplace/         - extracted Marketplace extensions (vscode-web only)
+#   shared/_marketplace/_cache/  - VSIX blobs fetched from the Marketplace
+#
+# Cache lifecycle:
+#   shared/ is a host-bound bind mount used by every workspace on this host, so we
+#   never delete a version another workspace might still want. After ensuring the
+#   target version of an id is present, we delete OLDER versions of that id only
+#   if their mtime is older than EXTENSIONS_TTL_DAYS (default 30). The activate
+#   script runs `touch -h` on each symlinked version at workspace start so
+#   actively-used versions never age out.
+#
+# Failure modes:
+#   - Registry unreachable for an unpinned id: leave existing shared entries
+#     untouched; activate will pick the highest available version.
+#   - VSIX download fails for a pinned id: log + skip. Activate will leave the
+#     symlink unchanged so the previous version (if any) stays in use.
 
 set -euo pipefail
 
 log() { printf '[extensions-install] %s\n' "$*"; }
 
 MANIFEST_DIR="${MANIFEST_DIR:-/usr/local/share/workspace-extensions.d}"
-CODE_SERVER_DIR="${CODE_SERVER_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/code-server}"
-VSCODE_WEB_DIR="${VSCODE_WEB_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web}"
-VSIX_CACHE_DIR="${VSIX_CACHE_DIR:-/home/coder/.vscode-extensions/shared/_cache}"
+SHARED_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
+MARKETPLACE_DIR="${MARKETPLACE_EXTENSIONS_DIR:-$SHARED_DIR/_marketplace}"
+VSIX_CACHE_DIR="${VSIX_CACHE_DIR:-$SHARED_DIR/_cache}"
+MARKETPLACE_VSIX_CACHE_DIR="${MARKETPLACE_VSIX_CACHE_DIR:-$MARKETPLACE_DIR/_cache}"
 CODE_SERVER="${CODE_SERVER_BIN:-/opt/code-server/bin/code-server}"
 VSCODE_WEB="${VSCODE_WEB_BIN:-/opt/vscode-web/bin/code-server}"
+EXTENSIONS_TTL_DAYS="${EXTENSIONS_TTL_DAYS:-30}"
 
 if [ ! -d "$MANIFEST_DIR" ]; then
   log "no manifest dir at $MANIFEST_DIR; nothing to install"
@@ -42,23 +55,9 @@ if ! command -v jq > /dev/null 2>&1; then
   exit 0
 fi
 
-mkdir -p "$CODE_SERVER_DIR" "$VSCODE_WEB_DIR" "$VSIX_CACHE_DIR"
+mkdir -p "$SHARED_DIR" "$MARKETPLACE_DIR" "$VSIX_CACHE_DIR" "$MARKETPLACE_VSIX_CACHE_DIR"
 
-# One-time migration: the previous layout populated the per-editor dirs with
-# symlinks pointing into the shared cache. Those break code-server's UI update
-# path and confuse our installed_version probe. Remove any symlink entries so
-# this script can re-install them as real directories. User-installed real
-# extension dirs are left untouched.
-for dir in "$CODE_SERVER_DIR" "$VSCODE_WEB_DIR"; do
-  shopt -s nullglob
-  for entry in "$dir"/*; do
-    if [ -L "$entry" ]; then
-      rm -f "$entry"
-    fi
-  done
-done
-
-# Parse "id" or "id@version" into globals: SPEC_ID, SPEC_VERSION (may be empty).
+# Parse "id" or "id@version" -> globals SPEC_ID, SPEC_VERSION.
 parse_spec() {
   local spec="$1"
   SPEC_ID="${spec%@*}"
@@ -69,83 +68,119 @@ parse_spec() {
   fi
 }
 
-# Find the installed version of $1 in $2 (the editor extensions dir).
-# Echoes the version string, or empty if not installed. Picks the highest version
-# if multiple are present (shouldn't normally happen but be safe).
-installed_version() {
-  local id="$1" dir="$2"
-  local id_lc; id_lc="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
-  shopt -s nullglob
-  local best=""
-  for entry in "$dir"/${id_lc}-*/; do
-    entry="${entry%/}"
-    local name; name="$(basename "$entry")"
-    # name is publisher.name-version[-target]; strip leading "id-".
-    local rest="${name#${id_lc}-}"
-    # The trailing target suffix is either a single token ("universal", "web")
-    # or two tokens separated by '-' ("linux-x64", "darwin-arm64", etc.).
-    # Strip whichever form is present so $ver is just the version.
-    local ver="$rest"
-    case "$rest" in
-      *-linux-x64|*-linux-arm64|*-darwin-x64|*-darwin-arm64|*-win32-x64|*-win32-arm64|*-alpine-x64|*-alpine-arm64)
-        ver="${rest%-*-*}"
-        ;;
-      *-universal|*-web)
-        ver="${rest%-*}"
-        ;;
-    esac
-    if [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$ver" | sort -V | tail -1)" = "$ver" ]; then
-      best="$ver"
-    fi
-  done
-  printf '%s' "$best"
+# Strip platform target suffix (-linux-x64, -universal, ...) from "<version>[-target]".
+strip_target() {
+  local rest="$1"
+  case "$rest" in
+    *-linux-x64|*-linux-arm64|*-darwin-x64|*-darwin-arm64|*-win32-x64|*-win32-arm64|*-alpine-x64|*-alpine-arm64)
+      printf '%s' "${rest%-*-*}"
+      ;;
+    *-universal|*-web)
+      printf '%s' "${rest%-*}"
+      ;;
+    *)
+      printf '%s' "$rest"
+      ;;
+  esac
 }
 
-# Download a VSIX for (id, version) into the cache. Echoes the cached path on
-# success, empty on failure. Tries OpenVSX first, then VS Code Marketplace.
+# Echo the on-disk directory name for $id-$version (with any target suffix) under
+# $dir, or empty if not present.
+installed_dirname() {
+  local id="$1" version="$2" dir="$3"
+  local id_lc; id_lc="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
+  shopt -s nullglob
+  for entry in "$dir"/${id_lc}-${version} "$dir"/${id_lc}-${version}-*; do
+    [ -d "$entry" ] && { basename "$entry"; return 0; }
+  done
+}
+
+# Query the registry for the latest version of $id. Echoes version string or empty.
+fetch_latest_version() {
+  local id="$1" source="$2"
+  local publisher="${id%%.*}"
+  local name="${id#*.}"
+
+  case "$source" in
+    openvsx)
+      curl -fsSL --max-time 20 "https://open-vsx.org/api/${publisher}/${name}" 2>/dev/null \
+        | jq -r '.version // empty' 2>/dev/null
+      ;;
+    marketplace)
+      local payload
+      payload=$(printf '{"filters":[{"criteria":[{"filterType":7,"value":"%s"}]}],"flags":914}' "$id")
+      curl -fsSL --max-time 20 \
+        -H 'Accept: application/json;api-version=3.0-preview.1' \
+        -H 'Content-Type: application/json' \
+        -X POST \
+        --data "$payload" \
+        'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' 2>/dev/null \
+        | jq -r '.results[0].extensions[0].versions[0].version // empty' 2>/dev/null
+      ;;
+  esac
+}
+
+# Fetch the VSIX for ($id, $version) into $cache_dir. Echoes path on success.
 fetch_vsix() {
-  local id="$1" version="$2" source="$3"
+  local id="$1" version="$2" source="$3" cache_dir="$4"
   local publisher="${id%%.*}"
   local name="${id#*.}"
   local id_lc; id_lc="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
-  local out="$VSIX_CACHE_DIR/${id_lc}-${version}.vsix"
+  local out="$cache_dir/${id_lc}-${version}.vsix"
 
   if [ -f "$out" ] && [ -s "$out" ]; then
     printf '%s' "$out"
     return 0
   fi
 
-  local urls=()
+  local url
   case "$source" in
     openvsx)
-      urls+=("https://open-vsx.org/api/${publisher}/${name}/${version}/file/${publisher}.${name}-${version}.vsix")
+      url="https://open-vsx.org/api/${publisher}/${name}/${version}/file/${publisher}.${name}-${version}.vsix"
       ;;
     marketplace)
-      urls+=("https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${name}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage")
+      url="https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${name}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage"
       ;;
-    any|*)
-      urls+=("https://open-vsx.org/api/${publisher}/${name}/${version}/file/${publisher}.${name}-${version}.vsix")
-      urls+=("https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${name}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage")
-      ;;
+    *) return 1 ;;
   esac
 
   local tmp="${out}.partial"
-  for url in "${urls[@]}"; do
-    if curl -fsSL --max-time 120 -o "$tmp" "$url" 2>/dev/null; then
-      mv "$tmp" "$out"
-      printf '%s' "$out"
-      return 0
-    fi
-  done
+  if curl -fsSL --max-time 120 -o "$tmp" "$url" 2>/dev/null; then
+    mv "$tmp" "$out"
+    printf '%s' "$out"
+    return 0
+  fi
   rm -f "$tmp"
   return 1
 }
 
-# install_one <bin> <dir> <spec> <label> <source>
-#   source: "openvsx" | "marketplace" (controls VSIX fetch fallback order and the
-#           registry the editor binary itself talks to)
+# Delete older-than-$want versions of $id from $dir whose mtime is past TTL.
+# Same id newer than $want is left alone (other workspaces may want it).
+prune_older_versions() {
+  local id="$1" want_version="$2" dir="$3" cache_dir="$4"
+  local id_lc; id_lc="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
+  shopt -s nullglob
+  for entry in "$dir"/${id_lc}-*/; do
+    entry="${entry%/}"
+    local name; name="$(basename "$entry")"
+    local rest="${name#${id_lc}-}"
+    local ver; ver="$(strip_target "$rest")"
+    if [ "$ver" = "$want_version" ]; then continue; fi
+    # Skip versions >= want.
+    if [ "$(printf '%s\n%s\n' "$ver" "$want_version" | sort -V | tail -1)" = "$ver" ]; then
+      continue
+    fi
+    if find "$entry" -maxdepth 0 -mtime "+$EXTENSIONS_TTL_DAYS" -print 2>/dev/null | grep -q .; then
+      log "  prune stale $name (older than $want_version, mtime > ${EXTENSIONS_TTL_DAYS}d)"
+      rm -rf -- "$entry"
+      rm -f -- "$cache_dir/${id_lc}-${ver}.vsix"
+    fi
+  done
+}
+
+# install_one <bin> <dir> <cache_dir> <spec> <label> <source>
 install_one() {
-  local bin="$1" dir="$2" spec="$3" label="$4" source="$5"
+  local bin="$1" dir="$2" cache_dir="$3" spec="$4" label="$5" source="$6"
   [ -n "$spec" ] || return 0
   if [ ! -x "$bin" ]; then
     log "[$label] skip $spec (binary $bin not present)"
@@ -154,45 +189,33 @@ install_one() {
 
   parse_spec "$spec"
   local id="$SPEC_ID" want_version="$SPEC_VERSION"
-  local have_version; have_version="$(installed_version "$id" "$dir")"
 
-  if [ -n "$want_version" ]; then
-    # Pinned version. No-op when already on disk. Replace otherwise.
-    if [ "$have_version" = "$want_version" ]; then
-      log "[$label] pinned $id@$want_version already installed"
+  if [ -z "$want_version" ]; then
+    want_version="$(fetch_latest_version "$id" "$source" || true)"
+    if [ -z "$want_version" ]; then
+      log "[$label] $id: registry lookup failed; keeping existing shared entries"
       return 0
     fi
-    if [ -n "$have_version" ]; then
-      log "[$label] pinned $id@$want_version replacing $have_version"
-      "$bin" --extensions-dir="$dir" --uninstall-extension "$id" > /tmp/ext-install.log 2>&1 || true
-    fi
-    local vsix; vsix="$(fetch_vsix "$id" "$want_version" "$source" || true)"
-    if [ -z "$vsix" ]; then
-      log "[$label] FAILED $id@$want_version (no VSIX downloadable)"
+  fi
+
+  if [ -n "$(installed_dirname "$id" "$want_version" "$dir")" ]; then
+    log "[$label] $id@$want_version already in shared cache"
+  else
+    local vsix
+    if ! vsix="$(fetch_vsix "$id" "$want_version" "$source" "$cache_dir")" || [ -z "$vsix" ]; then
+      log "[$label] FAILED $id@$want_version (VSIX download)"
       return 0
     fi
     if "$bin" --extensions-dir="$dir" --install-extension "$vsix" > /tmp/ext-install.log 2>&1; then
-      log "[$label] ok $id@$want_version (from $(basename "$vsix"))"
+      log "[$label] installed $id@$want_version into shared (from $(basename "$vsix"))"
     else
       log "[$label] FAILED $id@$want_version (install error)"
       sed 's/^/    /' /tmp/ext-install.log
+      return 0
     fi
-    return 0
   fi
 
-  # Floating "latest" spec. If any version is already installed, leave it alone
-  # so user-driven UI updates are preserved. Otherwise install whatever the
-  # editor's registry serves as latest.
-  if [ -n "$have_version" ]; then
-    log "[$label] $id already installed ($have_version); leaving in place"
-    return 0
-  fi
-  if "$bin" --extensions-dir="$dir" --install-extension "$id" > /tmp/ext-install.log 2>&1; then
-    log "[$label] ok $id (latest)"
-  else
-    log "[$label] FAILED $id (exit $?)"
-    sed 's/^/    /' /tmp/ext-install.log
-  fi
+  prune_older_versions "$id" "$want_version" "$dir" "$cache_dir"
 }
 
 shopt -s nullglob
@@ -207,13 +230,12 @@ for manifest in "${manifests[@]}"; do
 
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    install_one "$CODE_SERVER" "$CODE_SERVER_DIR" "$spec" "code-server" "openvsx"
-    install_one "$VSCODE_WEB"  "$VSCODE_WEB_DIR"  "$spec" "vscode-web"  "marketplace"
+    install_one "$CODE_SERVER" "$SHARED_DIR" "$VSIX_CACHE_DIR" "$spec" "shared" "openvsx"
   done < <(jq -r '(.shared // [])[]' "$manifest")
 
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    install_one "$VSCODE_WEB" "$VSCODE_WEB_DIR" "$spec" "vscode-web" "marketplace"
+    install_one "$VSCODE_WEB" "$MARKETPLACE_DIR" "$MARKETPLACE_VSIX_CACHE_DIR" "$spec" "vscode-web-only" "marketplace"
   done < <(jq -r '(.vscode_web_only // [])[]' "$manifest")
 done
 

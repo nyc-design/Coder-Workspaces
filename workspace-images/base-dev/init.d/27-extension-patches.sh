@@ -16,7 +16,7 @@ log() { printf '[code-server-init] %s\n' "$*"; }
 # extension on disk and therefore requires the extension to be installed first.
 patch_code_server_pencil_session_fallback() {
   local extension_dir bundle_js
-  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/shared/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
   if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
     log "Pencil extension not installed; skipping session fallback patch"
     return 0
@@ -67,7 +67,7 @@ NODE
 # `pencil.openWelcomeDocument` and the regular `.pen` editor are unaffected.
 patch_code_server_pencil_disable_first_run_open() {
   local extension_dir bundle_js
-  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/shared/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
   if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
     log "Pencil extension not installed; skipping first-run open patch"
     return 0
@@ -123,7 +123,7 @@ patch_code_server_continue_clipboard() {
   local extension_dir
   # Continue ships a per-target VSIX (linux-x64, darwin-arm64, etc.) plus a
   # platform-independent fallback. Take the most recent matching dir.
-  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/continue.continue-*/ 2>/dev/null | sort | tail -1 || true)"
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/shared/Continue.continue-*/ /home/coder/.vscode-extensions/shared/continue.continue-*/ 2>/dev/null | sort | tail -1 || true)"
   if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
     log "Continue extension not installed; skipping clipboard patch"
     return 0

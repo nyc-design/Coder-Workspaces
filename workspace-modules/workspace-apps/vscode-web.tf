@@ -1,8 +1,9 @@
 # vscode-web (Microsoft) — thin wrapper around the binary baked into base-dev.
 # Binary is installed at /opt/vscode-web/bin/code-server by the image build.
-# Its extensions dir is host-bound and writable; workspace-init.d installs each
-# manifest extension directly into it (Marketplace versions), so vscode-web has
-# a complete real-directory view with no symlink curation step.
+# workspace-init.d installs each manifest extension into a host-bound shared
+# cache, then symlinks the active manifest set (OpenVSX entries from shared/
+# plus Marketplace entries from shared/_marketplace/) into vscode-web's own
+# extensions dir at workspace start.
 
 locals {
   vscode_web_port              = 13338

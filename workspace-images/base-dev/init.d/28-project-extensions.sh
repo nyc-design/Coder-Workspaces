@@ -11,25 +11,25 @@
 # agent, so this script enumerates every non-hidden subdir under /workspaces/
 # and reads the two files if they exist. In practice there is one such dir.
 #
-# Targets: both per-editor extension dirs (code-server reads OpenVSX, vscode-web
-# reads Marketplace). Per-project Marketplace-only extensions are intentionally
-# out of scope; those should live in Tier 1 or Tier 2 (Copilot, Gemini) where
-# they are managed centrally.
+# Targets the shared OpenVSX cache (same dir 25-extensions-install.sh uses).
+# Per-project Marketplace-only extensions are intentionally out of scope; those
+# should live in Tier 1 or Tier 2 (Copilot, Gemini) where they are managed
+# centrally.
 #
-# Project manifests don't pin versions, so we use the same "don't downgrade,
-# install if missing" semantics as 25-extensions-install.sh: if the editor
-# already has any version of the id on disk (including UI-installed updates),
-# this script is a no-op for that id.
+# Project specs are always unpinned: a project's devcontainer/extensions.json
+# carries ids only, no version, so we treat them like manifest `"latest"` entries.
+# The activate script picks the highest version of each id from the shared cache,
+# so any version already installed by Tier 1/2 (or by another workspace) is
+# reused without re-downloading.
 
 set -euo pipefail
 
 log() { printf '[project-extensions] %s\n' "$*"; }
 
 WORKSPACES_ROOT="${WORKSPACES_ROOT:-/workspaces}"
-CODE_SERVER_DIR="${CODE_SERVER_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/code-server}"
-VSCODE_WEB_DIR="${VSCODE_WEB_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web}"
+SHARED_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
+VSIX_CACHE_DIR="${VSIX_CACHE_DIR:-$SHARED_DIR/_cache}"
 CODE_SERVER="${CODE_SERVER_BIN:-/opt/code-server/bin/code-server}"
-VSCODE_WEB="${VSCODE_WEB_BIN:-/opt/vscode-web/bin/code-server}"
 
 if [ ! -d "$WORKSPACES_ROOT" ]; then
   log "no $WORKSPACES_ROOT; skipping"
@@ -41,7 +41,7 @@ if ! command -v node > /dev/null 2>&1; then
   exit 0
 fi
 
-mkdir -p "$CODE_SERVER_DIR" "$VSCODE_WEB_DIR"
+mkdir -p "$SHARED_DIR" "$VSIX_CACHE_DIR"
 
 # Node helper: strip JSONC comments + trailing commas, then emit one extension
 # id per line for the relevant manifest type (devcontainer.json or
@@ -86,38 +86,39 @@ if (base === 'devcontainer.json') {
 
 for (const id of ids) {
   if (typeof id === 'string' && id.trim()) {
-    process.stdout.write(id.trim() + '\n');
+    // Strip any @version suffix; project manifests are unpinned.
+    process.stdout.write(id.trim().replace(/@.*$/, '') + '\n');
   }
 }
 NODE
 }
 
-# True iff any directory named "<id-lowercase>-*" exists under $2.
+# True iff $1 already has any directory named "<id_lc>-*" under $SHARED_DIR.
 has_any_version() {
   local id_lc; id_lc="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
   shopt -s nullglob
-  local entries=("$2"/${id_lc}-*/)
+  local entries=("$SHARED_DIR"/${id_lc}-*/)
   [ "${#entries[@]}" -gt 0 ]
 }
 
+# Install latest version of $1 into the shared cache, if missing. The cache may
+# already have a version from Tier 1/2 install or from another workspace.
 install_one() {
-  local bin="$1" dir="$2" ext="$3" label="$4" source="$5"
-  [ -z "$ext" ] && return 0
-  if [ ! -x "$bin" ]; then
-    log "[$label] skip $ext (binary $bin not present)"
+  local id="$1" source="$2"
+  [ -z "$id" ] && return 0
+  if [ ! -x "$CODE_SERVER" ]; then
+    log "skip $id (binary $CODE_SERVER not present)"
     return 0
   fi
-  # Strip any @version on project specs — Tier 3 floats latest by design.
-  ext="${ext%@*}"
-  if has_any_version "$ext" "$dir"; then
-    log "[$label] $ext already installed (from $source); leaving in place"
+  if has_any_version "$id"; then
+    log "ok $id (already in shared cache, from $source)"
     return 0
   fi
-  if "$bin" --extensions-dir="$dir" --install-extension "$ext" > /tmp/ext-install.log 2>&1; then
-    log "[$label] ok $ext (from $source)"
+  if "$CODE_SERVER" --extensions-dir="$SHARED_DIR" --install-extension "$id" > /tmp/ext-install.log 2>&1; then
+    log "ok $id (installed latest into shared, from $source)"
   else
     rc=$?
-    log "[$label] FAILED $ext (from $source, exit $rc)"
+    log "FAILED $id (from $source, exit $rc)"
     sed 's/^/    /' /tmp/ext-install.log
   fi
 }
@@ -136,8 +137,7 @@ for project in "$WORKSPACES_ROOT"/*/; do
     found_any=1
     log "reading ${manifest#$WORKSPACES_ROOT/}"
     while IFS= read -r ext; do
-      install_one "$CODE_SERVER" "$CODE_SERVER_DIR" "$ext" "code-server" "${manifest#$WORKSPACES_ROOT/}"
-      install_one "$VSCODE_WEB"  "$VSCODE_WEB_DIR"  "$ext" "vscode-web"  "${manifest#$WORKSPACES_ROOT/}"
+      install_one "$ext" "${manifest#$WORKSPACES_ROOT/}"
     done < <(extract_extensions "$manifest")
   done
 done

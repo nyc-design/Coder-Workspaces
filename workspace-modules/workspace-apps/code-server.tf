@@ -2,11 +2,10 @@
 # Binary is installed at /opt/code-server/bin/code-server by the image build;
 # the launcher script just configures and launches it. Replaces the
 # registry.coder.com/coder/code-server module so we avoid a download on each
-# workspace start. Extensions live in a host-bound, writable per-editor dir;
-# workspace-init.d installs each manifest extension into it as a real directory
-# (with a VSIX blob cache in ~/.vscode-extensions/shared/_cache for cross-editor
-# reuse), so code-server's UI update path works normally and version pins are
-# honored. Persists across restarts via the host mount.
+# workspace start. Extension installation is handled by the workspace-init.d
+# manifest framework, which installs versions into a host-bound shared cache
+# and symlinks the active manifest set into a per-editor dir at workspace
+# start; persisted versions survive across restarts via the shared mount.
 
 locals {
   code_server_port              = 13337
