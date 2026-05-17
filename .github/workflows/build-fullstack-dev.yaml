@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "workspace-images/fullstack-dev/**"
-      - "workspace-images/shared/**"
+      - "workspace-images/python-shared/**"
       - "workspace-images/python-dev/**"
       - "workspace-images/vite-dev/**"
       - ".github/workflows/build-fullstack-dev.yaml"

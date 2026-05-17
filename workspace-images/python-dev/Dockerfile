@@ -4,8 +4,8 @@ FROM ghcr.io/nyc-design/workspace-images/base-dev:latest
 USER root
 
 # Python development tools (shared script — single source of truth)
-COPY workspace-images/shared/install-python.sh /tmp/install-python.sh
-RUN chmod +x /tmp/install-python.sh && /tmp/install-python.sh && rm /tmp/install-python.sh
+COPY workspace-images/python-shared/20-install-python.sh /tmp/20-install-python.sh
+RUN chmod +x /tmp/20-install-python.sh && /tmp/20-install-python.sh && rm /tmp/20-install-python.sh
 
 # Shared Python contributions. Keep Python-specific scripts/manifests here so
 # python-dev and fullstack-dev both consume the same source without relying on

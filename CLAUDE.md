@@ -16,13 +16,13 @@ This repository contains Docker build files and initialization scripts for Coder
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, AI CLIs, RTK)
 │   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 05-rtk, ..., 10-mcp-cleanup)
-├── shared/               # Shared install scripts used by multiple images
-│   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
+├── python-shared/        # Shared Python contributions (init.d, settings.d, extensions.d, skills.d) layered into python-dev and fullstack-dev
+│   └── 20-install-python.sh # Python tools + libs install script (build-time, used by both Dockerfiles)
 ├── cpp-dev/              # C++ development environment (gcc/clang/cmake/ninja/vcpkg)
 ├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
-├── python-dev/           # Python development environment (uses shared/install-python.sh)
+├── python-dev/           # Python development environment (uses python-shared/20-install-python.sh)
 └── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
 
 workspace-templates/       # Coder workspace template definitions
@@ -58,9 +58,9 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ### Docker Image Hierarchy
 ```
 base-dev (core tools, Docker, Git, GCP, AI CLIs)
-├── python-dev (uses shared/install-python.sh)
+├── python-dev (uses python-shared/20-install-python.sh)
 ├── vite-dev (Node.js, npm globals, Playwright)
-│   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
+│   └── fullstack-dev (uses python-shared/20-install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 ├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
 └── playwright-dev
@@ -231,7 +231,7 @@ for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 `/responses` directly to the configured base).
 
 ### Shared Install Scripts
-- `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
+- `workspace-images/python-shared/20-install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
 - Eliminates duplication: both images COPY and RUN the same script
 
 ### Pencil MCP (Design Editor)
@@ -321,7 +321,7 @@ base-dev → rust-dev
 ```
 
 ### Build Triggers
-- **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/shared/**`, or workflow files
+- **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/python-shared/**`, or workflow files
 - **Cascade**: Parent image builds trigger child image rebuilds via `workflow_run`
 - **Manual**: `workflow_dispatch` for on-demand builds
 - **Authentication**: Uses workload identity with `GCP_SA_KEY` secret
@@ -364,7 +364,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 ## Common Tasks
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
-- **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
+- **Update Python packages**: Edit `workspace-images/python-shared/20-install-python.sh` (rebuilds both python-dev and fullstack-dev)
 - **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track latest, queried from the registry on each workspace start) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces; older-than-target versions are TTL-pruned (default 30 days) per id. `30-extensions-activate.sh` then symlinks the active manifest set into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication

@@ -28,6 +28,7 @@
   },
   "machine": {
     "git.useIntegratedAskPass": false,
-    "likec4.mcp.enabled": true
+    "likec4.mcp.enabled": true,
+    "remote.autoForwardPortsSource": "process"
   }
 }

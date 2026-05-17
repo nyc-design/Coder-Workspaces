@@ -10,7 +10,7 @@
     "mongodb.mongodb-vscode",
     "openai.chatgpt",
     "Continue.continue@1.3.38",
-    "ms-azuretools.vscode-docker",
+    "ms-azuretools.vscode-containers",
     "likec4.likec4-vscode",
     "nefrob.vscode-just-syntax",
     "Gruntfuggly.todo-tree",

@@ -130,10 +130,18 @@ patch_code_server_continue_clipboard() {
   fi
   extension_dir="${extension_dir%/}"
 
-  # Continue's VS Code extension entry point is dist/extension.js (bundled).
-  local bundle_js="$extension_dir/dist/extension.js"
-  if [ ! -f "$bundle_js" ]; then
-    log "Continue extension bundle not found at $bundle_js; skipping clipboard patch"
+  # Continue's VS Code extension entry point varies by version: older builds
+  # bundle to dist/extension.js, newer builds (>=1.3.x) bundle to
+  # out/extension.js. Probe both.
+  local bundle_js=""
+  for candidate in "$extension_dir/out/extension.js" "$extension_dir/dist/extension.js"; do
+    if [ -f "$candidate" ]; then
+      bundle_js="$candidate"
+      break
+    fi
+  done
+  if [ -z "$bundle_js" ]; then
+    log "Continue extension bundle not found under $extension_dir (looked for out/extension.js and dist/extension.js); skipping clipboard patch"
     return 0
   fi
 
@@ -158,11 +166,14 @@ if (source.includes(marker)) {
 //       copiedAt: new Date().toISOString(),
 //     };
 //   }
-// After esbuild minification this collapses to the form below; the identifier
-// for the vscode module alias varies per build, so match it loosely.
+// Bundles vary: esbuild minified single-line, esbuild unminified multi-line,
+// and newer builds wrap the Date in a `(/* @__PURE__ */ new Date())` annotation.
+// The identifier for the vscode module alias varies per build, so match it
+// loosely. Patterns ordered from most specific to most permissive; the `s` flag
+// allows `.` to span newlines for unminified bundles.
 const patterns = [
   /async getClipboardContent\(\)\{return\{text:await ([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\),copiedAt:new Date\(\)\.toISOString\(\)\}\}/,
-  /async getClipboardContent\(\)\s*\{\s*return\s*\{\s*text:\s*await\s+([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\)\s*,\s*copiedAt:\s*new Date\(\)\.toISOString\(\)\s*\}\s*;?\s*\}/,
+  /async getClipboardContent\(\)\s*\{\s*return\s*\{\s*text:\s*await\s+([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\)\s*,\s*copiedAt:\s*\(?\s*(?:\/\*[^*]*\*\/\s*)?new Date\(\)\s*\)?\.toISOString\(\)\s*,?\s*\}\s*;?\s*\}/s,
 ];
 
 let matched = false;
@@ -190,6 +201,11 @@ console.log('patched');
 NODE
 }
 
-patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
-patch_code_server_pencil_disable_first_run_open || log "warning: failed to patch Pencil first-run welcome"
-patch_code_server_continue_clipboard || log "warning: failed to patch Continue clipboard"
+# Each patch logs its own status. We deliberately do NOT swallow non-zero exits
+# with `|| log warning` here — silent failure is what caused the Continue
+# clipboard patch to regress against Continue 1.3.x (dist/ -> out/ bundle move).
+# If a patch's preconditions aren't met it should `return 0` itself; a non-zero
+# exit means an unexpected bundle shape that we want surfaced in init logs.
+patch_code_server_pencil_session_fallback
+patch_code_server_pencil_disable_first_run_open
+patch_code_server_continue_clipboard

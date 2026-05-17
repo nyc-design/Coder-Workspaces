@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared Python installation script — used by both python-dev and fullstack-dev.
-# Run as root inside a Dockerfile: COPY + RUN chmod +x + RUN ./install-python.sh
+# Run as root inside a Dockerfile: COPY + RUN chmod +x + RUN ./20-install-python.sh
 set -eu
 
 echo "[install-python] Installing Python development tools and libraries"
