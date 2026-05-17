@@ -29,7 +29,6 @@ resource "coder_script" "vscode_web" {
   script = templatefile("${path.module}/scripts/vscode-web-launch.sh", {
     INSTALL_PREFIX        = local.vscode_web_install_prefix
     EXTENSIONS_DIR        = local.vscode_web_extensions_dir
-    SHARED_EXTENSIONS_DIR = local.vscode_web_shared_extensions
     LOG_PATH              = local.vscode_web_log_path
     PORT                  = local.vscode_web_port
     TELEMETRY_LEVEL       = local.vscode_web_telemetry_level
