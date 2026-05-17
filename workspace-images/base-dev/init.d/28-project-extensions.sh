@@ -11,16 +11,12 @@
 # agent, so this script enumerates every non-hidden subdir under /workspaces/
 # and reads the two files if they exist. In practice there is one such dir.
 #
-# Targets the shared OpenVSX cache (same dir 25-extensions-install.sh uses).
-# Per-project Marketplace-only extensions are intentionally out of scope; those
-# should live in Tier 1 or Tier 2 (Copilot, Gemini) where they are managed
-# centrally.
+# Targets: the shared OpenVSX dir (read by both editors). Per-project Marketplace-
+# only extensions are intentionally out of scope; those should live in Tier 1
+# or Tier 2 (Copilot, Gemini) where they are managed centrally.
 #
-# Project specs are always unpinned: a project's devcontainer/extensions.json
-# carries ids only, no version, so we treat them like manifest `"latest"` entries.
-# The activate script picks the highest version of each id from the shared cache,
-# so any version already installed by Tier 1/2 (or by another workspace) is
-# reused without re-downloading.
+# code-server / vscode-web --install-extension is idempotent, so duplicates with
+# Tier 1 / Tier 2 are no-ops at install time.
 
 set -euo pipefail
 
@@ -28,7 +24,6 @@ log() { printf '[project-extensions] %s\n' "$*"; }
 
 WORKSPACES_ROOT="${WORKSPACES_ROOT:-/workspaces}"
 SHARED_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
-VSIX_CACHE_DIR="${VSIX_CACHE_DIR:-$SHARED_DIR/_cache}"
 CODE_SERVER="${CODE_SERVER_BIN:-/opt/code-server/bin/code-server}"
 
 if [ ! -d "$WORKSPACES_ROOT" ]; then
@@ -41,7 +36,7 @@ if ! command -v node > /dev/null 2>&1; then
   exit 0
 fi
 
-mkdir -p "$SHARED_DIR" "$VSIX_CACHE_DIR"
+mkdir -p "$SHARED_DIR"
 
 # Node helper: strip JSONC comments + trailing commas, then emit one extension
 # id per line for the relevant manifest type (devcontainer.json or
@@ -86,39 +81,24 @@ if (base === 'devcontainer.json') {
 
 for (const id of ids) {
   if (typeof id === 'string' && id.trim()) {
-    // Strip any @version suffix; project manifests are unpinned.
-    process.stdout.write(id.trim().replace(/@.*$/, '') + '\n');
+    process.stdout.write(id.trim() + '\n');
   }
 }
 NODE
 }
 
-# True iff $1 already has any directory named "<id_lc>-*" under $SHARED_DIR.
-has_any_version() {
-  local id_lc; id_lc="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
-  shopt -s nullglob
-  local entries=("$SHARED_DIR"/${id_lc}-*/)
-  [ "${#entries[@]}" -gt 0 ]
-}
-
-# Install latest version of $1 into the shared cache, if missing. The cache may
-# already have a version from Tier 1/2 install or from another workspace.
 install_one() {
-  local id="$1" source="$2"
-  [ -z "$id" ] && return 0
+  local ext="$1" source="$2"
+  [ -z "$ext" ] && return 0
   if [ ! -x "$CODE_SERVER" ]; then
-    log "skip $id (binary $CODE_SERVER not present)"
+    log "skip $ext (binary $CODE_SERVER not present)"
     return 0
   fi
-  if has_any_version "$id"; then
-    log "ok $id (already in shared cache, from $source)"
-    return 0
-  fi
-  if "$CODE_SERVER" --extensions-dir="$SHARED_DIR" --install-extension "$id" > /tmp/ext-install.log 2>&1; then
-    log "ok $id (installed latest into shared, from $source)"
+  if "$CODE_SERVER" --extensions-dir="$SHARED_DIR" --install-extension "$ext" > /tmp/ext-install.log 2>&1; then
+    log "ok $ext (from $source)"
   else
     rc=$?
-    log "FAILED $id (from $source, exit $rc)"
+    log "FAILED $ext (from $source, exit $rc)"
     sed 's/^/    /' /tmp/ext-install.log
   fi
 }

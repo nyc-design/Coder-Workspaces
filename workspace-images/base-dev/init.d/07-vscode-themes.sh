@@ -5,12 +5,10 @@ log() { printf '[vscode-themes-init] %s\n' "$*"; }
 
 THEMES_DIR="/usr/local/share/shared-assets/vscode-themes"
 # Globally persisted extension dirs (host-bound in workspace-runtime).
-# shared/ is the extracted OpenVSX cache used by both editors (via
-# 30-extensions-activate.sh symlinks); shared/_marketplace/ is the equivalent
-# Marketplace cache used only by vscode-web. We install themes into both so
-# they appear in either editor's curated view.
+# Shared dir is used by code-server and vscode-web (vscode-web merges).
+# vscode-web dir is MS-marketplace-only extensions for VS Code Web.
 CS_EXT_DIR="$HOME/.vscode-extensions/shared"
-VSCODE_EXT_DIR="$HOME/.vscode-extensions/shared/_marketplace"
+VSCODE_EXT_DIR="$HOME/.vscode-extensions/vscode-web"
 
 install_into_vscode_server() {
   local vsix_path="$1"
