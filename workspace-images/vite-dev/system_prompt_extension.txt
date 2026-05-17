@@ -3,5 +3,5 @@
 - Lint + format: Biome — `pnpm biome check --write` / `pnpm biome format --write`. Default config at `/usr/local/share/biome/biome.json`; project may override with its own `biome.json`.
 - Type checking: `tsc --noEmit` (or `pnpm tsc`). TypeScript LSP runs in the editor.
 - Tests: Vitest (unit), Playwright (E2E, Chromium only on ARM Linux). Drive browsers via the Playwright CLI.
-- Design tooling: `pencil interactive` (`.pen` wireframes / mockups), `stitch-mcp <cmd>` (Stitch design tool). The Pencil VS Code extension is also installed for `.pen` editing.
+- Design tooling CLIs: `pencil` (CLI for `.pen` wireframes / mockups — run `pencil interactive` for the interactive REPL, `pencil interactive -i in.pen -o out.pen` for headless edits) and `stitch-mcp` (CLI wrapper around the Stitch design tool — run `stitch-mcp <subcommand>`). Both are real shell binaries on `$PATH`, not MCP servers or VS Code commands. The Pencil VS Code extension is also installed for in-editor `.pen` editing.
 - Frontend implementation: compose React components and call contracted API endpoints. When the backend exposes an OpenAPI spec, generate TS types with `openapi-typescript` — do not hand-write API response types.
