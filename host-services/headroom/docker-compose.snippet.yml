@@ -80,11 +80,6 @@ services:
       # license cache, optional memory.db. Keeping these on a volume means
       # watchtower image swaps don't reset compression-savings history.
       - headroom-data:/data
-      # Patch the any-llm backend to emit an immediate no-op SSE prelude for
-      # OpenAI-compatible streaming. Coder chatd has a hard-coded 60s stream
-      # startup guard; long Meridian/OmniRoute/Claude Code requests can exceed
-      # that before their first real provider chunk.
-      - ../headroom-patch/anyllm.py:/usr/local/lib/python3.11/site-packages/headroom/backends/anyllm.py:ro
     labels:
       - "traefik.enable=true"
 

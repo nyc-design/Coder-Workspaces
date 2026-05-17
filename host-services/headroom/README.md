@@ -88,27 +88,6 @@ Not recommended on the shared Oracle VM (4 vCPU / 24 GB RAM): CPU
 inference would contend with active workspaces, and prompt cache is
 already capturing the bulk of available savings.
 
-
-## Local stream-start prelude patch
-
-This deployment still pulls `ghcr.io/chopratejas/headroom:latest`, but the
-compose snippet bind-mounts `../headroom-patch/anyllm.py` over Headroom's
-installed `headroom/backends/anyllm.py`. The patch emits an immediate empty
-OpenAI `chat.completion.chunk` before opening the upstream streaming request.
-
-Why: Coder chatd has a hard-coded 60 second stream startup guard. Long
-Claude Code / Meridian / OmniRoute requests can exceed 60 seconds before the
-provider yields its first real chunk, causing chatd to cancel and retry the
-request. The empty chunk is parsed as a valid stream part, disarms chatd's
-startup guard, and carries no user-visible content.
-
-Build/test from the repo root:
-
-```bash
-docker compose -f host-services/headroom/docker-compose.snippet.yml config
-python3 host-services/headroom-patch/test_stream_prelude.py
-```
-
 ## Auth
 
 Headroom is **transparent at this layer** — it does not validate or
