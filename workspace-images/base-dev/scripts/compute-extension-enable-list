@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# compute-extension-disable-list
+# compute-extension-enable-list
 #
-# Emit (one ID per line, stdout) the extension IDs present in the shared
-# extension cache but NOT in any active manifest. The launcher scripts
+# Emit (one ID per line, stdout, lowercased) the union of extension IDs
+# declared by the active manifests. The editor launchers
 # (code-server-launch.sh, vscode-web-launch.sh) consume this list and
-# pass --disable-extension <id> for each ID, so the editor sees only the
-# union of the active manifests as enabled.
+# symlink only the matching subdirs of the shared OpenVSX cache into the
+# per-editor extensions dir, so the editor sees exactly the manifest set
+# plus any user-installed extensions it has put in its own dir.
+#
+# This replaces compute-extension-disable-list: code-server has no
+# --disable-extension flag, so we can't gate activation via CLI; we gate
+# it via the filesystem (what gets symlinked into --extensions-dir).
 #
 # Active manifests considered:
 #   - Tier 1 (global)  : /usr/local/share/workspace-extensions.d/*.json
@@ -13,26 +18,19 @@
 #   - Tier 3 (project) : each /workspaces/<project>/.devcontainer/devcontainer.json
 #                        and /workspaces/<project>/.vscode/extensions.json
 #
-# All sources are read fresh at launch — no provenance ledger. The shared
-# cache stays the single source of truth on disk; this script just decides
-# which of its contents are activated for the current workspace.
-#
 # Env vars (with defaults):
-#   EXTENSIONS_DIR   /home/coder/.vscode-extensions/shared
 #   MANIFEST_DIR     /usr/local/share/workspace-extensions.d
 #   WORKSPACES_ROOT  /workspaces
 #
 # Fail-open: any error path that prevents us from computing the manifest
-# set produces empty output, which means no disables — better to leak a
-# few extensions than to disable everything.
+# set produces empty output. The launcher interprets empty output as
+# "no manifest known" and falls back to mirroring the entire shared cache,
+# which is safer than hiding every extension.
 
 set -euo pipefail
 
-EXTENSIONS_DIR="${EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
 MANIFEST_DIR="${MANIFEST_DIR:-/usr/local/share/workspace-extensions.d}"
 WORKSPACES_ROOT="${WORKSPACES_ROOT:-/workspaces}"
-
-[[ -d "$EXTENSIONS_DIR" ]] || exit 0
 
 declare -A manifest_set
 
@@ -91,22 +89,6 @@ NODE
   done
 fi
 
-# Fail-open: if we couldn't collect any manifest entries, emit nothing
-# rather than disabling every cached extension.
-if [[ ${#manifest_set[@]} -eq 0 ]]; then
-  exit 0
-fi
-
-# Walk the cache and emit any installed extension not in the manifest set.
-# Extension dirs follow the VS Code convention "<publisher>.<name>-<version>"
-# where <version> begins with a digit; strip the trailing "-<version>" to
-# recover the ID.
-shopt -s nullglob
-for entry in "$EXTENSIONS_DIR"/*/; do
-  basename="$(basename "${entry%/}")"
-  id="$(printf '%s' "$basename" | sed -E 's/-[0-9][0-9A-Za-z.+-]*$//')"
-  [[ -z "$id" || "$id" == "$basename" ]] && continue
-  if [[ -z "${manifest_set[${id,,}]:-}" ]]; then
-    printf '%s\n' "$id"
-  fi
+for id in "${!manifest_set[@]}"; do
+  printf '%s\n' "$id"
 done

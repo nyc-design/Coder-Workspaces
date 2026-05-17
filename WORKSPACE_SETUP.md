@@ -12,7 +12,7 @@ workspace-images/
 │   ├── Dockerfile              # Base Docker image definition
 │   └── scripts/                # Helper scripts baked into /usr/local/bin/
 │       ├── run-workspace-inits             # Init script runner utility
-│       └── compute-extension-disable-list  # Activation gate for cached extensions
+│       └── compute-extension-enable-list   # Manifest set used by launchers for symlink curation
 ├── cpp-dev/                    # C++ development image
 ├── fullstack-dev/              # Full-stack development image
 ├── vite-dev/                   # Vite/React development image
