@@ -23,7 +23,8 @@
     "rhalaly.scope-to-this",
     "jakobhoeg.vscode-pokemon",
     "d9once.pokechi",
-    "octohash.powermode-plus"
+    "octohash.powermode-plus",
+    "nyc-design.neils-themes"
   ],
   "vscode_web_only": [
     "GitHub.copilot",

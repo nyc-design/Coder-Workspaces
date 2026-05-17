@@ -8,4 +8,5 @@ models:
     apiBase: https://codestral.mistral.ai/v1
     apiKey: __CODESTRAL_API_KEY__
     roles:
+      - chat
       - autocomplete
