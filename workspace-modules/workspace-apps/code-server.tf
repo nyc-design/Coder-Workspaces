@@ -11,7 +11,6 @@ locals {
   code_server_port              = 13337
   code_server_install_prefix    = "/opt/code-server"
   code_server_extensions_dir    = "/home/coder/.vscode-extensions/code-server"
-  code_server_shared_extensions = "/home/coder/.vscode-extensions/shared"
   code_server_log_path          = "/tmp/code-server.log"
 }
 
@@ -25,7 +24,6 @@ resource "coder_script" "code_server" {
   script = templatefile("${path.module}/scripts/code-server-launch.sh", {
     INSTALL_PREFIX        = local.code_server_install_prefix
     EXTENSIONS_DIR        = local.code_server_extensions_dir
-    SHARED_EXTENSIONS_DIR = local.code_server_shared_extensions
     LOG_PATH              = local.code_server_log_path
     PORT                  = local.code_server_port
     APP_NAME              = "code-server"

@@ -161,7 +161,6 @@ COPY workspace-images/base-dev/settings.d/ /usr/local/share/workspace-settings.d
 COPY workspace-images/base-dev/continue.d/ /usr/local/share/workspace-continue.d/
 
 COPY workspace-images/base-dev/scripts/run-workspace-inits /usr/local/bin/run-workspace-inits
-COPY workspace-images/base-dev/scripts/compute-extension-enable-list /usr/local/bin/compute-extension-enable-list
-RUN chmod +x /usr/local/bin/run-workspace-inits /usr/local/bin/compute-extension-enable-list
+RUN chmod +x /usr/local/bin/run-workspace-inits
 
 USER coder

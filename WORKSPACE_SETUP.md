@@ -11,8 +11,7 @@ workspace-images/
 ├── base-dev/                    # Base development image (foundation for all others)
 │   ├── Dockerfile              # Base Docker image definition
 │   └── scripts/                # Helper scripts baked into /usr/local/bin/
-│       ├── run-workspace-inits             # Init script runner utility
-│       └── compute-extension-enable-list   # Manifest set used by launchers for symlink curation
+│       └── run-workspace-inits             # Init script runner utility
 ├── cpp-dev/                    # C++ development image
 ├── fullstack-dev/              # Full-stack development image
 ├── vite-dev/                   # Vite/React development image
