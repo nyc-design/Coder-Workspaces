@@ -18,6 +18,7 @@ RUN npm install -g \
     vitest \
     @playwright/test playwright @playwright/mcp @playwright/cli \
     tailwindcss postcss autoprefixer \
+    @pencil.dev/cli @_davideast/stitch-mcp \
  && chown -R coder:coder /usr/local/share/npm-global
 
 # Layered workspace contributions (all optional; source paths exist so COPYs

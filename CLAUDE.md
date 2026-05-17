@@ -16,13 +16,13 @@ This repository contains Docker build files and initialization scripts for Coder
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, AI CLIs, RTK)
 │   └── init.d/           # Modular init scripts (01-docker, 02-starship, ..., 05-rtk, ..., 10-mcp-cleanup)
-├── shared/               # Shared install scripts used by multiple images
-│   └── install-python.sh # Python tools + libs (used by python-dev and fullstack-dev)
+├── python-shared/        # Shared Python contributions (init.d, settings.d, extensions.d, skills.d) layered into python-dev and fullstack-dev
+│   └── scripts/install-python.sh # Python tools + libs install script (build-time, used by both Dockerfiles)
 ├── cpp-dev/              # C++ development environment (gcc/clang/cmake/ninja/vcpkg)
 ├── fullstack-dev/        # Full-stack web development (extends vite-dev + shared Python)
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
-├── python-dev/           # Python development environment (uses shared/install-python.sh)
+├── python-dev/           # Python development environment (uses python-shared/scripts/install-python.sh)
 └── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
 
 workspace-templates/       # Coder workspace template definitions
@@ -58,9 +58,9 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ### Docker Image Hierarchy
 ```
 base-dev (core tools, Docker, Git, GCP, AI CLIs)
-├── python-dev (uses shared/install-python.sh)
+├── python-dev (uses python-shared/scripts/install-python.sh)
 ├── vite-dev (Node.js, npm globals, Playwright)
-│   └── fullstack-dev (uses shared/install-python.sh + fastapi/uvicorn)
+│   └── fullstack-dev (uses python-shared/scripts/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 ├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
 └── playwright-dev
@@ -88,7 +88,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `11-agent-prompts.sh` | Assemble per-image system prompt → write to `~/.coder/AGENTS.md`; symlink `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` to it; symlink `~/.coder/skills` to `~/.claude/skills` |
 
 ### MCP Server Lifecycle Management
-Stdio-based MCP servers (likec4, stitch, signoz, playwright, pencil, agentmemory) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
+Stdio-based MCP servers (likec4, stitch, playwright, pencil, agentmemory) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
 
 1. **`mcp-wrap`** (`/usr/local/bin/mcp-wrap`) — Python wrapper that sets `PR_SET_PDEATHSIG(SIGTERM)` before `exec`'ing the real MCP server. The kernel automatically sends SIGTERM when the parent agent process dies. All stdio MCP commands in `mcp.tf` are wrapped: `command = "mcp-wrap"`, `args = ["original-cmd", ...]`. This is the primary defense.
 
@@ -231,11 +231,11 @@ for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 `/responses` directly to the configured base).
 
 ### Shared Install Scripts
-- `workspace-images/shared/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev
+- `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)
 - Eliminates duplication: both images COPY and RUN the same script
 
-### Pencil MCP (Design Editor)
-- Pencil MCP is provided via the Pencil VS Code extension for editor-driven workflows.
+### Design Tooling (vite-dev / fullstack-dev)
+- The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
 - Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
 - If Pencil MCP tool calls fail or return no response, switch to Pencil CLI headless mode (`pencil interactive -i input.pen -o output.pen`) and continue there.
 - No `pencil-ready` / `pencil-close` pre-step is required.
@@ -300,7 +300,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Workspace Docker mode is isolated DinD via `sysbox-runc`; avoid mounting host `/var/run/docker.sock` in workspace containers
 - `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
 - npm global install prefix is `/usr/local/share/npm-global` (shared by image-time and runtime installs as user `coder`)
-- `base-dev` globally installs the core AI/dev CLIs, including `ctx7` and `stitch-mcp`, into `/usr/local/share/npm-global`
+- `base-dev` globally installs the core AI/dev CLIs (`codex`, `claude-code`, `gemini-cli`, `likec4`, `skills`, `gitnexus`, `distill`, `ctx7`) into `/usr/local/share/npm-global`. Frontend-only CLIs (`pencil`, `stitch-mcp`) live in `vite-dev` instead.
 - `vite-dev` does not force a global `NODE_ENV`; project commands should set their own runtime mode
 - Starship prompt changes won't be visible until new interactive shell starts
 
@@ -321,7 +321,7 @@ base-dev → rust-dev
 ```
 
 ### Build Triggers
-- **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/shared/**`, or workflow files
+- **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/python-shared/**`, or workflow files
 - **Cascade**: Parent image builds trigger child image rebuilds via `workflow_run`
 - **Manual**: `workflow_dispatch` for on-demand builds
 - **Authentication**: Uses workload identity with `GCP_SA_KEY` secret
@@ -364,7 +364,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 ## Common Tasks
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
-- **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
+- **Update Python packages**: Edit `workspace-images/python-shared/scripts/install-python.sh` (rebuilds both python-dev and fullstack-dev)
 - **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track latest, queried from the registry on each workspace start) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces; older-than-target versions are TTL-pruned (default 30 days) per id. `30-extensions-activate.sh` then symlinks the active manifest set into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication

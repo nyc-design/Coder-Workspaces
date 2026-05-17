@@ -3,6 +3,7 @@
   "shared": [
     "ms-python.python",
     "detachhead.basedpyright",
-    "charliermarsh.ruff"
+    "charliermarsh.ruff",
+    "bruno-api-client.bruno"
   ]
 }

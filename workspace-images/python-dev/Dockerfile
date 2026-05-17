@@ -4,7 +4,7 @@ FROM ghcr.io/nyc-design/workspace-images/base-dev:latest
 USER root
 
 # Python development tools (shared script — single source of truth)
-COPY workspace-images/shared/install-python.sh /tmp/install-python.sh
+COPY workspace-images/python-shared/scripts/install-python.sh /tmp/install-python.sh
 RUN chmod +x /tmp/install-python.sh && /tmp/install-python.sh && rm /tmp/install-python.sh
 
 # Shared Python contributions. Keep Python-specific scripts/manifests here so

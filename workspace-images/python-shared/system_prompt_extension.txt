@@ -1,0 +1,2 @@
+-- Python observability --
+- OpenTelemetry / SigNoz: use the `signoz-*` agent skills (installed from `SigNoz/agent-skills`) for investigating traces, logs, alerts, and dashboards. Skills cover querying, dashboard creation, alert authoring, and ClickHouse query writing. Invoke a specific skill (e.g. `signoz-investigating-alerts`, `signoz-generating-queries`) when the user reports a perf regression, error burst, or asks for telemetry-driven analysis.

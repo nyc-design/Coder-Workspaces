@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "workspace-images/python-dev/**"
-      - "workspace-images/shared/**"
+      - "workspace-images/python-shared/**"
       - ".github/workflows/build-python-dev.yaml"
   workflow_dispatch:
   workflow_run:

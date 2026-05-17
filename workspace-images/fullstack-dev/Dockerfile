@@ -4,7 +4,7 @@ FROM ghcr.io/nyc-design/workspace-images/vite-dev:latest
 USER root
 
 # Add Python (same script used by python-dev — single source of truth)
-COPY workspace-images/shared/install-python.sh /tmp/install-python.sh
+COPY workspace-images/python-shared/scripts/install-python.sh /tmp/install-python.sh
 RUN chmod +x /tmp/install-python.sh && /tmp/install-python.sh && rm /tmp/install-python.sh
 
 # Python ENV vars (same as python-dev)
