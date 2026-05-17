@@ -32,6 +32,7 @@ locals {
     # under /home/ubuntu/secrets/.agents on the host remains there for manual
     # reference but is no longer reachable from inside the workspace.
     { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
+    { container_path = "/home/coder/.vscode-extensions/code-server", host_path = "/home/ubuntu/secrets/extensions/code-server", read_only = false },
     { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
     { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },
     { container_path = "/home/coder/.excalidraw", host_path = "/home/ubuntu/secrets/.excalidraw", read_only = false },

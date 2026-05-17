@@ -5,9 +5,9 @@ log() { printf '[vscode-themes-init] %s\n' "$*"; }
 
 THEMES_DIR="/usr/local/share/shared-assets/vscode-themes"
 # Globally persisted extension dirs (host-bound in workspace-runtime).
-# Shared dir is used by code-server and vscode-web (vscode-web merges).
-# vscode-web dir is MS-marketplace-only extensions for VS Code Web.
-CS_EXT_DIR="$HOME/.vscode-extensions/shared"
+# code-server dir gets the OpenVSX-style install; vscode-web dir is the
+# Marketplace-style install we hand-extract (it shares the same on-disk format).
+CS_EXT_DIR="$HOME/.vscode-extensions/code-server"
 VSCODE_EXT_DIR="$HOME/.vscode-extensions/vscode-web"
 
 install_into_vscode_server() {

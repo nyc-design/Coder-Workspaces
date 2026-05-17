@@ -2,7 +2,8 @@
 # vscode-web launcher (replaces registry.coder.com/coder/vscode-web module).
 # Intentionally minimal: assumes the binary is on disk at
 # INSTALL_PREFIX/bin/code-server (baked into base-dev) and that
-# workspace-init.d has already handled extension installs and symlink curation.
+# workspace-init.d has already handled extension installs into the editor's
+# own writable extensions dir.
 # Templated by Terraform: any token written here without escaping that matches
 # the form of an HCL interpolation will be substituted at module-eval time.
 

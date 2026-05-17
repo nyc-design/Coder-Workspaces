@@ -365,7 +365,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
 - **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
-- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Merged with the inherited Tier 1 base manifest at workspace start by `25-extensions-install.sh` / `26-settings-apply.sh`.
+- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Merged with the inherited Tier 1 base manifest at workspace start by `25-extensions-install.sh` / `26-settings-apply.sh`. Extension entries are either bare ids (`"publisher.name"`, floats to latest and never downgrades a UI-installed newer version) or pinned (`"publisher.name@1.2.3"`, exact version, replaces anything else). Pinned installs go through a host-bound VSIX cache at `~/.vscode-extensions/shared/_cache/` so each (id, version) is downloaded once and reused across `code-server` and `vscode-web`.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
 - **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output

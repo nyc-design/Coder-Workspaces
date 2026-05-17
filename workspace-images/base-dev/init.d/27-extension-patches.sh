@@ -16,7 +16,7 @@ log() { printf '[code-server-init] %s\n' "$*"; }
 # extension on disk and therefore requires the extension to be installed first.
 patch_code_server_pencil_session_fallback() {
   local extension_dir bundle_js
-  extension_dir="$(ls -1d /home/coder/.vscode-extensions/shared/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
   if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
     log "Pencil extension not installed; skipping session fallback patch"
     return 0
@@ -67,7 +67,7 @@ NODE
 # `pencil.openWelcomeDocument` and the regular `.pen` editor are unaffected.
 patch_code_server_pencil_disable_first_run_open() {
   local extension_dir bundle_js
-  extension_dir="$(ls -1d /home/coder/.vscode-extensions/shared/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/highagency.pencildev-*-universal 2>/dev/null | sort | tail -1 || true)"
   if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
     log "Pencil extension not installed; skipping first-run open patch"
     return 0
@@ -108,5 +108,88 @@ console.log('patched');
 NODE
 }
 
+# --- Continue extension: disable clipboard snippet to silence Safari ---
+# Continue's autocomplete pipeline pulls a "clipboard snippet" on every keystroke
+# (core/autocomplete/snippets/getAllSnippets.ts -> getClipboardSnippets -> ide.
+# getClipboardContent), which on the VS Code side calls vscode.env.clipboard.
+# readText(). In code-server that resolves to navigator.clipboard.readText() in
+# the browser. Safari requires a fresh user gesture for every readText() call,
+# so an autocomplete-driven call rejects and code-server surfaces "Unable to
+# read from the browser's clipboard" on each keystroke. There is no Continue
+# config flag to disable clipboard snippets, so we rewrite getClipboardContent
+# in the bundled extension to return empty text. Editor copy/paste is unaffected
+# (that flows through a different path inside a real keydown gesture).
+patch_code_server_continue_clipboard() {
+  local extension_dir
+  # Continue ships a per-target VSIX (linux-x64, darwin-arm64, etc.) plus a
+  # platform-independent fallback. Take the most recent matching dir.
+  extension_dir="$(ls -1d /home/coder/.vscode-extensions/code-server/continue.continue-*/ 2>/dev/null | sort | tail -1 || true)"
+  if [ -z "$extension_dir" ] || [ ! -d "$extension_dir" ]; then
+    log "Continue extension not installed; skipping clipboard patch"
+    return 0
+  fi
+  extension_dir="${extension_dir%/}"
+
+  # Continue's VS Code extension entry point is dist/extension.js (bundled).
+  local bundle_js="$extension_dir/dist/extension.js"
+  if [ ! -f "$bundle_js" ]; then
+    log "Continue extension bundle not found at $bundle_js; skipping clipboard patch"
+    return 0
+  fi
+
+  BUNDLE_JS="$bundle_js" node <<'NODE'
+const fs = require('fs');
+
+const file = process.env.BUNDLE_JS;
+let source = fs.readFileSync(file, 'utf8');
+
+// Marker string that survives the patch so re-runs are no-ops.
+const marker = '/*coder-clipboard-stub*/';
+if (source.includes(marker)) {
+  console.log('already patched');
+  process.exit(0);
+}
+
+// Match the bundled implementation of VsCodeIde.getClipboardContent. The
+// upstream source is:
+//   async getClipboardContent() {
+//     return {
+//       text: await vscode.env.clipboard.readText(),
+//       copiedAt: new Date().toISOString(),
+//     };
+//   }
+// After esbuild minification this collapses to the form below; the identifier
+// for the vscode module alias varies per build, so match it loosely.
+const patterns = [
+  /async getClipboardContent\(\)\{return\{text:await ([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\),copiedAt:new Date\(\)\.toISOString\(\)\}\}/,
+  /async getClipboardContent\(\)\s*\{\s*return\s*\{\s*text:\s*await\s+([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\)\s*,\s*copiedAt:\s*new Date\(\)\.toISOString\(\)\s*\}\s*;?\s*\}/,
+];
+
+let matched = false;
+for (const re of patterns) {
+  if (re.test(source)) {
+    source = source.replace(
+      re,
+      'async getClipboardContent(){' + marker + 'return{text:"",copiedAt:new Date().toISOString()}}'
+    );
+    matched = true;
+    break;
+  }
+}
+
+if (!matched) {
+  console.error(`Could not find getClipboardContent in ${file}; skipping`);
+  process.exit(1);
+}
+
+if (!fs.existsSync(`${file}.clipboard-stub.bak`)) {
+  fs.copyFileSync(file, `${file}.clipboard-stub.bak`);
+}
+fs.writeFileSync(file, source);
+console.log('patched');
+NODE
+}
+
 patch_code_server_pencil_session_fallback || log "warning: failed to patch Pencil session fallback"
 patch_code_server_pencil_disable_first_run_open || log "warning: failed to patch Pencil first-run welcome"
+patch_code_server_continue_clipboard || log "warning: failed to patch Continue clipboard"
