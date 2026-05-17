@@ -193,6 +193,7 @@ module "workspace_envbuilder" {
   is_new_project             = local.is_new_project
   fallback_image             = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
   devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
+  agent_env                  = coder_agent.main.env
 }
 
 module "workspace_apps_metadata" {

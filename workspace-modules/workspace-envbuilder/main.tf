@@ -29,7 +29,10 @@ locals {
     exit 0
   EOT
 
-  envbuilder_env = merge({
+  # Order: agent_env first so envbuilder/coder-token keys (which the
+  # module owns) win on conflict, then the is_new_project flags last
+  # so they're authoritative for that workspace lifecycle state.
+  envbuilder_env = merge(var.agent_env, {
     "CODER_AGENT_TOKEN"               = var.agent_token
     "CODER_AGENT_URL"                 = replace(var.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")
     "ENVBUILDER_SETUP_SCRIPT"         = local.envbuilder_setup_script

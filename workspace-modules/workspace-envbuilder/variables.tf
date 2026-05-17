@@ -38,3 +38,16 @@ variable "devcontainer_builder_image" {
   type    = string
   default = "ghcr.io/coder/envbuilder:latest"
 }
+
+# Map of environment variables declared on coder_agent.main.env. Forwarded
+# into the envbuilder-built container so they land on the workspace's
+# `coder agent` process at exec time. This matters for any agent config
+# the agent reads from its own os.Getenv at startup (e.g.
+# CODER_AGENT_EXP_SKILLS_DIRS, CODER_AGENT_EXP_INSTRUCTIONS_DIRS) —
+# those are NOT delivered via the manifest's EnvironmentVariables, which
+# the agent only applies to child processes (SSH sessions, scripts),
+# not to itself.
+variable "agent_env" {
+  type    = map(string)
+  default = {}
+}
