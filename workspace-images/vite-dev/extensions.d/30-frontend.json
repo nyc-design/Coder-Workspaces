@@ -4,6 +4,8 @@
     "biomejs.biome",
     "ms-playwright.playwright",
     "vitest.explorer",
-    "bradlc.vscode-tailwindcss"
+    "bradlc.vscode-tailwindcss",
+    "highagency.pencildev",
+    "joshbolduc.story-explorer"
   ]
 }

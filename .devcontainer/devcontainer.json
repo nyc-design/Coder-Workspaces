@@ -3,6 +3,9 @@
   "image": "ghcr.io/nyc-design/workspace-images/base-dev:latest",
   "customizations": {
     "vscode": {
+      "extensions": [
+        "hashicorp.terraform"
+      ],
       "settings": {
       }
     }

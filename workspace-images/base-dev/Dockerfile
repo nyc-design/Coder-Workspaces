@@ -43,7 +43,7 @@ ENV PATH=/usr/local/share/npm-global/bin:$PATH
 RUN install -d -m 0775 -o coder -g coder /usr/local/share/npm-global
 
 # AI coding CLIs + docs/tooling ecosystem
-RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli @pencil.dev/cli @_davideast/stitch-mcp gitnexus @samuelfaj/distill ctx7 \
+RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli gitnexus @samuelfaj/distill ctx7 \
  && chown -R coder:coder /usr/local/share/npm-global
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
@@ -80,15 +80,6 @@ RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/lat
  && tar xf just-lsp.tar.gz ./just-lsp \
  && install just-lsp -D -t /usr/local/bin/ \
  && rm just-lsp just-lsp.tar.gz
-
-# signoz-mcp-server (observability MCP for traces, logs, metrics)
-# Version pinned to avoid anonymous GitHub API rate limits on CI runners — bump manually.
-RUN SIGNOZ_VERSION=0.2.1 \
- && ARCH=$(uname -m) && [ "$ARCH" = "x86_64" ] && ARCH="amd64" || ARCH="arm64" \
- && curl -fLo signoz-mcp.tar.gz "https://github.com/SigNoz/signoz-mcp-server/releases/download/v${SIGNOZ_VERSION}/signoz-mcp-server_linux_${ARCH}.tar.gz" \
- && tar xf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" \
- && install "signoz-mcp-server_linux_${ARCH}/bin/signoz-mcp-server" -D -t /usr/local/bin/ \
- && rm -rf signoz-mcp.tar.gz "signoz-mcp-server_linux_${ARCH}"
 
 # code-server — OpenVSX-based browser editor served on the code-server Coder app.
 ENV CODE_SERVER_VERSION=4.117.0
