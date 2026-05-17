@@ -3,9 +3,9 @@
 # the launcher script just configures and launches it. Replaces the
 # registry.coder.com/coder/code-server module so we avoid a download on each
 # workspace start. Extension installation is handled by the workspace-init.d
-# manifest framework, which populates the shared extensions dir at first
-# boot; persisted extensions survive across restarts via the host-bound
-# shared mount.
+# manifest framework, which installs versions into a host-bound shared cache
+# and symlinks the active manifest set into a per-editor dir at workspace
+# start; persisted versions survive across restarts via the shared mount.
 
 locals {
   code_server_port              = 13337

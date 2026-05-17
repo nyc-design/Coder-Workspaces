@@ -365,7 +365,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
 - **Update Python packages**: Edit `workspace-images/shared/install-python.sh` (rebuilds both python-dev and fullstack-dev)
-- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Merged with the inherited Tier 1 base manifest at workspace start by `25-extensions-install.sh` / `26-settings-apply.sh`.
+- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track latest, queried from the registry on each workspace start) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces; older-than-target versions are TTL-pruned (default 30 days) per id. `30-extensions-activate.sh` then symlinks the active manifest set into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
 - **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output

@@ -11,6 +11,15 @@ set -e
 # First-boot ownership fix: see code-server-launch.sh for the rationale.
 sudo find /home/coder -xdev -not -user coder -exec chown -h coder:coder {} + 2>/dev/null || true
 
+# Wait for workspace-startup's init pipeline (in particular
+# 25-extensions-install.sh + 30-extensions-activate.sh) to populate the
+# per-editor symlink farm before launching the editor. Timeout after 5 min so
+# we never block startup indefinitely.
+for i in $(seq 1 300); do
+  [ -f /tmp/workspace-init.done ] && break
+  sleep 1
+done
+
 VSCODE_WEB="${INSTALL_PREFIX}/bin/code-server"
 EXTENSIONS_DIR="${EXTENSIONS_DIR}"
 LOG_PATH="${LOG_PATH}"

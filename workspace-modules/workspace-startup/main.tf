@@ -2,6 +2,8 @@ locals {
   startup_script = <<-EOT
     set -e
 
+    rm -f /tmp/workspace-init.done
+
     # Fix ownership that envbuilder's chown may have failed to complete.
     # envbuilder uses filepath.Walk which aborts on ENOENT if a temp file
     # is deleted mid-walk. This find-based approach handles vanishing files.
@@ -18,6 +20,11 @@ locals {
     fi
 
     /usr/local/bin/run-workspace-inits >> /tmp/workspace-init.log 2>&1 || true
+    # Sentinel for editor launchers: 30-extensions-activate.sh populates the
+    # per-editor symlink farms used by code-server / vscode-web --extensions-dir,
+    # but the launchers race with this script. Touch the sentinel after the
+    # init pipeline finishes so the launchers can wait on it before exec.
+    touch /tmp/workspace-init.done
   EOT
 }
 
