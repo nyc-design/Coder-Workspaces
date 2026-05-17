@@ -11,7 +11,7 @@
 host: "0.0.0.0"
 port: 8317
 
-# OAuth credentials volume. Bootstrap once per provider. CLIProxyAPI v6.10.9
+# OAuth credentials volume. Bootstrap once per provider. CLIProxyAPI
 # does NOT expose an --auth-dir flag; pass --config and it reads this
 # auth-dir setting. It exposes provider-specific flags for Codex/Claude,
 # and generic --login for Gemini:

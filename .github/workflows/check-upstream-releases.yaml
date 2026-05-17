@@ -1,0 +1,96 @@
+name: Check upstream releases and trigger image rebuilds
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-cliproxy:
+    name: Check CLIProxyAPI release
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.compare.outputs.updated }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch latest CLIProxyAPI release
+        id: upstream
+        run: |
+          LATEST=$(curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest" \
+            | jq -r '.tag_name')
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with current pinned version
+        id: compare
+        run: |
+          CURRENT=$(grep -oP '(?<=ARG CLI_PROXY_API_VERSION=)\S+' host-services/cliproxy/Dockerfile)
+          LATEST="${{ steps.upstream.outputs.version }}"
+          echo "Current: $CURRENT  Latest: $LATEST"
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=$LATEST" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version in Dockerfile and commit
+        if: steps.compare.outputs.updated == 'true'
+        run: |
+          NEW="${{ steps.compare.outputs.new_version }}"
+          sed -i "s|^ARG CLI_PROXY_API_VERSION=.*|ARG CLI_PROXY_API_VERSION=${NEW}|" \
+            host-services/cliproxy/Dockerfile
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add host-services/cliproxy/Dockerfile
+          git commit -m "chore(cliproxy): bump CLIProxyAPI to ${NEW} [skip ci on other paths]"
+          git push
+
+  check-agentmemory:
+    name: Check @agentmemory/agentmemory npm release
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.compare.outputs.updated }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch latest @agentmemory/agentmemory version from npm
+        id: upstream
+        run: |
+          LATEST=$(curl -fsSL "https://registry.npmjs.org/@agentmemory/agentmemory/latest" \
+            | jq -r '.version')
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with current pinned version
+        id: compare
+        run: |
+          # Extract the pinned version (may be "latest" on first run or a semver)
+          CURRENT=$(grep -oP '(?<=ARG AGENTMEMORY_VERSION=)\S+' host-services/agentmemory/Dockerfile)
+          LATEST="v${{ steps.upstream.outputs.version }}"
+          echo "Current: $CURRENT  Latest: $LATEST"
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+            echo "new_version=$LATEST" >> "$GITHUB_OUTPUT"
+            echo "npm_version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version in Dockerfile and commit
+        if: steps.compare.outputs.updated == 'true'
+        run: |
+          NEW_NPM="${{ steps.compare.outputs.npm_version }}"
+          NEW_TAG="${{ steps.compare.outputs.new_version }}"
+          sed -i "s|^ARG AGENTMEMORY_VERSION=.*|ARG AGENTMEMORY_VERSION=${NEW_NPM}|" \
+            host-services/agentmemory/Dockerfile
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add host-services/agentmemory/Dockerfile
+          git commit -m "chore(agentmemory): bump @agentmemory/agentmemory to ${NEW_TAG}"
+          git push
