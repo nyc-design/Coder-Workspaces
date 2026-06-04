@@ -27,7 +27,7 @@ ARG TARGETARCH
 # v0.11.6+ requires agentmemory to refactor for the sandbox-everything model
 # and is not compatible yet. Bump only after agentmemory upstream lifts the pin.
 ARG III_VERSION=v0.11.2
-ARG AGENTMEMORY_VERSION=0.9.25
+ARG AGENTMEMORY_VERSION=0.9.26
 
 # stunnel4 terminates TLS for `rediss://` Upstash endpoints. iii's vendored
 # redis crate (v1.0.1) is built without `tls-rustls` / `tls-native-tls`, so
