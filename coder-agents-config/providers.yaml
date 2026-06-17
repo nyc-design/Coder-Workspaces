@@ -1,10 +1,25 @@
-# Chat provider configs for Coder Agents (chatd).
-# Synced to /api/experimental/chats/providers by update-coder-agents-config.yaml.
+# AI provider configs for Coder Agents.
+# Synced to /api/v2/ai/providers by update-coder-agents-config.yaml.
 #
-# Stable identity: `provider` field (anthropic / openai / google / azure /
-# bedrock / openai-compat / openrouter / vercel — see fantasy.SupportedProviders).
+# Stable identity: `name` field. Must match `^[a-z0-9]+(-[a-z0-9]+)*$`.
 # This file is additive: providers in here get created/updated; manually-added
 # providers in the Coder UI are NOT removed by sync.
+#
+# Field reference (codersdk.CreateAIProviderRequest / UpdateAIProviderRequest):
+#   name          stable identifier (URL-safe, lowercase-hyphen)
+#   type          protocol: anthropic | openai | azure | google | openai-compat |
+#                 openrouter | vercel | bedrock | copilot
+#   display_name  human-readable label
+#   base_url      upstream endpoint
+#   api_keys      list of plaintext keys (omit for bedrock/copilot).
+#                 sync.sh rotates the key set by sending api_keys on every PATCH —
+#                 keys not present in YAML are deleted server-side.
+#   enabled       on/off
+#   settings      bedrock-only block (omitted otherwise)
+#
+# Deployment-wide flags `central_api_key_enabled`, `allow_user_api_key`,
+# `allow_central_api_key_fallback` no longer live per-provider. BYOK is now
+# controlled by CODER_AI_GATEWAY_ALLOW_BYOK at deployment level.
 #
 # `${VAR}` placeholders are substituted at sync time from env (set in the
 # workflow from GitHub repo secrets / GCP Secret Manager).
@@ -15,47 +30,43 @@ providers:
   #   - Claude Code direct OAuth in OmniRoute
   #   - Meridian (Claude Code SDK / Pro-Max OAuth)
   #   - CLIProxyAPI Claude Code OAuth fallback
-  - provider: anthropic
+  - name: anthropic
+    type: anthropic
     display_name: OmniRoute Anthropic Gateway
     base_url: https://llm.tapiavala.com
-    api_key: ${LLM_GATEWAY_API_KEY}
+    api_keys:
+      - ${LLM_GATEWAY_API_KEY}
     enabled: true
-    central_api_key_enabled: true
-    allow_user_api_key: false
-    allow_central_api_key_fallback: false
 
   # Canonical OpenAI Responses-API entrypoint. Codex models use `/v1/responses`
   # end-to-end through Headroom and OmniRoute.
-  - provider: openai
+  - name: openai
+    type: openai
     display_name: OmniRoute OpenAI Gateway
     base_url: https://llm.tapiavala.com/v1
-    api_key: ${LLM_GATEWAY_API_KEY}
+    api_keys:
+      - ${LLM_GATEWAY_API_KEY}
     enabled: true
-    central_api_key_enabled: true
-    allow_user_api_key: false
-    allow_central_api_key_fallback: false
 
   # Chat-Completions-only entrypoint. Fantasy `openai-compat` does NOT call
   # WithUseResponsesAPI(), so this provider talks `/v1/chat/completions` end-to-end.
   # Used for upstreams that only speak Chat Completions: Cerebras, Groq, Codestral,
   # OpenCode Zen, and any other non-Responses OpenAI-shaped provider routed through
   # OmniRoute combos.
-  - provider: openai-compat
+  - name: openai-compat
+    type: openai-compat
     display_name: OmniRoute OpenAI-Compatible Gateway
     base_url: https://llm.tapiavala.com/v1
-    api_key: ${LLM_GATEWAY_API_KEY}
+    api_keys:
+      - ${LLM_GATEWAY_API_KEY}
     enabled: true
-    central_api_key_enabled: true
-    allow_user_api_key: false
-    allow_central_api_key_fallback: false
 
   # Gemini/native Google-shaped entrypoint. Leave disabled until we explicitly
   # route Gemini / Cloud Code Assist through OmniRoute for Coder Agents.
-  - provider: google
+  - name: google
+    type: google
     display_name: OmniRoute Gemini Gateway
     base_url: https://llm.tapiavala.com
-    api_key: ${LLM_GATEWAY_API_KEY}
+    api_keys:
+      - ${LLM_GATEWAY_API_KEY}
     enabled: false
-    central_api_key_enabled: true
-    allow_user_api_key: false
-    allow_central_api_key_fallback: false

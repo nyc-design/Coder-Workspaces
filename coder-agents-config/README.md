@@ -9,7 +9,7 @@ GitHub Actions workflow on every commit that touches this directory.
 
 | File | Synced to | Stable identity (matched on POST/PATCH) |
 |---|---|---|
-| `providers.yaml` | `/api/experimental/chats/providers` | `provider` field |
+| `providers.yaml` | `/api/v2/ai/providers` | `name` field |
 | `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` tuple |
 | `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` field |
 | `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton, PUT) |
