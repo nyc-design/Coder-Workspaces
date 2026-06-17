@@ -8,89 +8,90 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  check-cliproxy:
-    name: Check CLIProxyAPI release
+  check-upstream-releases:
+    name: Check upstream releases
     runs-on: ubuntu-latest
-    outputs:
-      updated: ${{ steps.compare.outputs.updated }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch latest CLIProxyAPI release
-        id: upstream
+      - name: Check upstream versions and bump pins
+        id: bump
         run: |
-          LATEST=$(curl -fsSL \
+          set -euo pipefail
+
+          UPDATED_CLIPROXY=false
+          UPDATED_AGENTMEMORY=false
+
+          CLIPROXY_LATEST=$(curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest" \
             | jq -r '.tag_name')
-          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
 
-      - name: Compare with current pinned version
-        id: compare
-        run: |
-          CURRENT=$(grep -oP '(?<=ARG CLI_PROXY_API_VERSION=)\S+' host-services/cliproxy/Dockerfile)
-          LATEST="${{ steps.upstream.outputs.version }}"
-          echo "Current: $CURRENT  Latest: $LATEST"
-          if [ "$CURRENT" != "$LATEST" ]; then
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-            echo "new_version=$LATEST" >> "$GITHUB_OUTPUT"
-          else
-            echo "updated=false" >> "$GITHUB_OUTPUT"
+          CLIPROXY_CURRENT=$(grep -oP '(?<=ARG CLI_PROXY_API_VERSION=)\S+' host-services/cliproxy/Dockerfile)
+          echo "CLIProxyAPI current: ${CLIPROXY_CURRENT} latest: ${CLIPROXY_LATEST}"
+
+          if [ "${CLIPROXY_CURRENT}" != "${CLIPROXY_LATEST}" ]; then
+            sed -i "s|^ARG CLI_PROXY_API_VERSION=.*|ARG CLI_PROXY_API_VERSION=${CLIPROXY_LATEST}|" \
+              host-services/cliproxy/Dockerfile
+            UPDATED_CLIPROXY=true
           fi
 
-      - name: Bump version in Dockerfile and commit
-        if: steps.compare.outputs.updated == 'true'
-        run: |
-          NEW="${{ steps.compare.outputs.new_version }}"
-          sed -i "s|^ARG CLI_PROXY_API_VERSION=.*|ARG CLI_PROXY_API_VERSION=${NEW}|" \
-            host-services/cliproxy/Dockerfile
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add host-services/cliproxy/Dockerfile
-          git commit -m "chore(cliproxy): bump CLIProxyAPI to ${NEW} [skip ci on other paths]"
-          git push
-
-  check-agentmemory:
-    name: Check @agentmemory/agentmemory npm release
-    runs-on: ubuntu-latest
-    outputs:
-      updated: ${{ steps.compare.outputs.updated }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Fetch latest @agentmemory/agentmemory version from npm
-        id: upstream
-        run: |
-          LATEST=$(curl -fsSL "https://registry.npmjs.org/@agentmemory/agentmemory/latest" \
+          AGENTMEMORY_NPM_LATEST=$(curl -fsSL "https://registry.npmjs.org/@agentmemory/agentmemory/latest" \
             | jq -r '.version')
-          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+          AGENTMEMORY_TAG_LATEST="v${AGENTMEMORY_NPM_LATEST}"
 
-      - name: Compare with current pinned version
-        id: compare
-        run: |
-          # Extract the pinned version (may be "latest" on first run or a semver)
-          CURRENT=$(grep -oP '(?<=ARG AGENTMEMORY_VERSION=)\S+' host-services/agentmemory/Dockerfile)
-          LATEST="v${{ steps.upstream.outputs.version }}"
-          echo "Current: $CURRENT  Latest: $LATEST"
-          if [ "$CURRENT" != "$LATEST" ]; then
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-            echo "new_version=$LATEST" >> "$GITHUB_OUTPUT"
-            echo "npm_version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "updated=false" >> "$GITHUB_OUTPUT"
+          AGENTMEMORY_CURRENT=$(grep -oP '(?<=ARG AGENTMEMORY_VERSION=)\S+' host-services/agentmemory/Dockerfile)
+          echo "agentmemory current: ${AGENTMEMORY_CURRENT} latest: ${AGENTMEMORY_NPM_LATEST}"
+
+          if [ "${AGENTMEMORY_CURRENT}" != "${AGENTMEMORY_NPM_LATEST}" ]; then
+            sed -i "s|^ARG AGENTMEMORY_VERSION=.*|ARG AGENTMEMORY_VERSION=${AGENTMEMORY_NPM_LATEST}|" \
+              host-services/agentmemory/Dockerfile
+            UPDATED_AGENTMEMORY=true
           fi
 
-      - name: Bump version in Dockerfile and commit
-        if: steps.compare.outputs.updated == 'true'
+          echo "updated_cliproxy=${UPDATED_CLIPROXY}" >> "$GITHUB_OUTPUT"
+          echo "updated_agentmemory=${UPDATED_AGENTMEMORY}" >> "$GITHUB_OUTPUT"
+          echo "cliproxy_latest=${CLIPROXY_LATEST}" >> "$GITHUB_OUTPUT"
+          echo "agentmemory_latest=${AGENTMEMORY_TAG_LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bumps
+        if: steps.bump.outputs.updated_cliproxy == 'true' || steps.bump.outputs.updated_agentmemory == 'true'
         run: |
-          NEW_NPM="${{ steps.compare.outputs.npm_version }}"
-          NEW_TAG="${{ steps.compare.outputs.new_version }}"
-          sed -i "s|^ARG AGENTMEMORY_VERSION=.*|ARG AGENTMEMORY_VERSION=${NEW_NPM}|" \
-            host-services/agentmemory/Dockerfile
+          set -euo pipefail
+
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add host-services/agentmemory/Dockerfile
-          git commit -m "chore(agentmemory): bump @agentmemory/agentmemory to ${NEW_TAG}"
+
+          git add host-services/cliproxy/Dockerfile host-services/agentmemory/Dockerfile
+
+          parts=()
+          if [ "${{ steps.bump.outputs.updated_cliproxy }}" = "true" ]; then
+            parts+=("cliproxy to ${{ steps.bump.outputs.cliproxy_latest }}")
+          fi
+          if [ "${{ steps.bump.outputs.updated_agentmemory }}" = "true" ]; then
+            parts+=("agentmemory to ${{ steps.bump.outputs.agentmemory_latest }}")
+          fi
+
+          message="chore(host-services): bump upstream releases"
+          if [ "${#parts[@]}" -gt 0 ]; then
+            message="${message} (${parts[*]})"
+          fi
+
+          git commit -m "${message}"
           git push
+
+      - name: Trigger cliproxy image rebuild
+        if: steps.bump.outputs.updated_cliproxy == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-cliproxy.yaml --ref main
+
+      - name: Trigger agentmemory image rebuild
+        if: steps.bump.outputs.updated_agentmemory == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-agentmemory.yaml --ref main
