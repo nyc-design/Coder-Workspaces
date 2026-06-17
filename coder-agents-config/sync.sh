@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # sync.sh — apply this directory's YAML files against a running Coder
-# deployment via the experimental Coder Agents config API.
+# deployment via the Coder Agents config APIs.
 #
 # Modes:
 #   push (default)  Apply YAML → Coder. See per-resource semantics below.
@@ -9,15 +9,20 @@
 #                   from values you've tuned in the UI.
 #
 # Per-resource sync semantics on push:
-#   providers       additive   (POST if missing, PATCH if exists; never delete)
+#   ai providers    additive   (POST if missing, PATCH if exists; never delete)
+#                              key rotation: PATCH replaces the api_keys set
+#                              with the YAML list every run (keys not in YAML
+#                              are deleted server-side).
 #   models          declarative (POST/PATCH desired; DELETE any model not in YAML)
+#                              models reference providers by name; sync.sh
+#                              resolves name → ai_provider_id at push time.
 #   mcp servers     additive   (POST if missing, PATCH if exists; never delete)
 #   system prompt   PUT singleton
 #
 # Required env:
 #   CODER_URL              base URL of the Coder deployment
 #   CODER_SESSION_TOKEN    admin session token (Owner role)
-#   LLM_GATEWAY_API_KEY client-facing OmniRoute/Headroom gateway key (push only)
+#   LLM_GATEWAY_API_KEY    client-facing OmniRoute/Headroom gateway key (push only)
 #   CONTEXT7_API_KEY       Context7 API key (push only)
 #   GITHUB_PAT             GitHub PAT for the github MCP server (push only)
 #
@@ -25,8 +30,8 @@
 # All four are available on github-hosted runners by default.
 #
 # Stable keys per resource:
-#   providers       provider field (anthropic | openai | google | …)
-#   models          (provider, model) tuple
+#   ai providers    name field (lowercase-alphanumeric-hyphen)
+#   models          (provider, model) tuple in YAML; ai_provider_id on the wire
 #   mcp servers     slug field
 
 set -euo pipefail
@@ -73,31 +78,79 @@ coder_post()   { _curl POST   "$1" "$2"; }
 coder_patch()  { _curl PATCH  "$1" "$2"; }
 coder_delete() { _curl DELETE "$1"; }
 
-# ───────── PROVIDERS (additive) ─────────────────────────────────────────────
+# Cache of name → id for ai providers, populated by push_providers and used
+# by push_models to resolve `provider: anthropic` → `ai_provider_id: <uuid>`.
+AI_PROVIDERS_JSON=""
+
+# ───────── AI PROVIDERS (additive) ──────────────────────────────────────────
+# Wire schema (codersdk.CreateAIProviderRequest / UpdateAIProviderRequest):
+#   POST   /api/v2/ai/providers           {type, name, display_name, base_url,
+#                                          api_keys: [<plaintext>], enabled,
+#                                          settings?}
+#   PATCH  /api/v2/ai/providers/{id}      {display_name?, enabled?, base_url?,
+#                                          api_keys?: [{api_key: "..."}, ...],
+#                                          settings?}
+#
+# Key rotation: on PATCH we send api_keys as a fresh list of
+# {api_key: <plaintext>} mutations every run. Any existing key whose id is
+# not referenced is deleted server-side, so the YAML is the source of truth
+# for the key set. Bedrock and Copilot reject api_keys.
 push_providers() {
   local file="$CONFIG_DIR/providers.yaml"
   [ -f "$file" ] || { echo "no providers.yaml, skipping"; return; }
 
-  echo "==> syncing providers from $file"
+  echo "==> syncing ai providers from $file"
   local desired current
   desired="$(expand_yaml "$file")"
-  current="$(coder_get '/api/experimental/chats/providers')"
+  current="$(coder_get '/api/v2/ai/providers')"
 
   echo "$desired" | jq -c '.providers[]' | while read -r p; do
-    local provider existing_id
-    provider="$(jq -r '.provider' <<< "$p")"
-    existing_id="$(jq -r --arg n "$provider" \
-      '.[] | select(.provider == $n and .id != "" and .id != "00000000-0000-0000-0000-000000000000") | .id' \
-      <<< "$current" | head -n1)"
+    local name type existing_id body
+    name="$(jq -r '.name' <<< "$p")"
+    type="$(jq -r '.type' <<< "$p")"
+    existing_id="$(jq -r --arg n "$name" \
+      '.[] | select(.name == $n) | .id' <<< "$current" | head -n1)"
 
     if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
-      echo "    PATCH $provider ($existing_id)"
-      coder_patch "/api/experimental/chats/providers/$existing_id" "$p" >/dev/null
+      # PATCH: api_keys must be a list of mutations; we send {api_key: "..."}
+      # for each plaintext to replace the entire key set.
+      body="$(jq '{
+        display_name: .display_name,
+        enabled: .enabled,
+        base_url: .base_url,
+        api_keys: ((.api_keys // []) | map({api_key: .})),
+        settings: .settings
+      } | with_entries(select(.value != null))' <<< "$p")"
+      echo "    PATCH $name ($existing_id)"
+      coder_patch "/api/v2/ai/providers/$existing_id" "$body" >/dev/null
     else
-      echo "    POST  $provider (new)"
-      coder_post "/api/experimental/chats/providers" "$p" >/dev/null
+      # POST: api_keys is a flat list of plaintext strings.
+      body="$(jq '{
+        type: .type,
+        name: .name,
+        display_name: .display_name,
+        enabled: .enabled,
+        base_url: .base_url,
+        api_keys: (.api_keys // []),
+        settings: .settings
+      } | with_entries(select(.value != null))' <<< "$p")"
+      echo "    POST  $name (new, type=$type)"
+      coder_post "/api/v2/ai/providers" "$body" >/dev/null
     fi
   done
+
+  # Refresh the cache so push_models can resolve provider names to UUIDs.
+  AI_PROVIDERS_JSON="$(coder_get '/api/v2/ai/providers')"
+}
+
+# Resolve a provider name (e.g. "anthropic") to its ai_provider_id UUID.
+# Reads from AI_PROVIDERS_JSON; fetches it lazily if push_providers wasn't run.
+resolve_ai_provider_id() {
+  local name="$1"
+  if [ -z "$AI_PROVIDERS_JSON" ]; then
+    AI_PROVIDERS_JSON="$(coder_get '/api/v2/ai/providers')"
+  fi
+  jq -r --arg n "$name" '.[] | select(.name == $n) | .id' <<< "$AI_PROVIDERS_JSON" | head -n1
 }
 
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
@@ -107,6 +160,11 @@ push_providers() {
 #      is NOT in YAML. Order matters — we need everything in YAML in place
 #      first, in case one of those needs to become the new default before we
 #      can delete the old one.
+#
+# The chat model config endpoints (/api/experimental/chats/model-configs) still
+# require provider linkage; they now require `ai_provider_id` (UUID) instead
+# of the old `provider` string. We keep `provider:` in YAML for readability /
+# stable identity and resolve it to ai_provider_id at push time.
 push_models() {
   local file="$CONFIG_DIR/models.yaml"
   [ -f "$file" ] || { echo "no models.yaml, skipping"; return; }
@@ -118,19 +176,29 @@ push_models() {
 
   # Phase 1: apply desired (POST or PATCH)
   echo "$desired" | jq -c '.models[]' | while read -r m; do
-    local provider model existing_id
+    local provider model existing_id ai_provider_id body
     provider="$(jq -r '.provider' <<< "$m")"
     model="$(jq -r '.model' <<< "$m")"
     existing_id="$(jq -r --arg p "$provider" --arg m "$model" \
       '.[] | select(.provider == $p and .model == $m) | .id' \
       <<< "$current" | head -n1)"
 
+    ai_provider_id="$(resolve_ai_provider_id "$provider")"
+    if [ -z "$ai_provider_id" ] || [ "$ai_provider_id" = "null" ]; then
+      echo "    SKIP  $provider/$model — provider '$provider' not registered (push providers first)" >&2
+      continue
+    fi
+
+    # Inject ai_provider_id; strip the human-readable `provider` field so the
+    # server-side type derivation isn't fighting our YAML.
+    body="$(jq --arg id "$ai_provider_id" 'del(.provider) | .ai_provider_id = $id' <<< "$m")"
+
     if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
       echo "    PATCH $provider/$model ($existing_id)"
-      coder_patch "/api/experimental/chats/model-configs/$existing_id" "$m" >/dev/null
+      coder_patch "/api/experimental/chats/model-configs/$existing_id" "$body" >/dev/null
     else
       echo "    POST  $provider/$model (new)"
-      coder_post "/api/experimental/chats/model-configs" "$m" >/dev/null
+      coder_post "/api/experimental/chats/model-configs" "$body" >/dev/null
     fi
   done
 
@@ -263,17 +331,16 @@ push_template_allowlist() {
 # Dumps current Coder admin state to the YAML files. Useful for bootstrapping
 # from existing UI configs or refreshing after manual edits in the admin UI.
 #
-# - providers.yaml: includes all DB-backed providers (skips stub entries)
+# - providers.yaml: every ai provider (api_keys come back masked — placeholder
+#   restored to ${LLM_GATEWAY_API_KEY} so the dump round-trips through push)
 # - models.yaml: every model config
 # - mcp-servers.yaml: every MCP server
 # - system-prompt.txt: current prompt content
 #
-# Secret values (api_key, custom_headers values) come back as `has_*: true`
-# booleans only — actual values are never readable. Pull preserves any
-# `${VAR}` placeholders already in your YAML by NOT replacing those fields
-# when the GET response signals presence; if you want a clean dump, delete
-# the YAML files first and re-run pull. Then re-add `${VAR}` references for
-# secrets manually.
+# Secret values (api_keys, mcp custom_headers) are never readable. Pull
+# substitutes ${LLM_GATEWAY_API_KEY} for api_keys and a `${...}` placeholder
+# for custom_headers. Restore real `${VAR}` references manually before
+# committing if you want different bindings.
 # prettify_yaml — yq's default emit packs list items with no separator
 # between them. For the human-edited yaml files we want a blank line before
 # each top-level list item (`^  - `) so blocks are easy to scan. The awk
@@ -289,14 +356,15 @@ prettify_yaml() {
 pull_all() {
   echo "==> pulling current admin state into $CONFIG_DIR/"
 
-  # Providers — strip stub entries (id == Nil UUID), keep all DB rows
+  # AI providers — emit name, type, display_name, base_url, enabled, settings.
+  # api_keys come back as masked strings; we replace with ${LLM_GATEWAY_API_KEY}
+  # so the dump push-round-trips. Restore real bindings manually if needed.
   echo "  providers.yaml"
-  coder_get '/api/experimental/chats/providers' | \
-    jq '{providers: [.[] | select(.id != "" and .id != "00000000-0000-0000-0000-000000000000")
-                    | {provider, display_name, base_url,
-                       api_key: (if .has_api_key then "${LLM_GATEWAY_API_KEY}" else null end),
-                       enabled, central_api_key_enabled, allow_user_api_key,
-                       allow_central_api_key_fallback}
+  coder_get '/api/v2/ai/providers' | \
+    jq '{providers: [.[] | {name, type, display_name, base_url, enabled,
+                            api_keys: (if (.api_keys // []) | length > 0
+                                       then ["${LLM_GATEWAY_API_KEY}"] else null end),
+                            settings: (if .settings then .settings else null end)}
                     | with_entries(select(.value != null))]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/providers.yaml.new"
   prettify_yaml "$CONFIG_DIR/providers.yaml.new"
@@ -346,14 +414,16 @@ pull_all() {
   echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}           && mv $CONFIG_DIR/system-prompt.txt{.new,}"
   echo "  diff $CONFIG_DIR/plan-mode-instructions.txt{,.new}  && mv $CONFIG_DIR/plan-mode-instructions.txt{.new,}"
   echo
-  echo "Heads up: secret fields come back as opaque placeholders. Restore"
-  echo "your \${VAR} references in api_key / custom_headers before committing."
+  echo "Heads up: secret fields come back masked. Restore your \${VAR} references"
+  echo "in api_keys / custom_headers before committing."
 }
 
 case "$MODE" in
   push)
     # Order matters: providers → models (with delete pass) → MCPs → prompts.
-    # Coder rejects model creation if its provider isn't already configured.
+    # Coder rejects model creation if its provider isn't already configured,
+    # and push_models reads the post-push AI_PROVIDERS_JSON cache to resolve
+    # name → ai_provider_id.
     push_providers
     push_models
     push_mcp_servers

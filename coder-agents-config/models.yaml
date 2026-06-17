@@ -4,6 +4,11 @@
 # Stable identity: `(provider, model)` tuple. This file is declarative: models
 # missing from this YAML are deleted from Coder on sync.
 #
+# `provider:` here is the provider NAME from providers.yaml (e.g. "anthropic").
+# sync.sh resolves it to the new `ai_provider_id` UUID required by the server
+# at push time, so YAML stays human-readable while the wire payload conforms
+# to the post-DEVEX-227 chat model config schema.
+#
 # Model IDs here are live OmniRoute model IDs from `GET /v1/models`.
 # Cost values are USD per 1M tokens in Coder's model_config.cost schema.
 # Most values are from OmniRoute's LiteLLM pricing sync source; dashboard-only
