@@ -97,8 +97,8 @@ models:
           send_reasoning: true
 
   - provider: anthropic
-    model: cliproxy-claude/claude-opus-4-6
-    display_name: Claude Opus 4.6 — CLIProxyAPI Claude Code
+    model: cliproxy-claude/claude-opus-4-8
+    display_name: Claude Opus 4.8 — CLIProxyAPI Claude Code
     enabled: true
     is_default: false
     context_limit: 1000000
