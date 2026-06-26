@@ -1,0 +1,8 @@
+{
+  "_comment": "Tier 3 extensions manifest (esp32-dev). Layers on top of cpp-dev's 30-cpp.json. ESP-IDF + serial tooling.",
+  "shared": [
+    "espressif.esp-idf-extension",
+    "ms-vscode.vscode-serial-monitor",
+    "platformio.platformio-ide"
+  ]
+}
