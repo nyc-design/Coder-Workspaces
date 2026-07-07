@@ -18,7 +18,7 @@ ARG TARGETARCH
 
 # Pin the upstream release. Bump in PRs and let watchtower roll the new
 # image out — no runtime version drift on the VM.
-ARG CLI_PROXY_API_VERSION=v7.2.50
+ARG CLI_PROXY_API_VERSION=v7.2.51
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates tini \
