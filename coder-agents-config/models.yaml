@@ -10,10 +10,12 @@
 # to the post-DEVEX-227 chat model config schema.
 #
 # Model IDs here are live OmniRoute model IDs from `GET /v1/models`.
-# Cost values are USD per 1M tokens in Coder's model_config.cost schema.
-# Most values are from OmniRoute's LiteLLM pricing sync source; dashboard-only
-# overrides require an OmniRoute manage/admin token to inspect. New models
-# mirror the cost of their closest sibling until LiteLLM pricing is confirmed.
+# Cost values are USD per 1M tokens in Coder's model_config.cost schema,
+# sourced from LiteLLM's public pricing map
+# (BerriAI/litellm model_prices_and_context_window.json) for the underlying
+# model tier. These are display/estimate values: the meridian/*, cliproxy-*
+# paths are subscription-OAuth-backed (Claude Pro/Max, ChatGPT/Codex), so
+# actual billing is the flat subscription, not per-token.
 #
 # context_limit values are the live `context_length` reported by OmniRoute.
 # compression_threshold is a uniform 30 (compress at 30% of context).
@@ -29,10 +31,10 @@ models:
     compression_threshold: 30
     model_config:
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "25"
-        cache_read_price_per_million_tokens: "0.5"
-        cache_write_price_per_million_tokens: "6.25"
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
       provider_options:
         anthropic:
           send_reasoning: true
@@ -114,10 +116,10 @@ models:
     compression_threshold: 30
     model_config:
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "25"
-        cache_read_price_per_million_tokens: "0.5"
-        cache_write_price_per_million_tokens: "6.25"
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
       provider_options:
         anthropic:
           send_reasoning: true
@@ -303,9 +305,9 @@ models:
     compression_threshold: 30
     model_config:
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "30"
-        cache_read_price_per_million_tokens: "0.5"
+        input_price_per_million_tokens: "2.5"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.25"
       provider_options:
         openai:
           reasoning_effort: high
@@ -320,9 +322,9 @@ models:
     compression_threshold: 30
     model_config:
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "30"
-        cache_read_price_per_million_tokens: "0.5"
+        input_price_per_million_tokens: "1"
+        output_price_per_million_tokens: "6"
+        cache_read_price_per_million_tokens: "0.1"
       provider_options:
         openai:
           reasoning_effort: high
