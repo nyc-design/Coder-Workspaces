@@ -59,8 +59,11 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: ${{ env.IMG }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,ref=${{ env.IMG }}:buildcache
-          cache-to: type=gha,ref=${{ env.IMG }}:buildcache,mode=max
+          # GHA cache is scoped separately per image and architecture so the
+          # native matrix jobs cannot reserve the same cache entry.
+          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.platform }}
+          # A cache-quota or reservation failure must not prevent publishing :latest.
+          cache-to: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.platform }},mode=max,ignore-error=true
           provenance: false
           sbom: false
 
