@@ -82,7 +82,7 @@ RUN JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/lat
  && rm just-lsp just-lsp.tar.gz
 
 # code-server — OpenVSX-based browser editor served on the code-server Coder app.
-ENV CODE_SERVER_VERSION=4.117.0
+ENV CODE_SERVER_VERSION=4.129.0
 ENV CODE_SERVER_PREFIX=/opt/code-server
 RUN curl -fsSL https://code-server.dev/install.sh \
       | sh -s -- --method=standalone --prefix="${CODE_SERVER_PREFIX}" --version="${CODE_SERVER_VERSION}" \
