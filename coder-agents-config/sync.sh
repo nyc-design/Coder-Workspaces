@@ -31,7 +31,7 @@
 #
 # Stable keys per resource:
 #   ai providers    name field (lowercase-alphanumeric-hyphen)
-#   models          (provider, model) tuple in YAML; ai_provider_id on the wire
+#   models          (provider name, model) in YAML; (ai_provider_id, model) in the API
 #   mcp servers     slug field
 
 set -euo pipefail
@@ -156,15 +156,14 @@ resolve_ai_provider_id() {
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
 # Sync flow:
 #   1. POST/PATCH every model in YAML
-#   2. After step 1 succeeds, DELETE any model in Coder whose (provider, model)
-#      is NOT in YAML. Order matters — we need everything in YAML in place
-#      first, in case one of those needs to become the new default before we
-#      can delete the old one.
+#   2. After step 1 succeeds, DELETE any model in Coder whose
+#      (ai_provider_id, model) is NOT in YAML. Order matters — we need
+#      everything in YAML in place first, in case one of those needs to become
+#      the new default before we can delete the old one.
 #
-# The chat model config endpoints (/api/experimental/chats/model-configs) still
-# require provider linkage; they now require `ai_provider_id` (UUID) instead
-# of the old `provider` string. We keep `provider:` in YAML for readability /
-# stable identity and resolve it to ai_provider_id at push time.
+# YAML uses the human-readable `(provider name, model)` tuple. The chat model
+# config API uses `(ai_provider_id, model)`, so provider names are resolved to
+# UUIDs before models are matched or written.
 push_models() {
   local file="$CONFIG_DIR/models.yaml"
   [ -f "$file" ] || { echo "no models.yaml, skipping"; return; }
@@ -174,21 +173,31 @@ push_models() {
   desired="$(expand_yaml "$file")"
   current="$(coder_get '/api/experimental/chats/model-configs')"
 
-  # Phase 1: apply desired (POST or PATCH)
+  # Resolve all YAML provider names before mutating model configs. Model config
+  # responses no longer include a provider name, so ai_provider_id is the stable key.
+  local desired_models='[]'
+  local desired_model provider ai_provider_id
+  while IFS= read -r desired_model; do
+    provider="$(jq -r '.provider' <<< "$desired_model")"
+    ai_provider_id="$(resolve_ai_provider_id "$provider")"
+    if [ -z "$ai_provider_id" ] || [ "$ai_provider_id" = "null" ]; then
+      echo "ERROR: could not resolve AI provider '$provider' for model sync" >&2
+      return 1
+    fi
+    desired_models="$(jq --arg id "$ai_provider_id" --argjson model "$desired_model" \
+      '. + [($model | .ai_provider_id = $id)]' <<< "$desired_models")"
+  done < <(jq -c '.models[]' <<< "$desired")
+  desired="$(jq -n --argjson models "$desired_models" '{models: $models}')"
+
+  # Phase 1: apply desired (POST or PATCH) by (ai_provider_id, model).
   echo "$desired" | jq -c '.models[]' | while read -r m; do
     local provider model existing_id ai_provider_id body
     provider="$(jq -r '.provider' <<< "$m")"
     model="$(jq -r '.model' <<< "$m")"
-    existing_id="$(jq -r --arg p "$provider" --arg m "$model" \
-      '.[] | select(.provider == $p and .model == $m) | .id' \
+    ai_provider_id="$(jq -r '.ai_provider_id' <<< "$m")"
+    existing_id="$(jq -r --arg pid "$ai_provider_id" --arg model "$model" \
+      '.[] | select(.ai_provider_id == $pid and .model == $model) | .id' \
       <<< "$current" | head -n1)"
-
-    ai_provider_id="$(resolve_ai_provider_id "$provider")"
-    if [ -z "$ai_provider_id" ] || [ "$ai_provider_id" = "null" ]; then
-      echo "    SKIP  $provider/$model — provider '$provider' not registered (push providers first)" >&2
-      continue
-    fi
-
     # Inject ai_provider_id; strip the human-readable `provider` field so the
     # server-side type derivation isn't fighting our YAML.
     body="$(jq --arg id "$ai_provider_id" 'del(.provider) | .ai_provider_id = $id' <<< "$m")"
@@ -202,18 +211,29 @@ push_models() {
     fi
   done
 
-  # Phase 2: delete anything in Coder but not in desired
+  # Phase 2: delete configs not in desired by (ai_provider_id, model).
   current="$(coder_get '/api/experimental/chats/model-configs')"
+  if ! jq -e '
+    type == "array" and
+    all(.[];
+      (.id | type) == "string" and (.id | length) > 0 and
+      (.ai_provider_id | type) == "string" and (.ai_provider_id | length) > 0 and
+      (.model | type) == "string" and (.model | length) > 0
+    )
+  ' <<< "$current" >/dev/null; then
+    echo "ERROR: unexpected model-config API response; refusing deletions" >&2
+    return 1
+  fi
   echo "$current" | jq -c '.[]' | while read -r m; do
-    local provider model id in_desired
-    provider="$(jq -r '.provider' <<< "$m")"
+    local ai_provider_id model id in_desired
+    ai_provider_id="$(jq -r '.ai_provider_id' <<< "$m")"
     model="$(jq -r '.model' <<< "$m")"
     id="$(jq -r '.id' <<< "$m")"
-    in_desired="$(echo "$desired" | jq --arg p "$provider" --arg m "$model" \
-      'any(.models[]; .provider == $p and .model == $m)')"
+    in_desired="$(echo "$desired" | jq --arg pid "$ai_provider_id" --arg model "$model" \
+      'any(.models[]; .ai_provider_id == $pid and .model == $model)')"
 
     if [ "$in_desired" = "false" ]; then
-      echo "    DELETE $provider/$model ($id) — not in YAML"
+      echo "    DELETE $ai_provider_id/$model ($id) — not in YAML"
       coder_delete "/api/experimental/chats/model-configs/$id" >/dev/null
     fi
   done
