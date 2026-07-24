@@ -13,6 +13,13 @@ permissions:
   contents: read
   packages: write
 
+# Serialize runs of this workflow so a run's cleanup step never deletes the
+# in-flight per-arch digests of a concurrent run. Queue newer runs rather than
+# cancelling in-progress ones so image pushes always complete.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: workspace-images
