@@ -184,7 +184,7 @@ if [ -d "$MANIFEST_DIR" ] && command -v jq >/dev/null 2>&1; then
   for manifest in "$MANIFEST_DIR"/*.json; do
     while IFS= read -r ext; do
       add_manifest_id "$ext"
-    done < <(jq -r '((.shared // []) + (.vscode_web_only // []))[]' "$manifest" 2>/dev/null || true)
+    done < <(jq -r '((.shared // []) + (.shared_marketplace // []) + (.vscode_web_only // []))[]' "$manifest" 2>/dev/null || true)
   done
 fi
 

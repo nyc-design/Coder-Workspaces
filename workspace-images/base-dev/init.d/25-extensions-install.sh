@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Install (or refresh) extensions declared in any
-# /usr/local/share/workspace-extensions.d/*.json manifest. Two install targets:
+# /usr/local/share/workspace-extensions.d/*.json manifest. Three install targets:
 #
-#   - "shared"          -> /home/coder/.vscode-extensions/shared      (OpenVSX, used by both editors)
-#   - "vscode_web_only" -> /home/coder/.vscode-extensions/vscode-web  (Marketplace, vscode-web only)
+#   - "shared"            -> /home/coder/.vscode-extensions/shared      (OpenVSX, used by both editors)
+#   - "shared_marketplace" -> /home/coder/.vscode-extensions/shared      (native Marketplace VSIX, code-server compatible)
+#   - "vscode_web_only"   -> /home/coder/.vscode-extensions/vscode-web  (Marketplace, vscode-web only)
 #
 # Both target dirs are host-bound (workspace-runtime mounts), so installs
 # persist across workspaces. Manifests may pin a version with `<id>@<ver>` or
@@ -15,7 +16,7 @@
 #     the shared cache, then this script re-asserts the pin on the next start.
 #
 #   - Unpinned (`<id>`): query the relevant registry (OpenVSX for shared,
-#     Marketplace for vscode_web_only) for the latest version, then install
+#     Marketplace for shared_marketplace and vscode_web_only) for the latest version, then install
 #     only if `<dir>/<id>-<latest>-*/` is absent. One HTTP call per unpinned
 #     id; no install if we're already current.
 #
@@ -65,16 +66,44 @@ latest_openvsx() {
     | jq -r '.version // empty' 2>/dev/null
 }
 
-# Resolve latest version from VS Code Marketplace for `<publisher>.<name>`.
+# Query VS Code Marketplace metadata for `<publisher>.<name>`.
 # flags=914 (0x382): IncludeVersions|IncludeAssetUri|IncludeVersionProperties|ExcludeNonValidated|IncludeLatestVersionOnly
-latest_marketplace() {
+marketplace_versions() {
   local id="$1"
   curl -sSfL --max-time 10 \
     -H 'Accept: application/json;api-version=3.0-preview.1' \
     -H 'Content-Type: application/json' \
     -X POST 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' \
-    -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"${id}\"}]}],\"flags\":914}" \
-    | jq -r '.results[0].extensions[0].versions[0].version // empty' 2>/dev/null
+    -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"${id}\"}]}],\"flags\":914}"
+}
+
+latest_marketplace() {
+  marketplace_versions "$1" | jq -r '.results[0].extensions[0].versions[0].version // empty' 2>/dev/null
+}
+
+marketplace_target_platform() {
+  case "$(uname -m)" in
+    x86_64|amd64) printf 'linux-x64' ;;
+    aarch64|arm64) printf 'linux-arm64' ;;
+    *) return 1 ;;
+  esac
+}
+
+# Print the latest native Marketplace VSIX as `<version>\t<url>`.
+marketplace_targeted_vsix() {
+  local id="$1" target
+  target="$(marketplace_target_platform)" || {
+    log "[shared-marketplace] unsupported architecture $(uname -m) for $id"
+    return 1
+  }
+
+  marketplace_versions "$id" | jq -r --arg target "$target" '
+    .results[0].extensions[0].versions[]
+    | select(.targetPlatform == $target)
+    | . as $version
+    | ($version.files[] | select(.assetType == "Microsoft.VisualStudio.Services.VSIXPackage") | .source) as $url
+    | "\($version.version)\t\($url)"
+  ' 2>/dev/null | head -n1
 }
 
 # install_extension <bin> <dir> <spec> <label> <resolver>
@@ -114,6 +143,53 @@ install_extension() {
     log "[$label] FAILED $install_spec (exit $rc)"
     sed 's/^/    /' /tmp/ext-install.log
   fi
+}
+
+# Install the current-architecture Marketplace VSIX into the shared cache so
+# code-server can activate it through its normal shared-cache symlink farm.
+install_marketplace_targeted_extension() {
+  local bin="$1" dir="$2" spec="$3"
+  [ -z "$spec" ] && return 0
+  if [ ! -x "$bin" ]; then
+    log "[shared-marketplace] skip $spec (binary $bin not present)"
+    return 0
+  fi
+
+  local id requested_ver resolved version url vsix rc
+  if [[ "$spec" == *"@"* ]]; then
+    id="${spec%@*}"; requested_ver="${spec#*@}"
+  else
+    id="$spec"; requested_ver=""
+  fi
+  resolved="$(marketplace_targeted_vsix "$id" || true)"
+  if [ -z "$resolved" ]; then
+    log "[shared-marketplace] could not resolve targeted Marketplace VSIX for $id"
+    return 0
+  fi
+  IFS=$'\t' read -r version url <<< "$resolved"
+  if [ -n "$requested_ver" ] && [ "$requested_ver" != "$version" ]; then
+    log "[shared-marketplace] requested $id@$requested_ver but Marketplace exposes $version for this target"
+    return 0
+  fi
+  if has_version "$dir" "$id" "$version"; then
+    log "[shared-marketplace] ok $id@$version (already in cache)"
+    return 0
+  fi
+
+  vsix="$(mktemp /tmp/extension-vsix.XXXXXX)"
+  if ! curl -sSfL --max-time 120 -o "$vsix" "$url"; then
+    log "[shared-marketplace] FAILED downloading $id@$version"
+    rm -f "$vsix"
+    return 0
+  fi
+  if "$bin" --extensions-dir="$dir" --install-extension "$vsix" > /tmp/ext-install.log 2>&1; then
+    log "[shared-marketplace] ok $id@$version (installed targeted Marketplace VSIX)"
+  else
+    rc=$?
+    log "[shared-marketplace] FAILED $id@$version (exit $rc)"
+    sed 's/^/    /' /tmp/ext-install.log
+  fi
+  rm -f "$vsix"
 }
 
 # Prune <dir>: per id, delete `<id>-<oldver>-*/` whose mtime is older than
@@ -186,6 +262,10 @@ for manifest in "${manifests[@]}"; do
   while IFS= read -r spec; do
     install_extension "$CODE_SERVER" "$SHARED_DIR" "$spec" "shared" latest_openvsx
   done < <(jq -r '(.shared // [])[]' "$manifest")
+
+  while IFS= read -r spec; do
+    install_marketplace_targeted_extension "$CODE_SERVER" "$SHARED_DIR" "$spec"
+  done < <(jq -r '(.shared_marketplace // [])[]' "$manifest")
 
   while IFS= read -r spec; do
     install_extension "$VSCODE_WEB" "$VSCODE_WEB_DIR" "$spec" "vscode-web" latest_marketplace

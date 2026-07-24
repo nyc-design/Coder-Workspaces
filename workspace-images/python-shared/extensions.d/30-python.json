@@ -1,9 +1,11 @@
 {
-  "_comment": "Tier 2 extensions manifest (python-dev). Layers on top of base-dev's 10-base.json. fullstack-dev gets this manifest via an explicit COPY in its Dockerfile (it does not derive from python-dev).",
+  "_comment": "Tier 2 extensions manifest (python-dev). Layers on top of base-dev's 10-base.json. fullstack-dev gets this manifest via an explicit COPY in its Dockerfile (it does not derive from python-dev). ms-python.python uses Marketplace's native target because OpenVSX's universal package omits PET.",
   "shared": [
-    "ms-python.python",
     "detachhead.basedpyright",
     "charliermarsh.ruff",
     "bruno-api-client.bruno"
+  ],
+  "shared_marketplace": [
+    "ms-python.python"
   ]
 }
