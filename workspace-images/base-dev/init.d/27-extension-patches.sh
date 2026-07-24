@@ -108,17 +108,25 @@ console.log('patched');
 NODE
 }
 
-# --- Continue extension: disable clipboard snippet to silence Safari ---
-# Continue's autocomplete pipeline pulls a "clipboard snippet" on every keystroke
-# (core/autocomplete/snippets/getAllSnippets.ts -> getClipboardSnippets -> ide.
-# getClipboardContent), which on the VS Code side calls vscode.env.clipboard.
-# readText(). In code-server that resolves to navigator.clipboard.readText() in
-# the browser. Safari requires a fresh user gesture for every readText() call,
-# so an autocomplete-driven call rejects and code-server surfaces "Unable to
-# read from the browser's clipboard" on each keystroke. There is no Continue
-# config flag to disable clipboard snippets, so we rewrite getClipboardContent
-# in the bundled extension to return empty text. Editor copy/paste is unaffected
-# (that flows through a different path inside a real keydown gesture).
+# --- Continue extension: neutralize programmatic clipboard reads ---
+# Continue reads the browser clipboard from two code paths that fire without a
+# user gesture:
+#   1. Autocomplete's "clipboard snippet" (getClipboardSnippets ->
+#      IDE.getClipboardContent), pulled on essentially every keystroke.
+#   2. IDE.getTerminalContents(), which copies the terminal selection via the
+#      clipboard when terminal context is gathered.
+# Both resolve to vscode.env.clipboard.readText(), which in code-server becomes
+# navigator.clipboard.readText() in the browser. Safari (and any browser without
+# a fresh user gesture) rejects that call, so code-server surfaces "Unable to
+# read from the browser's clipboard" -- on autocomplete, once per keystroke.
+#
+# There is no Continue config flag to disable these reads, so we rewrite the
+# bundled extension. Rather than match a specific (and frequently changing)
+# minified method signature, we neutralize the clipboard read at the API-call
+# level: every `<alias>.env.clipboard.readText()` is replaced with an inert
+# expression that resolves to "". This is stable across Continue versions and
+# per-arch bundles. Clipboard WRITES and all editor copy/paste (which run inside
+# a real keydown gesture through separate code paths) are left untouched.
 patch_code_server_continue_clipboard() {
   local extension_dir
   # Continue ships a per-target VSIX (linux-x64, darwin-arm64, etc.) plus a
@@ -158,46 +166,27 @@ if (source.includes(marker)) {
   process.exit(0);
 }
 
-// Match the bundled implementation of VsCodeIde.getClipboardContent. The
-// upstream source is:
-//   async getClipboardContent() {
-//     return {
-//       text: await vscode.env.clipboard.readText(),
-//       copiedAt: new Date().toISOString(),
-//     };
-//   }
-// Bundles vary: esbuild minified single-line, esbuild unminified multi-line,
-// and newer builds wrap the Date in a `(/* @__PURE__ */ new Date())` annotation.
-// The identifier for the vscode module alias varies per build, so match it
-// loosely. Patterns ordered from most specific to most permissive; the `s` flag
-// allows `.` to span newlines for unminified bundles.
-const patterns = [
-  /async getClipboardContent\(\)\{return\{text:await ([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\),copiedAt:new Date\(\)\.toISOString\(\)\}\}/,
-  /async getClipboardContent\(\)\s*\{\s*return\s*\{\s*text:\s*await\s+([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\)\s*,\s*copiedAt:\s*\(?\s*(?:\/\*[^*]*\*\/\s*)?new Date\(\)\s*\)?\.toISOString\(\)\s*,?\s*\}\s*;?\s*\}/s,
-];
-
-let matched = false;
-for (const re of patterns) {
-  if (re.test(source)) {
-    source = source.replace(
-      re,
-      'async getClipboardContent(){' + marker + 'return{text:"",copiedAt:new Date().toISOString()}}'
-    );
-    matched = true;
-    break;
-  }
-}
-
-if (!matched) {
-  console.error(`Could not find getClipboardContent in ${file}; skipping`);
+// Neutralize every programmatic clipboard read. The module alias for the
+// `vscode` import is minified per build (e.g. `vscode34`), so match it loosely.
+// Each `<alias>.env.clipboard.readText()` becomes a marked async IIFE that
+// resolves to "" without touching the browser clipboard. Awaiting it keeps the
+// surrounding `await` valid, and the empty string is the same value the reads
+// would yield when the clipboard is empty -- so callers degrade gracefully
+// (autocomplete drops the clipboard snippet; getTerminalContents returns "").
+const re = /([A-Za-z_$][\w$]*)\.env\.clipboard\.readText\(\)/g;
+const matches = source.match(re);
+if (!matches) {
+  console.error(`No vscode clipboard.readText() calls found in ${file}; skipping`);
   process.exit(1);
 }
+
+source = source.replace(re, `(async()=>${marker}"")()`);
 
 if (!fs.existsSync(`${file}.clipboard-stub.bak`)) {
   fs.copyFileSync(file, `${file}.clipboard-stub.bak`);
 }
 fs.writeFileSync(file, source);
-console.log('patched');
+console.log(`patched ${matches.length} clipboard.readText() call(s)`);
 NODE
 }
 
