@@ -42,6 +42,13 @@ disable-cooling: false
 request-retry: 2
 max-retry-interval: 15
 
+# Keep long-lived streaming/non-streaming connections alive so proxies and
+# clients between here and the caller don't idle-timeout mid-response.
+streaming:
+  keepalive-seconds: 20
+  bootstrap-retries: 3
+nonstream-keepalive-interval: 20
+
 # Don't forward client auth headers upstream; OAuth credential files only.
 passthrough-headers: false
 

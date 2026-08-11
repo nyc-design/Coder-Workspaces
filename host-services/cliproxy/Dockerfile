@@ -54,9 +54,6 @@ VOLUME ["/data/auth"]
 
 EXPOSE 8317
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl --fail --silent -o /dev/null http://127.0.0.1:8317/health || exit 1
-
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
 
 LABEL org.opencontainers.image.title="cliproxy" \
