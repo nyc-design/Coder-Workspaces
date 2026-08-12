@@ -22,6 +22,7 @@
 
 models:
   # ── Claude Code subscription paths (Anthropic Messages API) ────────────────
+
   - provider: anthropic
     model: meridian/claude-fable-5
     display_name: Claude Fable 5 — Meridian
@@ -30,6 +31,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "10"
         output_price_per_million_tokens: "50"
@@ -38,6 +42,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: meridian/claude-opus-5
@@ -47,6 +52,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "5"
         output_price_per_million_tokens: "25"
@@ -55,6 +63,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: meridian/claude-sonnet-5
@@ -64,6 +73,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "3"
         output_price_per_million_tokens: "15"
@@ -72,6 +84,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-fable-5
@@ -81,6 +94,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "10"
         output_price_per_million_tokens: "50"
@@ -89,6 +105,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-opus-4-8
@@ -98,6 +115,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "5"
         output_price_per_million_tokens: "25"
@@ -106,6 +126,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-opus-5
@@ -115,6 +136,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "5"
         output_price_per_million_tokens: "25"
@@ -123,6 +147,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-sonnet-5
@@ -132,6 +157,9 @@ models:
     context_limit: 1000000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "3"
         output_price_per_million_tokens: "15"
@@ -140,6 +168,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-haiku-4-5
@@ -149,6 +178,9 @@ models:
     context_limit: 200000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "1"
         output_price_per_million_tokens: "5"
@@ -157,8 +189,10 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   # ── Kiro (OmniRoute Anthropic-Compatible) ───────────────────────────────
+
   - provider: anthropic
     model: kiro/claude-sonnet-4.5
     display_name: Kiro — Claude Sonnet 4.5 (Free)
@@ -167,6 +201,9 @@ models:
     context_limit: 200000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "0"
         output_price_per_million_tokens: "0"
@@ -175,6 +212,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
+          web_search_enabled: true
 
   # ── Codex subscription paths (OpenAI Responses API) ───────────────────────
 
@@ -186,13 +224,16 @@ models:
     context_limit: 256000
     compression_threshold: 80
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "5"
         output_price_per_million_tokens: "30"
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
-          reasoning_effort: high
+          web_search_enabled: true
           reasoning_summary: auto
 
   - provider: openai
@@ -203,13 +244,16 @@ models:
     context_limit: 256000
     compression_threshold: 80
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "2.5"
         output_price_per_million_tokens: "15"
         cache_read_price_per_million_tokens: "0.25"
       provider_options:
         openai:
-          reasoning_effort: high
+          web_search_enabled: true
           reasoning_summary: auto
 
   - provider: openai
@@ -220,13 +264,16 @@ models:
     context_limit: 256000
     compression_threshold: 80
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "1"
         output_price_per_million_tokens: "6"
         cache_read_price_per_million_tokens: "0.1"
       provider_options:
         openai:
-          reasoning_effort: high
+          web_search_enabled: true
           reasoning_summary: auto
 
   - provider: openai
@@ -237,13 +284,16 @@ models:
     context_limit: 256000
     compression_threshold: 80
     model_config:
+      reasoning_effort:
+        default: high
+        max: max
       cost:
         input_price_per_million_tokens: "5"
         output_price_per_million_tokens: "30"
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
-          reasoning_effort: high
+          web_search_enabled: true
           reasoning_summary: auto
 
   - provider: openai
@@ -254,16 +304,20 @@ models:
     context_limit: 256000
     compression_threshold: 80
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.75"
         output_price_per_million_tokens: "4.5"
         cache_read_price_per_million_tokens: "0.075"
       provider_options:
         openai:
-          reasoning_effort: medium
+          web_search_enabled: true
           reasoning_summary: auto
 
   # ── Free / bundled OpenAI-compatible routes (Chat Completions API) ─────────
+
   - provider: openai-compat
     model: free-tier
     display_name: OmniRoute Combo - Free Tier
@@ -272,13 +326,15 @@ models:
     context_limit: 200000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0"
         output_price_per_million_tokens: "0"
         cache_read_price_per_million_tokens: "0"
       provider_options:
         openai-compat:
-          reasoning_effort: medium
           reasoning_summary: auto
 
   - provider: openai-compat
@@ -289,12 +345,14 @@ models:
     context_limit: 131072
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.29"
         output_price_per_million_tokens: "0.59"
       provider_options:
         openai-compat:
-          reasoning_effort: medium
           reasoning_summary: auto
 
   - provider: openai-compat
@@ -305,12 +363,14 @@ models:
     context_limit: 131072
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.35"
         output_price_per_million_tokens: "0.75"
       provider_options:
         openai-compat:
-          reasoning_effort: medium
           reasoning_summary: auto
 
   - provider: openai-compat
@@ -321,12 +381,14 @@ models:
     context_limit: 32000
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0"
         output_price_per_million_tokens: "0"
       provider_options:
         openai-compat:
-          reasoning_effort: medium
           reasoning_summary: auto
 
   - provider: openai-compat
@@ -337,6 +399,9 @@ models:
     context_limit: 204800
     compression_threshold: 30
     model_config:
+      reasoning_effort:
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.3"
         output_price_per_million_tokens: "1.2"
@@ -344,5 +409,4 @@ models:
         cache_write_price_per_million_tokens: "0.375"
       provider_options:
         openai-compat:
-          reasoning_effort: medium
           reasoning_summary: auto
