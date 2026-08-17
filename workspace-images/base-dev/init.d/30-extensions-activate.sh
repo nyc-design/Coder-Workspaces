@@ -55,12 +55,55 @@ const path = require('path');
 const file = process.env.FILE;
 let text;
 try { text = fs.readFileSync(file, 'utf8'); } catch (e) { process.exit(0); }
-text = text
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/^([^"\n]*?)\/\/.*$/gm, '$1')
-  .replace(/,(\s*[}\]])/g, '$1');
+
+function stripJsonc(input) {
+  let output = '';
+  let inString = false, escaped = false, lineComment = false, blockComment = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i], next = input[i + 1];
+    if (lineComment) { if (ch === '\n') { lineComment = false; output += ch; } continue; }
+    if (blockComment) {
+      if (ch === '*' && next === '/') { blockComment = false; i += 1; }
+      else if (ch === '\n') output += ch;
+      continue;
+    }
+    if (inString) {
+      output += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; output += ch; continue; }
+    if (ch === '/' && next === '/') { lineComment = true; i += 1; continue; }
+    if (ch === '/' && next === '*') { blockComment = true; i += 1; continue; }
+    output += ch;
+  }
+
+  let result = '';
+  inString = false; escaped = false;
+  for (let i = 0; i < output.length; i += 1) {
+    const ch = output[i];
+    if (inString) {
+      result += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; result += ch; continue; }
+    if (ch === ',') {
+      let next = i + 1;
+      while (/\s/.test(output[next] ?? '')) next += 1;
+      if (output[next] === '}' || output[next] === ']') continue;
+    }
+    result += ch;
+  }
+  return result;
+}
+
 let data;
-try { data = JSON.parse(text); } catch (e) { process.exit(0); }
+try { data = JSON.parse(stripJsonc(text)); } catch (e) { process.exit(0); }
 const base = path.basename(file);
 let ids = [];
 if (base === 'devcontainer.json') {

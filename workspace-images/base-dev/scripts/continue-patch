@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PATCH_NAME="Continue 2.x browser clipboard patch"
+readonly MARKER_PREFIX="/*coder-continue-browser-patch:v"
+readonly MARKER="${MARKER_PREFIX}2*/"
+readonly DEFAULT_EXTENSION_ROOT="/home/coder/.vscode-extensions/shared"
+readonly BACKUP_SUFFIX=".coder-continue-original.bak"
+
+log() { printf '[continue-patch] %s\n' "$*"; }
+fail() { log "ERROR: $*" >&2; exit 1; }
+
+find_continue_dirs() {
+  local root="${CONTINUE_EXTENSION_ROOT:-$DEFAULT_EXTENSION_ROOT}"
+  [ -d "$root" ] || return 0
+  find "$root" -mindepth 1 -maxdepth 1 -type d \
+    \( -iname 'continue.continue-*' -o -iname 'Continue.continue-*' \) -printf '%T@ %p\0' \
+    | sort -z -nr \
+    | head -z -n 1 \
+    | cut -z -d ' ' -f 2-
+}
+
+patch_bundle() {
+  local extension_dir="$1"
+  local bundle_js=""
+  local candidate
+
+  for candidate in "$extension_dir/out/extension.js" "$extension_dir/dist/extension.js"; do
+    if [ -f "$candidate" ]; then
+      bundle_js="$candidate"
+      break
+    fi
+  done
+
+  if [ -z "$bundle_js" ]; then
+    log "Continue bundle not found under $extension_dir; checked out/extension.js and dist/extension.js"
+    return 0
+  fi
+
+  local version="unknown"
+  if [ -f "$extension_dir/package.json" ]; then
+    version="$(node -e 'try { console.log(require(process.argv[1]).version || "unknown") } catch { console.log("unknown") }' "$extension_dir/package.json")"
+  fi
+
+  log "checking Continue ${version}: $bundle_js"
+
+  CODER_CONTINUE_PATCH_NAME="$PATCH_NAME" \
+  CODER_CONTINUE_MARKER="$MARKER" \
+  CODER_CONTINUE_MARKER_PREFIX="$MARKER_PREFIX" \
+  CODER_CONTINUE_BACKUP_SUFFIX="$BACKUP_SUFFIX" \
+  CODER_CONTINUE_BUNDLE_JS="$bundle_js" \
+  node <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const { spawnSync } = require("child_process");
+
+const file = process.env.CODER_CONTINUE_BUNDLE_JS;
+const marker = process.env.CODER_CONTINUE_MARKER;
+const markerPrefix = process.env.CODER_CONTINUE_MARKER_PREFIX;
+const backupSuffix = process.env.CODER_CONTINUE_BACKUP_SUFFIX;
+const patchName = process.env.CODER_CONTINUE_PATCH_NAME;
+
+const clipboardRead = /\b[A-Za-z_$][\w$]*\.env\.clipboard\.readText\(\)/g;
+const legacyMarker = /\/\*coder-clipboard-stub\*\//g;
+const versionedMarker = /\/\*coder-continue-browser-patch:v\d+\*\//g;
+const patchedClipboardMethod = /async\s+getClipboardContent\s*\([^)]*\)\s*\{\s*\/\*coder-continue-browser-patch:v2\*\/\s*return\s*\{\s*text\s*:\s*""\s*,\s*copiedAt\s*:\s*new Date\(\)\.toISOString\(\)\s*\}\s*;?\s*\}/g;
+const patchedTerminalMethod = /async\s+getTerminalContents\s*\([^)]*\)\s*\{\s*\/\*coder-continue-browser-patch:v2\*\/\s*return\s+""\s*;?\s*\}/g;
+
+function count(source, re) {
+  return Array.from(source.matchAll(new RegExp(re.source, re.flags))).length;
+}
+
+function postconditions(source) {
+  return {
+    markerCount: source.split(marker).length - 1,
+    clipboardReads: count(source, clipboardRead),
+    clipboardMethods: count(source, patchedClipboardMethod),
+    terminalMethods: count(source, patchedTerminalMethod),
+  };
+}
+
+function isComplete(source) {
+  const state = postconditions(source);
+  return state.markerCount > 0 && state.clipboardReads === 0 &&
+    state.clipboardMethods > 0 && state.terminalMethods > 0;
+}
+
+function replaceMethod(source, methodName, replacement) {
+  const header = new RegExp(`\\basync\\s+${methodName}\\s*\\([^)]*\\)\\s*\\{`, "g");
+  let match;
+  let cursor = 0;
+  let replacements = 0;
+  let result = "";
+
+  while ((match = header.exec(source)) !== null) {
+    const open = header.lastIndex - 1;
+    let depth = 1;
+    let i = open + 1;
+    let quote = null;
+    let escaped = false;
+    let lineComment = false;
+    let blockComment = false;
+
+    for (; i < source.length && depth > 0; i += 1) {
+      const ch = source[i];
+      const next = source[i + 1];
+
+      if (lineComment) {
+        if (ch === "\n") lineComment = false;
+        continue;
+      }
+      if (blockComment) {
+        if (ch === "*" && next === "/") { blockComment = false; i += 1; }
+        continue;
+      }
+      if (quote) {
+        if (escaped) { escaped = false; continue; }
+        if (ch === "\\") { escaped = true; continue; }
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === "/" && next === "/") { lineComment = true; i += 1; continue; }
+      if (ch === "/" && next === "*") { blockComment = true; i += 1; continue; }
+      if (ch === "\"" || ch === "'" || ch === "`") { quote = ch; continue; }
+      if (ch === "{") depth += 1;
+      if (ch === "}") depth -= 1;
+    }
+
+    if (depth !== 0) throw new Error(`Unbalanced ${methodName}() method in ${file}`);
+    result += source.slice(cursor, match.index) + replacement;
+    cursor = i;
+    replacements += 1;
+    header.lastIndex = i;
+  }
+
+  return { source: replacements ? result + source.slice(cursor) : source, replacements };
+}
+
+let original = fs.readFileSync(file, "utf8");
+if (isComplete(original)) {
+  const syntax = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+  if (syntax.status !== 0) {
+    throw new Error(`existing patched bundle failed node --check:\n${syntax.stderr || syntax.stdout}`);
+  }
+  const state = postconditions(original);
+  console.log(`already patched (${state.clipboardMethods} clipboard method(s), ${state.terminalMethods} terminal method(s))`);
+  process.exit(0);
+}
+
+let source = original.replace(versionedMarker, "").replace(legacyMarker, "");
+
+// Structurally neutralize every extension-host implementation. This avoids
+// terminal selection/copy side effects as well as browser clipboard permission
+// prompts. Continue's GUI paste handler is in a separate browser asset and is
+// intentionally untouched because it runs in response to a user gesture.
+let result = replaceMethod(
+  source,
+  "getClipboardContent",
+  `async getClipboardContent(){${marker}return{text:"",copiedAt:new Date().toISOString()}}`,
+);
+source = result.source;
+const clipboardMethods = result.replacements;
+
+result = replaceMethod(
+  source,
+  "getTerminalContents",
+  `async getTerminalContents(){${marker}return ""}`,
+);
+source = result.source;
+const terminalMethods = result.replacements;
+
+// Also neutralize any direct programmatic reads outside those methods. The
+// Promise shape preserves surrounding await/then usage without clipboard I/O.
+let directReads = 0;
+source = source.replace(clipboardRead, () => {
+  directReads += 1;
+  return `(Promise.resolve(${marker}""))`;
+});
+
+if (clipboardMethods === 0 || terminalMethods === 0) {
+  throw new Error(
+    `${patchName} does not recognize this bundle: found ${clipboardMethods} getClipboardContent() and ${terminalMethods} getTerminalContents() method(s)`,
+  );
+}
+if (!isComplete(source)) {
+  throw new Error(`${patchName} postconditions failed: ${JSON.stringify(postconditions(source))}`);
+}
+
+const tempDir = fs.mkdtempSync(path.join(path.dirname(file), ".continue-patch-"));
+const tempFile = path.join(tempDir, "extension.js");
+try {
+  fs.writeFileSync(tempFile, source, { mode: fs.statSync(file).mode });
+  const syntax = spawnSync(process.execPath, ["--check", tempFile], { encoding: "utf8" });
+  if (syntax.status !== 0) {
+    throw new Error(`node --check failed:\n${syntax.stderr || syntax.stdout}`);
+  }
+
+  const backup = `${file}${backupSuffix}`;
+  if (!fs.existsSync(backup)) fs.copyFileSync(file, backup);
+  fs.renameSync(tempFile, file);
+} finally {
+  fs.rmSync(tempDir, { recursive: true, force: true });
+}
+
+console.log(
+  `patched ${clipboardMethods} clipboard method(s), ${terminalMethods} terminal method(s), and ${directReads} remaining direct clipboard read(s)`,
+);
+NODE
+}
+
+main() {
+  local found=0
+  local failed=0
+  local patched=0
+  local extension_dir
+  local output
+
+  while IFS= read -r -d '' extension_dir; do
+    found=1
+    if output="$(patch_bundle "$extension_dir" 2>&1)"; then
+      printf '%s\n' "$output"
+      if grep -q '^patched ' <<<"$output"; then patched=1; fi
+    else
+      printf '%s\n' "$output" >&2
+      failed=1
+    fi
+  done < <(find_continue_dirs)
+
+  if [ "$found" -eq 0 ]; then
+    log "Continue extension is not installed; nothing to patch"
+    return 0
+  fi
+  if [ "$failed" -ne 0 ]; then
+    fail "one or more Continue bundles could not be patched"
+  fi
+  log "the newest installed Continue bundle satisfies the patch postconditions"
+  if [ "${patched:-0}" -ne 0 ]; then
+    log "Reload the editor window (or restart the extension host) before using Continue."
+  fi
+}
+
+main "$@"

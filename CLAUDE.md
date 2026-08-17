@@ -81,11 +81,13 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 | `03-git.sh` | GitHub auth, git pull defaults, global gitignore |
 | `04-gcp.sh` | GCP project setup, secrets discovery + loading |
 | `05-rtk.sh` | RTK context optimizer hook configuration for all AI agents |
-| `06-code-server.sh` | code-server GitHub auth extension/product metadata patches and Pencil session-cli fallback |
+| `06-code-server.sh` | code-server GitHub auth extension/product metadata patches |
 | `07-vscode-themes.sh` | Installs baked `.vsix` themes from `shared-assets/vscode-themes/` into both code-server and VS Code Web |
 | `09-shell-helpers.sh` | LazyVim, gitquick, template helpers, excalidraw |
 | `10-mcp-cleanup.sh` | Periodic orphaned MCP process reaper (safety net) |
 | `11-agent-prompts.sh` | Assemble per-image system prompt → write to `~/.coder/AGENTS.md`; symlink `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` to it; symlink `~/.coder/skills` to `~/.claude/skills` |
+| `27-continue-patch.sh` | Apply Continue's code-server clipboard compatibility patch via the reusable `continue-patch` helper |
+| `28-project-customizations.sh` | Layer project devcontainer settings and install project extension recommendations |
 
 ### MCP Server Lifecycle Management
 Stdio-based MCP servers (likec4, stitch, playwright, pencil, agentmemory) can become orphans when a Claude/HAPI session restarts or crashes. Two mechanisms prevent accumulation:
@@ -248,6 +250,8 @@ for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 - `justfile-template <filename>` downloads a selected shared Just template from `shared-assets/justfile-templates/` into the current directory
 - `excalidraw-template <filename>` manually syncs a selected shared Excalidraw library file from `shared-assets/excalidraw/` to `/home/coder/.excalidraw/library.excalidrawlib`
 - `.vsix` files placed in `shared-assets/vscode-themes/` are baked into the `base-dev` image and installed on workspace startup for both code-server and VS Code Web
+- Project `.devcontainer/devcontainer.json` customizations are applied by `28-project-customizations.sh`: `customizations.vscode.settings` deep-merges over base/image machine settings for code-server and VS Code Web; project extensions and recommendations still install into the shared OpenVSX cache. User settings remain untouched.
+- Run `continue-patch` after Continue updates. If the helper changes the bundle, reload the editor window or restart the extension host.
 - The bundled `neils-themes` extension currently contributes `Lunar Dark` and `Solarized Moon`
 - `Solarized Moon` intentionally no longer overrides the integrated terminal ANSI palette, so Starship and other shell prompts that use ANSI named colors keep their own prompt styling
 - Workspace creation no longer force-syncs Excalidraw library content from this repo; users opt in by running `excalidraw-template`

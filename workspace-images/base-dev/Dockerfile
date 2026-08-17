@@ -119,10 +119,11 @@ RUN install -d -m 0755 \
 # them in sorted order and writes the result to ~/.coder/AGENTS.md (with
 # symlinks for Claude/Codex/Gemini provider-specific files).
 COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-prompts/00-base.txt
+COPY workspace-images/base-dev/scripts/continue-patch /usr/local/bin/continue-patch
 COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
-RUN chmod +x /usr/local/share/workspace-init.d/*.sh
+RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patch
 
 # Image-bundled skills, in two flavors. Both are consumed by
 # 13-agent-skills.sh on every workspace start: it copies the SKILL.md dirs
