@@ -32,3 +32,4 @@ scrapyard/
 # Terraform
 .terraform/
 .terraform.lock.hcl
+.gitnexus
