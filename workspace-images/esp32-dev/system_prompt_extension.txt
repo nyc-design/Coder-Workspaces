@@ -1,0 +1,38 @@
+ESP32 / embedded firmware workspace (esp32-dev)
+===============================================
+
+This image extends cpp-dev with the ESP-IDF SDK, esptool, and espflash for
+ESP32-family microcontrollers (esp32, -s2, -s3, -c3, -c6).
+
+Build system
+------------
+- ESP-IDF is at /opt/esp-idf (IDF_PATH); cross toolchains at /opt/esp-idf-tools.
+- Interactive bash shells auto-source export.sh, so `idf.py` is on PATH.
+- In a non-interactive/agent shell, source it first:
+    . "$IDF_PATH/export.sh"
+- Typical project flow: `idf.py set-target esp32`, `idf.py menuconfig`,
+  `idf.py build`.
+
+Flashing & monitoring a real board (IMPORTANT)
+----------------------------------------------
+The workspace is a container on a remote host. The board is on the USER's
+local PC. There is NO local USB and NO host kernel access (sysbox), so
+VirtualHere/usbip are not available. Flash/monitor over NETWORK SERIAL:
+
+1. The user runs, on the PC where the board is attached:
+     esp_rfc2217_server.py -v -p 4000 /dev/ttyUSB0   (or COMx on Windows)
+2. The user exposes port 4000 to the workspace (Tailscale IP, or
+   `coder port-forward`, or an SSH reverse tunnel).
+3. From here, use the baked wrapper:
+     esp-remote flash   <host:port>
+     esp-remote monitor <host:port>
+     esp-remote run     <host:port>      # build + flash + monitor
+   or raw esptool/idf.py against rfc2217://<host:port>?ign_set_control
+
+Do NOT assume /dev/ttyUSB0 exists in this container. If the user asks to
+flash a board and has not set up the RFC2217 bridge, explain the steps above
+and ask for the host:port. The "esp32-remote-flash" skill has the full
+procedure.
+
+espflash (alternative to esptool) is also installed and supports the same
+remote-serial idea via its `--port` option.
