@@ -44,7 +44,9 @@ case "$phase" in
     sudo apt-get install --no-install-recommends -y "${packages[@]}"
     # A tag is resolved during discovery and rechecked here, so it cannot move silently.
     git init "$source_dir"
-    git -C "$source_dir" remote add origin https://github.com/blender/blender.git
+    # GitHub mirrors Git history but does not host Blender's LFS assets.
+    # Use canonical upstream so checkout downloads the actual bundled assets.
+    git -C "$source_dir" remote add origin https://projects.blender.org/blender/blender.git
     git -C "$source_dir" fetch --depth 1 origin "refs/tags/v${BLENDER_VERSION}"
     git -C "$source_dir" checkout --detach FETCH_HEAD
     [[ $(git -C "$source_dir" rev-parse HEAD) == "$BLENDER_SOURCE_SHA" ]] || {
