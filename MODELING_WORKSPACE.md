@@ -30,39 +30,28 @@ That work would also verify scaffold initialization supports
 if needed. No external scaffold or central prompt changes are required for
 existing-repository image use, and none are part of this integration.
 
-## Build and package contract
+## Blender package source
 
-The modeling image lineage is:
+ARM64 Blender uses the user-approved third-party community package from
+[`lfdevs/blender-linux-arm64`](https://github.com/lfdevs/blender-linux-arm64),
+stable release `v5.1.0` (not an official Blender Foundation ARM64 Linux binary).
 
-```text
-base-dev → python-dev → modeling-dev
-```
-
-The separate Blender ARM64 source build is
-`.github/workflows/build-blender-arm64.yaml`. Producers and consumers must agree
-on these exact names:
-
-| Item | Name |
-| --- | --- |
-| Package release tag | `blender-<version>` |
-| Linux ARM64 archive | `blender-<version>-linux-arm64.tar.xz` |
-
-The source package and modeling image have separate build responsibilities.
-Publish the required Blender archive before expecting its modeling image
-consumer to build successfully.
+- Asset: `blender-5.1.0-git20260325.ae6d847d66fa-aarch64.tar.gz`
+- SHA-256: `a4927219950566af13572e72f31b5bcb8baf87190ee86a26e2572ce7fd059793`
+- Package updates require explicit review; no source compilation or automatic updates.
+- The previous standalone source-build workflow and `blender-build/` tooling remain removed.
 
 ## Validation and rollout
 
-Native ARM64 Blender compilation and end-to-end modeling workspace execution
-have not been validated locally. CI must demonstrate the source build and
-subsequent image build before those paths are considered tested.
+Verified on native ARM64 with the selected package:
 
-For existing-repository usage:
+- Background execution reports Blender `5.1.0`.
+- USD support is enabled (`true`).
+- Default-scene USDZ export and archive integrity checks pass.
+- CPU rendering passes with denoising disabled.
+- CPU rendering with denoising enabled fails with `SIGILL`; keep denoising disabled for the verified path.
 
-1. Build and publish the ARM64 Blender package using the agreed tag and asset.
-2. Build and publish `modeling-dev` through its image workflow.
-3. Configure a repository's devcontainer to select the published modeling image.
-4. Create/rebuild that repository's workspace through the existing-project flow.
-5. Smoke-test Python imports and headless Blender startup.
-
-No new-project template option or external scaffold is needed for this flow.
+Apple Vision Pro / RealityKit device compatibility is **untested**. Successful
+USDZ export does not establish device compatibility. The full modeling image
+build and end-to-end workspace rollout are **untested**; package-level checks
+do not establish image-level readiness.

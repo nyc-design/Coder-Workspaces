@@ -24,43 +24,29 @@ wheels or update these pins.
 
 ## Blender release contract
 
-The separate Blender ARM64 source workflow publishes a release only after its
-build/package checks succeed:
+Both architectures pin Blender 5.1.0 and verify SHA256 before extraction.
+AMD64 uses the official `blender-5.1.0-linux-x64.tar.xz` distribution and its
+existing checksum. ARM64 uses the approved third-party
+[`lfdevs/blender-linux-arm64` v5.1.0](https://github.com/lfdevs/blender-linux-arm64/releases/tag/v5.1.0)
+asset `blender-5.1.0-git20260325.ae6d847d66fa-aarch64.tar.gz`, SHA256
+`a4927219950566af13572e72f31b5bcb8baf87190ee86a26e2572ce7fd059793`.
+These are not official Blender Foundation ARM64 Linux binaries. No moving
+release lookup or source build is used; package updates require review.
 
-- tag: `blender-X.Y.Z`
-- asset: `blender-X.Y.Z-linux-arm64.tar.xz`, with one top-level directory
-- checksum asset: `blender-X.Y.Z-linux-arm64.tar.xz.sha256`, containing the
-  conventional `sha256sum` line naming that archive
+### Safe CPU startup defaults
 
-`resolve-blender.py` paginates repository releases, excludes drafts/prereleases,
-requires both nonempty uploaded assets, then sorts by publication timestamp
-(with stable ID/tag tie-breakers). It never uses GitHub's `/releases/latest`, so
-other release types cannot collide. A complete published release is the producer's
-success contract; incomplete uploads fail closed. Publish release assets immutably;
-replacing already-published assets undermines reproducibility and Docker caching.
+The ARM64 package renders successfully with Cycles CPU denoising disabled;
+enabling denoising caused SIGILL in native testing. `30-modeling.sh` explicitly
+runs `modeling-safe-defaults.py` to save an initial user `startup.blend` with
+CPU rendering and final/preview denoising disabled. Existing user startup files
+are preserved, not silently overwritten. This is a scene startup configuration,
+not a global preference or an enforcement hook: **loaded projects, existing
+startup files, and `--factory-startup` can enable denoising again**. Set
+`scene.cycles.use_denoising = False` explicitly in automated render scripts.
 
-CI resolves the version **once before the architecture matrix**, even if another
-release is published during a build. Both matrix builds receive the same version.
-The official amd64 artifact is
-`https://download.blender.org/release/BlenderX.Y/blender-X.Y.Z-linux-x64.tar.xz`
-and its checksum comes from `blender-X.Y.Z.sha256` in the same directory. Missing
-assets or mismatched checksums fail the build; no architecture/version fallback.
-The workflow cascades from successful `python-dev` builds, supports manual dispatch,
-and is path-triggered. Publish a Blender source release first, then dispatch the
-modeling image build when adopting a new Blender version. No Blender release is
-required for static/unit tests, but one is required to build the full image.
-
-Manual build from repository root (automatically resolves the release):
-
-```sh
-docker build -f workspace-images/modeling-dev/Dockerfile -t modeling-dev .
-```
-
-To reproduce a version selected earlier, pass `--build-arg BLENDER_VERSION=X.Y.Z`.
-`BLENDER_RELEASE_REPOSITORY` defaults to `nyc-design/Coder-Workspaces`.
-ARM64 OpenUSD compilation defaults to two jobs; change `OPENUSD_BUILD_JOBS` only
-when adequate memory is available. Source builds may take substantially longer
-than amd64's wheel installation.
+Image smoke tests fail on missing USD, wrong Blender version, failed CPU render,
+invalid GLB, failed USDZ export, or invalid/empty/CRC-damaged USDZ ZIP archives.
+Runtime checks run exports without rendering; image builds pass `--render`.
 
 ## Usage
 

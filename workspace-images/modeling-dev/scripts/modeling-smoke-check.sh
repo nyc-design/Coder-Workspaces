@@ -34,12 +34,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 printf '%s\n' '{"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{}]}' > "$work/smoke.gltf"
 gltf-validate "$work/smoke.gltf" > /dev/null
-if [[ "${1:-}" == '--render' ]]; then
-    blender --background --factory-startup --python-exit-code 1 --python-expr \
-        "import bpy; s=bpy.context.scene; s.render.engine='CYCLES'; s.cycles.device='CPU'; s.cycles.samples=1; s.render.resolution_x=32; s.render.resolution_y=32; s.render.resolution_percentage=100; s.render.image_settings.file_format='PNG'; s.render.filepath='$work/cpu.png'; bpy.ops.render.render(write_still=True)"
-    test -s "$work/cpu.png"
-else
-    blender --background --factory-startup --python-exit-code 1 --python-expr \
-        "import bpy; assert bpy.app.build_options.cycles; print('Blender bundled Python OK')"
-fi
-echo '[modeling-smoke-check] OK'
+blender --background --factory-startup --python-exit-code 1 \
+    --python /usr/local/share/modeling-tools/blender-smoke.py -- "$work" "${1:-}"
+gltf-validate "$work/scene.glb" >/dev/null
+echo '[modeling-dev] Modeling smoke checks passed'

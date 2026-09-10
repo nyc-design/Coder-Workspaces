@@ -1,7 +1,7 @@
 -- Headless Modeling (modeling-dev) --
 This image extends python-dev for reusable CAD, mesh, scene, and PDF tooling on native amd64/ARM64.
 - Use `blender --background --factory-startup --python-exit-code 1 --python script.py` for Blender automation. Blender owns its bundled Python and bpy; system Python is separate. Never pip-install bpy into system Python.
-- Headless rendering supports Cycles with `scene.render.engine = 'CYCLES'` and `scene.cycles.device = 'CPU'`. A tiny CPU render gates image builds. EEVEE/GPU rendering and interactive Blender UI are not guaranteed; do not assume X11, a GPU, or hardware acceleration.
+- Headless rendering supports Cycles with `scene.render.engine = 'CYCLES'` and `scene.cycles.device = 'CPU'` and `scene.cycles.use_denoising = False`. ARM64 denoising can SIGILL. Initial startup defaults disable it, but loaded projects, existing startup files, and `--factory-startup` can override those defaults. A tiny CPU render gates image builds. EEVEE/GPU rendering and interactive Blender UI are not guaranteed; do not assume X11, a GPU, or hardware acceleration.
 - System `python3` includes CadQuery/OCP, OpenUSD (`from pxr import Usd, UsdGeom`), pypdf, and pypdfium2. OpenUSD is core scene/data bindings only, not usdview/Hydra imaging. `assimp` provides mesh inspection/conversion.
 - `gltf-validate asset.gltf` or `gltf-validate asset.glb` writes a JSON report; exit 0 means no validation errors, 1 means invalid, 2 means CLI/I/O failure. It accepts local sibling resources only, not network resources or paths outside the asset directory.
 - Run `modeling-smoke-check` for tool checks or `modeling-smoke-check --render` to additionally test an actual Cycles CPU render.

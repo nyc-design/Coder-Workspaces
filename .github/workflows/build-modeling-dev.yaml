@@ -9,7 +9,7 @@ on:
       - ".github/workflows/build-modeling-dev.yaml"
   workflow_dispatch:
   workflow_run:
-    workflows: ["Build & Push python-dev (multi-arch, native runners) - GHCR", "Build Blender ARM64 package"]
+    workflows: ["Build & Push python-dev (multi-arch, native runners) - GHCR"]
     types:
       - completed
     branches:
@@ -32,26 +32,9 @@ env:
   IMAGE_NAME: modeling-dev
 
 jobs:
-  resolve-blender:
+  build:
     # A failed parent image build must not publish a child against stale layers.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.release.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test release selection
-        run: python3 -m unittest discover -s workspace-images/modeling-dev/tests -p 'test_resolve_blender.py' -v
-      - name: Select latest complete Blender source release
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 workspace-images/modeling-dev/scripts/resolve-blender.py \
-            --repository "$GITHUB_REPOSITORY" --github-output "$GITHUB_OUTPUT"
-
-  build:
-    needs: resolve-blender
     strategy:
       fail-fast: false
       matrix:
@@ -89,9 +72,6 @@ jobs:
           context: .
           file: workspace-images/modeling-dev/Dockerfile
           platforms: ${{ matrix.platform }}
-          build-args: |
-            BLENDER_VERSION=${{ needs.resolve-blender.outputs.version }}
-            BLENDER_RELEASE_REPOSITORY=${{ github.repository }}
           tags: ${{ env.IMG }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           # GHA cache is scoped separately per image and architecture so the
