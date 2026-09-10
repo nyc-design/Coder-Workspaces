@@ -153,7 +153,7 @@ resolve_ai_provider_id() {
   jq -r --arg n "$name" '.[] | select(.name == $n) | .id' <<< "$AI_PROVIDERS_JSON" | head -n1
 }
 
-resolve_models_url() {
+resolve_organization_id() {
   local organization_ref organization_id
   organization_ref="${CODER_ORGANIZATION:-default}"
   organization_id="$(coder_get "/api/v2/organizations/$organization_ref" | jq -r '.id')"
@@ -161,7 +161,15 @@ resolve_models_url() {
     echo "ERROR: could not resolve Coder organization '$organization_ref'" >&2
     return 1
   fi
-  printf '/api/v2/organizations/%s/chats/models' "$organization_id"
+  printf '%s' "$organization_id"
+}
+
+resolve_models_url() {
+  printf '/api/v2/organizations/%s/chats/models' "$(resolve_organization_id)"
+}
+
+resolve_mcp_servers_url() {
+  printf '/api/v2/organizations/%s/mcp-servers' "$(resolve_organization_id)"
 }
 
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
@@ -259,9 +267,10 @@ push_mcp_servers() {
   [ -f "$file" ] || { echo "no mcp-servers.yaml, skipping"; return; }
 
   echo "==> syncing MCP servers from $file"
-  local desired current
+  local desired current mcp_servers_url
   desired="$(expand_yaml "$file")"
-  current="$(coder_get '/api/experimental/mcp/servers')"
+  mcp_servers_url="$(resolve_mcp_servers_url)"
+  current="$(coder_get "$mcp_servers_url")"
 
   echo "$desired" | jq -c '.mcp_servers[]' | while read -r s; do
     local slug existing_id
@@ -270,10 +279,10 @@ push_mcp_servers() {
 
     if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
       echo "    PATCH $slug ($existing_id)"
-      coder_patch "/api/experimental/mcp/servers/$existing_id" "$s" >/dev/null
+      coder_patch "$mcp_servers_url/$existing_id" "$s" >/dev/null
     else
       echo "    POST  $slug (new)"
-      coder_post "/api/experimental/mcp/servers" "$s" >/dev/null
+      coder_post "$mcp_servers_url" "$s" >/dev/null
     fi
   done
 }
@@ -414,7 +423,9 @@ pull_all() {
   prettify_yaml "$CONFIG_DIR/models.yaml.new"
 
   echo "  mcp-servers.yaml"
-  coder_get '/api/experimental/mcp/servers' | \
+  local mcp_servers_url
+  mcp_servers_url="$(resolve_mcp_servers_url)"
+  coder_get "$mcp_servers_url" | \
     jq '{mcp_servers: [.[] | {slug, display_name, description, icon_url, transport, url,
                               auth_type, availability,
                               custom_headers: (if .has_custom_headers
