@@ -1,4 +1,4 @@
-"""Run inside the unmodified upstream image. Uses a mock LLM; makes no model API calls."""
+"""Run inside the derived image with its packaged supervisor and adapter. Uses a mock LLM; makes no model API calls."""
 import asyncio
 import json
 import os
@@ -56,6 +56,13 @@ async def retrieve(hash_key):
             await session.initialize()
             tools = await session.list_tools()
             assert "headroom_retrieve" in {tool.name for tool in tools.tools}
+            assert tools.tools[0].annotations.readOnlyHint
+            missing = await session.call_tool("headroom_retrieve", {"hash": "000000000000"})
+            assert missing.isError, missing
+            rejected = await session.call_tool("headroom_retrieve", {})
+            assert rejected.isError, rejected
+            queried = await session.call_tool("headroom_retrieve", {"hash": hash_key, "query": "Build"})
+            assert not queried.isError, queried
             result = await session.call_tool("headroom_retrieve", {"hash": hash_key})
             assert not result.isError, result
             return json.loads(result.content[0].text)
@@ -67,11 +74,9 @@ def main():
     env = dict(os.environ, OPENAI_TARGET_API_URL="http://127.0.0.1:18789")
     with open("/tmp/headroom-integration.log", "w") as log:
         proxy = subprocess.Popen([
-            "headroom", "proxy", "--host", "127.0.0.1", "--port", "18788",
+            "python", "/opt/headroom/docker-entrypoint.py", "--host", "127.0.0.1", "--port", "18788",
             "--no-ccr-inject-tool", "--disable-kompress", "--no-rate-limit"],
-            env=env, stdout=log, stderr=log)
-        mcp_server = subprocess.Popen(["python", "-c", os.environ["HEADROOM_MCP_BOOTSTRAP"]],
-            env=dict(os.environ, HEADROOM_PROXY_URL="http://127.0.0.1:18788"), stdout=log, stderr=log)
+            env=dict(env, HEADROOM_PROXY_URL="http://127.0.0.1:18788"), stdout=log, stderr=log)
         try:
             for _ in range(120):
                 try:
@@ -122,8 +127,6 @@ def main():
             print(f"PASS: ordinary output compressed {len(original)} -> {len(compressed)} bytes; "
                   "MCP recovered proxy content and its result stayed intact", flush=True)
         finally:
-            mcp_server.terminate()
-            mcp_server.wait(timeout=15)
             proxy.terminate()
             proxy.wait(timeout=15)
             mock.shutdown()

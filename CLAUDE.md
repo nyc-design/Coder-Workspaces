@@ -41,7 +41,7 @@ host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 ├── agentmemory/           # Persistent memory backend (built image, GHCR)
 ├── cliproxy/              # Claude Code + Codex + Gemini OAuth proxy (built image, GHCR)
-├── headroom/              # Upstream compression proxy + internal HTTP retrieval MCP (compose-only)
+├── headroom/              # Upstream compression proxy + internal HTTP retrieval MCP (built image, GHCR)
 ├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
 └── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)
 
@@ -234,15 +234,25 @@ for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 
 ### Headroom retrieval for native Coder Agents
 
-`host-services/headroom/docker-compose.snippet.yml` runs the unmodified,
-upstream `:latest` image as both the compression proxy and an internal HTTP
-MCP adapter. `coder-agents-config/mcp-servers.yaml` registers the adapter as
-`headroom` with `availability: force_on`; chatd exposes
-`headroom__headroom_retrieve`. Workspace CLI MCP files do not configure chatd.
-Native delegation tools and retrieval outputs are excluded from compression.
-The defective document-compaction path is disabled while normal compression
-remains active. See `host-services/headroom/README.md` for image provenance,
-cache persistence, deployment, and regression tests.
+`host-services/headroom/docker-compose.snippet.yml` runs one derived image,
+`ghcr.io/nyc-design/headroom:latest`, matching agentmemory's packaging pattern.
+It extends upstream Headroom without forking or patching its code. A Python
+entrypoint supervises the proxy and extracted FastMCP HTTP retrieval adapter;
+either child exiting stops the container, shutdown signals stop both process
+groups, and the healthcheck probes both listeners.
+
+Central MCP uses `http://headroom:8788/mcp`, slug `headroom`, and
+`availability: force_on`; chatd exposes `headroom__headroom_retrieve`. The adapter
+retrieves through `http://127.0.0.1:8787/v1/retrieve`, sharing the proxy CCR store.
+Only the existing proxy port 8787 has a Traefik route; MCP remains private.
+Native delegation and retrieval results are excluded from compression, document
+compaction is disabled, and synthetic retrieval injection is disabled.
+
+`build-headroom.yaml` runs native AMD64/ARM64 regression and lifecycle tests.
+PRs and feature-branch manual dispatches do not publish. Main-branch runs publish
+GHCR images; weekly rebuilds pull upstream updates and pin publication to the
+tested base digest. See `host-services/headroom/README.md` for migration steps,
+cache persistence, test commands, and deployment validation limits.
 
 ### Shared Install Scripts
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)

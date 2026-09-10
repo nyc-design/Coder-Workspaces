@@ -88,7 +88,7 @@ mcp_servers:
     description: Recover original tool output from Headroom compression references.
     icon_url: /icon/database.svg
     transport: streamable_http
-    url: http://headroom-mcp:8788/mcp
+    url: http://headroom:8788/mcp
     auth_type: none
     enabled: true
     availability: force_on

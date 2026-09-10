@@ -1,10 +1,7 @@
-# Deploy both services on the host Docker network shared with Coder and OmniRoute.
-# Both use the unmodified upstream registry image; no local build or source patch.
-# MCP port 8788 is internal only. See README.md for source, rationale, and validation.
-
+# One derived image, one container. MCP is private to the shared Docker network.
 services:
   headroom:
-    image: ghcr.io/chopratejas/headroom:latest
+    image: ghcr.io/nyc-design/headroom:latest
     container_name: headroom
     restart: unless-stopped
     environment:
@@ -21,6 +18,7 @@ services:
       HEADROOM_SMART_CRUSHER_COMPACTION: 'false'
       HEADROOM_CCR_SQLITE_PATH: /data/ccr_store.db
       HEADROOM_EXCLUDE_TOOLS: spawn_agent,wait_agent,message_agent,interrupt_agent,list_agents,list_subagent_models,close_agent,headroom_retrieve,headroom__headroom_retrieve,mcp__headroom__headroom_retrieve
+      HEADROOM_PROXY_URL: http://127.0.0.1:8787
     volumes:
     - headroom-data:/data
     labels:
@@ -36,66 +34,9 @@ services:
     - --port
     - '8787'
     - --no-ccr-inject-tool
-  headroom-mcp:
-    image: ghcr.io/chopratejas/headroom:latest
-    container_name: headroom-mcp
-    restart: unless-stopped
-    entrypoint:
-    - python
-    - -c
-    command:
-    - |
-      import os
-      import httpx
-      from mcp.server.fastmcp import FastMCP
-      from mcp.server.transport_security import TransportSecuritySettings
-      from mcp.types import ToolAnnotations
-      from starlette.responses import JSONResponse
-
-      mcp = FastMCP(
-          "headroom", host="0.0.0.0", port=8788,
-          stateless_http=True, json_response=True,
-          instructions="Use headroom_retrieve to recover original content from Headroom compression markers. Pass only the hash, not the entire marker. Delegation reports are preserved by the proxy.",
-          transport_security=TransportSecuritySettings(
-              allowed_hosts=["headroom-mcp:*", "localhost:*", "127.0.0.1:*"],
-          ),
-      )
-
-      @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
-      async def headroom_retrieve(hash: str, query: str | None = None) -> dict:
-          """Recover the original behind <<ccr:HASH,...>> or hash=HASH. Optionally search with query."""
-          payload = {"hash": hash}
-          if query is not None:
-              payload["query"] = query
-          async with httpx.AsyncClient(timeout=30) as client:
-              response = await client.post(
-                  os.environ.get("HEADROOM_PROXY_URL", "http://headroom:8787") + "/v1/retrieve",
-                  json=payload,
-              )
-              response.raise_for_status()
-              return response.json()
-
-      @mcp.custom_route("/healthz", methods=["GET"])
-      async def health(request):
-          return JSONResponse({"status": "ok"})
-
-      mcp.run(transport="streamable-http")
-    environment:
-      HEADROOM_PROXY_URL: http://headroom:8787
-    depends_on:
-      headroom:
-        condition: service_healthy
-    healthcheck:
-      test:
-      - CMD
-      - python
-      - -c
-      - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8788/healthz", timeout=3)
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    labels:
-    - traefik.enable=false
-    - com.centurylinklabs.watchtower.enable=true
+    expose:
+    - '8787'
+    - '8788'
+    stop_grace_period: 20s
 volumes:
   headroom-data: null

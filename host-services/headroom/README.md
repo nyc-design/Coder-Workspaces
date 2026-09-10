@@ -1,23 +1,41 @@
 # Headroom for native Coder Agents
 
 The source of truth is this directory plus `coder-agents-config/mcp-servers.yaml`.
-Deploy both services from `docker-compose.snippet.yml` on the host Docker network
-shared by Coder and OmniRoute. The VM does not build an image or mount source code.
+Deploy the single `headroom` service from `docker-compose.snippet.yml` on the host
+Docker network shared by Coder and OmniRoute. The VM only pulls the published
+image: it does not build images or mount source code.
 
-## Image source
+## Image source and rebuild policy
 
-Both services pull **`ghcr.io/chopratejas/headroom:latest`**, the unmodified
-[upstream image](https://github.com/chopratejas/headroom). Watchtower is enabled
-for both services, matching the other host services. OmniRoute likewise uses
-`diegosouzapw/omniroute:latest` with Watchtower enabled.
+**`ghcr.io/nyc-design/headroom:latest`** follows agentmemory's packaging pattern:
+one derived image, one container, a proxy and a private HTTP MCP bridge. The
+Dockerfile extends `ghcr.io/chopratejas/headroom:latest` and copies three small
+runtime files. It does not fork, patch, reinstall, or vendor upstream Headroom.
+The validated upstream baseline is Headroom 0.27.0, whose retrieval MCP server
+has no native HTTP transport; `mcp-http-bridge.py` adapts its installed FastMCP
+SDK to Streamable HTTP and delegates retrieval to the proxy.
 
-The image tested on 2026-09-10 contained Headroom 0.27.0 and MCP SDK 1.28.0 for
-AMD64 and ARM64. There is no local `headroom-coder` image, source patch, custom
-Dockerfile, or separate image publication workflow. The MCP service's Compose
-command adapts the installed MCP SDK to HTTP; it does not install packages or
-modify the image. If an upstream modification becomes necessary, add a GHCR
-build workflow in this repo following `build-cliproxy.yaml` rather than deploying
-a VM-only image.
+`.github/workflows/build-headroom.yaml` builds and tests on native AMD64 and
+ARM64 runners, publishes per-architecture digests, and merges GHCR `latest` and
+`sha-<7-char-commit>` tags. It runs on relevant main-branch changes, manual
+dispatch, and weekly (Monday 05:23 UTC) to pick up upstream changes. Pull requests and feature-branch manual dispatches run tests
+without publishing; registry login, image pushes, and manifest/retention jobs are
+restricted to `main`. Each native
+job pulls upstream, tests the built image, and pins its publication build to the
+same upstream digest. Tests must pass on both architectures before `latest` is
+updated. Scheduled rebuilds can update a SHA tag without a source commit because
+the upstream base is floating; use a registry digest for immutable deployment.
+Watchtower updates the single service after publication. Roll back by selecting
+a retained image digest; retention follows the agentmemory workflow and is short.
+
+`docker-entrypoint.py` starts the upstream `headroom proxy` and bridge as child
+process groups. SIGTERM/SIGINT stop both, with a 10-second cleanup deadline and
+SIGKILL fallback. Any unexpected child exit (including exit code zero) stops its
+sibling and exits nonzero so Compose can restart the whole unit. The Docker
+healthcheck probes both proxy `/readyz` and bridge `/healthz`; a running but
+unresponsive child makes the container unhealthy. Docker restart policies act on
+exit, not health status, so persistent hangs require operational intervention.
+The Compose stop grace period is 20 seconds.
 
 ## Compression and delegation
 
@@ -51,9 +69,9 @@ settings: the installed proxy CLI does not read them.
 
 ## Actual retrieval in Coder Agents
 
-The separate `headroom-mcp` service exposes only `headroom_retrieve` over
-Streamable HTTP at `http://headroom-mcp:8788/mcp`. It forwards retrieval to
-`http://headroom:8787/v1/retrieve`, so it reads the same cache used by compression.
+The packaged MCP bridge exposes only `headroom_retrieve` over
+Streamable HTTP at `http://headroom:8788/mcp`. It forwards retrieval to
+`http://127.0.0.1:8787/v1/retrieve`, so it reads the same cache used by compression.
 It has no local compression store and no access to workspace files.
 
 The central MCP entry uses slug `headroom`, `enabled: true`, and
@@ -66,21 +84,43 @@ An optional `query` searches the original. Missing/expired hashes return a tool
 error. The proxy cache is stored at `/data/ccr_store.db` on `headroom-data`; entries
 retain the upstream default 30-minute TTL.
 
-The MCP service publishes no host port and has no Traefik route. Coder connects
+Neither port is published on the host. Traefik routes only proxy port 8787;
+MCP port 8788 has no public ingress. Coder connects
 from the same Docker network, so the central entry uses `auth_type: none`.
 Do not expose this unauthenticated retrieval service to the public internet.
 Workspace Codex/Claude CLI MCP config files do not configure native Coder Agents.
 
 ## Deployment and validation
 
-1. Apply the host Compose snippet and start `headroom` and `headroom-mcp`.
-2. Sync the central MCP entry using the existing **Update Coder Agents central
+1. Publish the derived image through **Build & Push headroom** before deployment.
+2. Apply the one-service Compose snippet and recreate `headroom`. Remove the old
+   `headroom-mcp` service/container from the previous deployment (for example,
+   `docker compose up -d --remove-orphans headroom` with the complete host config).
+   Keep the existing `headroom-data` volume.
+3. Sync the central MCP entry using the existing **Update Coder Agents central
    config** workflow and its normal configuration sync.
-3. Refresh the chat's MCP connections or start a new chat if an existing session
+4. Refresh the chat's MCP connections or start a new chat if an existing session
    retains its old tool inventory.
 
-Run `bash host-services/headroom/test.sh` from the repo root. It uses the upstream `:latest`
-image and tests the actual Compose HTTP adapter with a mock model
-endpoint. No model API calls are made. The tests cover native tool exclusions,
-streaming/nonstreaming reports, ordinary `execute` compression, complete HTTP MCP
-retrieval, and preservation of the retrieved result on the next model request.
+Run `bash host-services/headroom/test.sh` from the repo root. It builds the derived
+image from an explicitly pulled upstream digest and tests the packaged supervisor
+and adapter with a mock
+model endpoint. No real model API calls are made. Set `HEADROOM_SKIP_BUILD=1`
+and optionally `HEADROOM_TEST_IMAGE=<tag>` to retest an already built image.
+Tests cover all ten native tool exclusions, streaming/nonstreaming reports,
+ordinary `execute` compression, HTTP MCP retrieval/query/missing-hash errors,
+invalid arguments, and preservation of retrieved results on the next request.
+Container tests exercise the real image PID 1 and healthcheck: SIGTERM, SIGINT,
+either child killed, and either HTTP process suspended. Test containers are
+removed automatically; local tests do not publish images or change deployment.
+
+Local validation covers the host's native architecture. The workflow provides
+the other architecture's native tests; GHCR publication, host networking,
+Watchtower, and a real Coder chat still require deployment validation.
+
+### Recorded local result
+
+On September 10, 2026, the native ARM64 derived image passed the full suite with
+Headroom 0.27.0 and MCP SDK 1.28.0. Ordinary output shrank from 84,290 to 2,569
+bytes and recovered exactly through MCP. All six lifecycle cases passed.
+AMD64 execution and GitHub Actions publication were not run locally.
