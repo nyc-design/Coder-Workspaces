@@ -23,6 +23,7 @@ workspace-images/          # Docker images for different development stacks
 ├── vite-dev/             # Vite/React specific setup (Node.js, Playwright, npm globals)
 ├── playwright-dev/       # Browser testing with VNC support
 ├── python-dev/           # Python development environment (uses python-shared/scripts/install-python.sh)
+├── modeling-dev/         # Python-based modeling environment with Blender (extends python-dev)
 └── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
 
 workspace-templates/       # Coder workspace template definitions
@@ -59,6 +60,7 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ```
 base-dev (core tools, Docker, Git, GCP, AI CLIs)
 ├── python-dev (uses python-shared/scripts/install-python.sh)
+│   └── modeling-dev (Python + Blender)
 ├── vite-dev (Node.js, npm globals, Playwright)
 │   └── fullstack-dev (uses python-shared/scripts/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
@@ -232,6 +234,28 @@ root and appends `/responses` directly. Headroom is root-mounted on
 for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 `/responses` directly to the configured base).
 
+### Modeling Image Integration
+
+`modeling-dev` extends `python-dev`. Existing repositories select it through
+`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
+`scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
+
+ARM64 Blender uses the user-approved community package from
+[`lfdevs/blender-linux-arm64`](https://github.com/lfdevs/blender-linux-arm64),
+stable release `v5.1.0`, asset
+`blender-5.1.0-git20260325.ae6d847d66fa-aarch64.tar.gz`, SHA-256
+`a4927219950566af13572e72f31b5bcb8baf87190ee86a26e2572ce7fd059793`.
+This is not an official Blender Foundation ARM64 Linux binary. Updates require
+explicit review; no source compilation or automatic updates are configured.
+The obsolete source-build workflow and `blender-build/` tooling remain removed.
+
+Native package checks pass for background version `5.1.0`, USD support (`true`),
+default-scene USDZ export and archive integrity, and CPU rendering with denoising
+disabled. Denoising enabled fails with `SIGILL`. Apple Vision Pro / RealityKit
+device compatibility and the full modeling image build remain untested.
+See [MODELING_WORKSPACE.md](MODELING_WORKSPACE.md) for validation limits and integration prerequisites.
+
 ### Shared Install Scripts
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)
 - Eliminates duplication: both images COPY and RUN the same script
@@ -318,7 +342,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 
 ### Build Chain
 ```
-base-dev → python-dev
+base-dev → python-dev → modeling-dev
 base-dev → vite-dev → fullstack-dev
 base-dev → cpp-dev
 base-dev → rust-dev
@@ -378,3 +402,47 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 - **Monitor builds**: Watch GitHub Actions for build status and multi-arch manifest creation
 
 This repository follows Docker best practices and Coder workspace patterns. All changes should maintain backward compatibility and follow the established initialization flow.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **Coder-Workspaces** (613 symbols, 665 relationships, 4 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/Coder-Workspaces/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Coder-Workspaces/clusters` | All functional areas |
+| `gitnexus://repo/Coder-Workspaces/processes` | All execution flows |
+| `gitnexus://repo/Coder-Workspaces/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

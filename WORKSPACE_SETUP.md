@@ -1,6 +1,26 @@
 # Coder Workspace Images and Init Scripts
 
-This repository contains Docker images and initialization scripts for Coder workspaces. It provides a standardized development environment setup with various language-specific configurations.
+## Modeling workspaces
+
+`modeling-dev` extends `python-dev`. Existing repositories select it through
+`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
+`scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
+
+ARM64 Blender uses the user-approved community package from
+[`lfdevs/blender-linux-arm64`](https://github.com/lfdevs/blender-linux-arm64),
+stable release `v5.1.0`, asset
+`blender-5.1.0-git20260325.ae6d847d66fa-aarch64.tar.gz`, SHA-256
+`a4927219950566af13572e72f31b5bcb8baf87190ee86a26e2572ce7fd059793`.
+This is not an official Blender Foundation ARM64 Linux binary. Updates require
+explicit review; no source compilation or automatic updates are configured.
+The obsolete source-build workflow and `blender-build/` tooling remain removed.
+
+Native package checks pass for background version `5.1.0`, USD support (`true`),
+default-scene USDZ export and archive integrity, and CPU rendering with denoising
+disabled. Denoising enabled fails with `SIGILL`. Apple Vision Pro / RealityKit
+device compatibility and the full modeling image build remain untested.
+See [MODELING_WORKSPACE.md](MODELING_WORKSPACE.md) for validation limits and integration prerequisites.
 
 ## Architecture Overview
 
