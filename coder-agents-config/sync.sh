@@ -153,6 +153,17 @@ resolve_ai_provider_id() {
   jq -r --arg n "$name" '.[] | select(.name == $n) | .id' <<< "$AI_PROVIDERS_JSON" | head -n1
 }
 
+resolve_models_url() {
+  local organization_ref organization_id
+  organization_ref="${CODER_ORGANIZATION:-default}"
+  organization_id="$(coder_get "/api/v2/organizations/$organization_ref" | jq -r '.id')"
+  if [ -z "$organization_id" ] || [ "$organization_id" = "null" ]; then
+    echo "ERROR: could not resolve Coder organization '$organization_ref'" >&2
+    return 1
+  fi
+  printf '/api/v2/organizations/%s/chats/models' "$organization_id"
+}
+
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
 # Sync flow:
 #   1. POST/PATCH every model in YAML
@@ -169,9 +180,12 @@ push_models() {
   [ -f "$file" ] || { echo "no models.yaml, skipping"; return; }
 
   echo "==> syncing model configs from $file (declarative)"
-  local desired current
+  local desired current models_url
   desired="$(expand_yaml "$file")"
-  current="$(coder_get '/api/experimental/chats/model-configs')"
+
+  # Model configs are organization-scoped in the v2 API.
+  models_url="$(resolve_models_url)"
+  current="$(coder_get "$models_url")"
 
   # Resolve all YAML provider names before mutating model configs. Model config
   # responses no longer include a provider name, so ai_provider_id is the stable key.
@@ -204,15 +218,15 @@ push_models() {
 
     if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
       echo "    PATCH $provider/$model ($existing_id)"
-      coder_patch "/api/experimental/chats/model-configs/$existing_id" "$body" >/dev/null
+      coder_patch "$models_url/$existing_id" "$body" >/dev/null
     else
       echo "    POST  $provider/$model (new)"
-      coder_post "/api/experimental/chats/model-configs" "$body" >/dev/null
+      coder_post "$models_url" "$body" >/dev/null
     fi
   done
 
   # Phase 2: delete configs not in desired by (ai_provider_id, model).
-  current="$(coder_get '/api/experimental/chats/model-configs')"
+  current="$(coder_get "$models_url")"
   if ! jq -e '
     type == "array" and
     all(.[];
@@ -234,7 +248,7 @@ push_models() {
 
     if [ "$in_desired" = "false" ]; then
       echo "    DELETE $ai_provider_id/$model ($id) — not in YAML"
-      coder_delete "/api/experimental/chats/model-configs/$id" >/dev/null
+      coder_delete "$models_url/$id" >/dev/null
     fi
   done
 }
@@ -390,7 +404,9 @@ pull_all() {
   prettify_yaml "$CONFIG_DIR/providers.yaml.new"
 
   echo "  models.yaml"
-  coder_get '/api/experimental/chats/model-configs' | \
+  local models_url
+ models_url="$(resolve_models_url)"
+ coder_get "$models_url" | \
     jq '{models: [.[] | {provider, model, display_name, enabled, is_default,
                          context_limit, compression_threshold, model_config}
                   | with_entries(select(.value != null))]}' | \
