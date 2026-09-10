@@ -1,5 +1,18 @@
 # Coder Workspace Images and Init Scripts
 
+## Modeling workspaces
+
+`modeling-dev` extends `python-dev` with Blender. Existing repositories select
+its published image in their own devcontainer configuration and use the normal
+existing-project workspace flow. New-project scaffold integration is deferred:
+`scaffold/modeling` does not exist in `nyc-design/Project-Scaffolds`, so the
+template intentionally does not offer a modeling project-type option.
+
+See [Modeling Workspace Integration](MODELING_WORKSPACE.md) for the ARM64 package naming
+contract, rollout prerequisites, and validation status. Native ARM64 source
+compilation remains untested locally until CI validates it.
+
+
 This repository contains Docker images and initialization scripts for Coder workspaces. It provides a standardized development environment setup with various language-specific configurations.
 
 ## Architecture Overview

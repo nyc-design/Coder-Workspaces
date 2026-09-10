@@ -1,0 +1,9 @@
+{
+  "name": "modeling-dev-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Architecture-independent glTF validation API for the gltf-validate helper",
+  "dependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

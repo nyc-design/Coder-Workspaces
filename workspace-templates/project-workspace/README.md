@@ -1,5 +1,18 @@
 # Project Workspaces
 
+## Modeling workspaces
+
+`modeling-dev` extends `python-dev` with Blender. Existing repositories select
+its published image in their own devcontainer configuration and use the normal
+existing-project workspace flow. New-project scaffold integration is deferred:
+`scaffold/modeling` does not exist in `nyc-design/Project-Scaffolds`, so the
+template intentionally does not offer a modeling project-type option.
+
+See [Modeling Workspace Integration](../../MODELING_WORKSPACE.md) for the ARM64 package naming
+contract, rollout prerequisites, and validation status. Native ARM64 source
+compilation remains untested locally until CI validates it.
+
+
 Default workspace template for any GitHub repository or scaffolded new project. Slug: `project-workspace`. The display name shown in the Coder dashboard is set from `display_name.txt`, the description from `description.txt`, and the icon from `icon.txt` — all pushed by the `update-coder-templates.yaml` workflow on each commit that touches this directory.
 
 Replaces the older `repo-envbuilder` template. The previous Coder Agents-specific template (`coder-agents`) was removed in favor of this template's `workspace_mode=agent` parameter, which produces an equivalent agent-managed workspace.
