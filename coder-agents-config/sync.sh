@@ -346,28 +346,25 @@ push_template_allowlist() {
   [ -f "$file" ] || { echo "no template-allowlist.yaml, skipping"; return; }
 
   echo "==> syncing template allowlist from $file"
-  local desired_slugs templates ids body slug
-  desired_slugs="$(yq -o=json '.allowed_templates // []' "$file")"
-  templates="$(coder_get '/api/v2/templates')"
+  local desired current
+  desired="$(expand_yaml "$file")"
+  current="$(coder_get '/api/v2/templates')"
 
-  ids='[]'
-  for slug in $(echo "$desired_slugs" | jq -r '.[]'); do
-    local id
-    id="$(jq -r --arg n "$slug" '.[] | select(.name == $n) | .id' <<< "$templates" | head -n1)"
-    if [ -z "$id" ] || [ "$id" = "null" ]; then
-      echo "    WARN  template slug '$slug' not found in deployment; skipping" >&2
-      continue
+  # Agent access now lives on each template as `agents_allowed`; the former
+  # global template-allowlist endpoint has been removed.
+  echo "$current" | jq -c '.[]' | while IFS= read -r template; do
+    local id name current_allowed desired_allowed body
+    id="$(jq -r '.id' <<< "$template")"
+    name="$(jq -r '.name' <<< "$template")"
+    current_allowed="$(jq -r '.agents_allowed // false' <<< "$template")"
+    desired_allowed="$(jq -r --arg name "$name" 'any(.allowed_templates[]; . == $name)' <<< "$desired")"
+
+    if [ "$current_allowed" != "$desired_allowed" ]; then
+      echo "    PATCH $name agents_allowed=$desired_allowed"
+      body="$(jq -n --argjson allowed "$desired_allowed" '{agents_allowed: $allowed}')"
+      coder_patch "/api/v2/templates/$id" "$body" >/dev/null
     fi
-    echo "    resolve $slug → $id"
-    ids="$(echo "$ids" | jq --arg id "$id" '. + [$id]')"
   done
-
-  body="$(jq -n --argjson ids "$ids" '{template_ids: $ids}')"
-  curl -sS --fail-with-body -X PUT \
-    -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
-    -d "$body" \
-    "${CODER_URL}/api/experimental/chats/config/template-allowlist" >/dev/null
-  echo "    PUT template-allowlist ($(echo "$ids" | jq 'length') templates)"
 }
 
 # ───────── PULL MODE ────────────────────────────────────────────────────────
@@ -442,16 +439,11 @@ pull_all() {
   coder_get '/api/experimental/chats/config/plan-mode-instructions' | \
     jq -r '.plan_mode_instructions' > "$CONFIG_DIR/plan-mode-instructions.txt.new"
 
-  # Template allowlist — convert UUIDs back to slugs via v2 templates list
-  # for readability (matching how the file is committed).
+  # Template access is stored directly on each template.
   echo "  template-allowlist.yaml"
-  local allowlist templates slugs
-  allowlist="$(coder_get '/api/experimental/chats/config/template-allowlist')"
-  templates="$(coder_get '/api/v2/templates')"
-  slugs="$(jq -n --argjson a "$allowlist" --argjson t "$templates" \
-    '{allowed_templates: ($a.template_ids // []) | map(. as $id | ($t[] | select(.id == $id) | .name)) | sort}')"
-  echo "$slugs" | yq -o=yaml -P '.' > "$CONFIG_DIR/template-allowlist.yaml.new"
-
+  coder_get '/api/v2/templates' | \
+    jq '{allowed_templates: [.[] | select(.agents_allowed == true) | .name] | sort}' | \
+    yq -o=yaml -P '.' > "$CONFIG_DIR/template-allowlist.yaml.new"
   echo
   echo "Wrote *.new files alongside existing YAML. Diff and rename:"
   echo "  diff $CONFIG_DIR/providers.yaml{,.new}              && mv $CONFIG_DIR/providers.yaml{.new,}"
