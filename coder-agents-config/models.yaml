@@ -225,7 +225,7 @@ models:
     compression_threshold: 80
     model_config:
       reasoning_effort:
-        default: high
+        default: medium
         max: max
       cost:
         input_price_per_million_tokens: "10"
@@ -247,7 +247,7 @@ models:
     compression_threshold: 80
     model_config:
       reasoning_effort:
-        default: high
+        default: medium
         max: max
       cost:
         input_price_per_million_tokens: "5"
@@ -268,7 +268,7 @@ models:
     compression_threshold: 80
     model_config:
       reasoning_effort:
-        default: high
+        default: medium
         max: max
       cost:
         input_price_per_million_tokens: "2.5"
@@ -289,7 +289,7 @@ models:
     compression_threshold: 80
     model_config:
       reasoning_effort:
-        default: high
+        default: medium
         max: max
       cost:
         input_price_per_million_tokens: "1"
