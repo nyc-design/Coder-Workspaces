@@ -6,20 +6,16 @@ shared by Coder and OmniRoute. The VM does not build an image or mount source co
 
 ## Image source
 
-Both services pull the **unmodified upstream image** from
-[`ghcr.io/chopratejas/headroom`](https://github.com/chopratejas/headroom), pinned to
-its multi-architecture digest:
+Both services pull **`ghcr.io/chopratejas/headroom:latest`**, the unmodified
+[upstream image](https://github.com/chopratejas/headroom). Watchtower is enabled
+for both services, matching the other host services. OmniRoute likewise uses
+`diegosouzapw/omniroute:latest` with Watchtower enabled.
 
-```
-sha256:50b85d8e320cfcdf1b38919bb7ae067b93ff7a8de0a93f05b2c1246370200d1c
-```
-
-This image contains Headroom 0.27.0 and MCP SDK 1.28.0 for AMD64 and ARM64. There is
-no local `headroom-coder` image, source patch, custom Dockerfile, or separate image
-publication workflow in this setup. The MCP service's Compose command adapts the
-installed MCP SDK to HTTP; it does not install packages or modify the image.
-Watchtower is off for these digest-pinned services. Review and test a digest bump
-before deployment. If an upstream modification becomes necessary, add a GHCR
+The image tested on 2026-09-10 contained Headroom 0.27.0 and MCP SDK 1.28.0 for
+AMD64 and ARM64. There is no local `headroom-coder` image, source patch, custom
+Dockerfile, or separate image publication workflow. The MCP service's Compose
+command adapts the installed MCP SDK to HTTP; it does not install packages or
+modify the image. If an upstream modification becomes necessary, add a GHCR
 build workflow in this repo following `build-cliproxy.yaml` rather than deploying
 a VM-only image.
 
@@ -84,8 +80,8 @@ Workspace Codex/Claude CLI MCP config files do not configure native Coder Agents
 3. Refresh the chat's MCP connections or start a new chat if an existing session
    retains its old tool inventory.
 
-Run `bash host-services/headroom/test.sh` from the repo root. It pulls the pinned
-upstream image and tests the actual Compose HTTP adapter with a mock model
+Run `bash host-services/headroom/test.sh` from the repo root. It uses the upstream `:latest`
+image and tests the actual Compose HTTP adapter with a mock model
 endpoint. No model API calls are made. The tests cover native tool exclusions,
 streaming/nonstreaming reports, ordinary `execute` compression, complete HTTP MCP
 retrieval, and preservation of the retrieved result on the next model request.

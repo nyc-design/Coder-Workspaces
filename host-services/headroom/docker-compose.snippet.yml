@@ -4,7 +4,7 @@
 
 services:
   headroom:
-    image: ghcr.io/chopratejas/headroom@sha256:50b85d8e320cfcdf1b38919bb7ae067b93ff7a8de0a93f05b2c1246370200d1c
+    image: ghcr.io/chopratejas/headroom:latest
     container_name: headroom
     restart: unless-stopped
     environment:
@@ -29,7 +29,7 @@ services:
     - traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`)
     - traefik.http.routers.headroom.entrypoints=websecure
     - traefik.http.routers.headroom.tls.certresolver=le
-    - com.centurylinklabs.watchtower.enable=false
+    - com.centurylinklabs.watchtower.enable=true
     command:
     - --host
     - 0.0.0.0
@@ -37,7 +37,7 @@ services:
     - '8787'
     - --no-ccr-inject-tool
   headroom-mcp:
-    image: ghcr.io/chopratejas/headroom@sha256:50b85d8e320cfcdf1b38919bb7ae067b93ff7a8de0a93f05b2c1246370200d1c
+    image: ghcr.io/chopratejas/headroom:latest
     container_name: headroom-mcp
     restart: unless-stopped
     entrypoint:
@@ -96,6 +96,6 @@ services:
       retries: 3
     labels:
     - traefik.enable=false
-    - com.centurylinklabs.watchtower.enable=false
+    - com.centurylinklabs.watchtower.enable=true
 volumes:
   headroom-data: null

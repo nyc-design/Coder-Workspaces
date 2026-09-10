@@ -235,7 +235,7 @@ for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 ### Headroom retrieval for native Coder Agents
 
 `host-services/headroom/docker-compose.snippet.yml` runs the unmodified,
-digest-pinned upstream image as both the compression proxy and an internal HTTP
+upstream `:latest` image as both the compression proxy and an internal HTTP
 MCP adapter. `coder-agents-config/mcp-servers.yaml` registers the adapter as
 `headroom` with `availability: force_on`; chatd exposes
 `headroom__headroom_retrieve`. Workspace CLI MCP files do not configure chatd.
