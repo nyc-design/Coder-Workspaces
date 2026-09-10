@@ -169,7 +169,7 @@ resolve_models_url() {
 }
 
 resolve_mcp_servers_url() {
-  printf '/api/v2/organizations/%s/mcp-servers' "$(resolve_organization_id)"
+  printf '/api/v2/organizations/%s/chats/mcp-servers' "$(resolve_organization_id)"
 }
 
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
