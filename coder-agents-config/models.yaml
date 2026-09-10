@@ -217,6 +217,28 @@ models:
   # ── Codex subscription paths (OpenAI Responses API) ───────────────────────
 
   - provider: openai
+    model: cliproxy-codex/gpt-6-astra
+    display_name: GPT-6 Astra — CLIProxyAPI Codex
+    enabled: true
+    is_default: false
+    context_limit: 1050000
+    compression_threshold: 80
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
+      provider_options:
+        openai:
+          store: false
+          web_search_enabled: true
+          reasoning_summary: auto
+
+  - provider: openai
     model: cliproxy-codex/gpt-5.6-sol
     display_name: GPT-5.6 Sol — CLIProxyAPI Codex
     enabled: true
@@ -233,6 +255,7 @@ models:
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -253,6 +276,7 @@ models:
         cache_read_price_per_million_tokens: "0.25"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -273,6 +297,7 @@ models:
         cache_read_price_per_million_tokens: "0.1"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -293,6 +318,7 @@ models:
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -313,6 +339,7 @@ models:
         cache_read_price_per_million_tokens: "0.075"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
