@@ -185,7 +185,7 @@ push_models() {
 
   # Model configs are organization-scoped in the v2 API.
   models_url="$(resolve_models_url)"
-  current="$(coder_get "$models_url")"
+  current="$(coder_get "$models_url" | jq '.models')"
 
   # Resolve all YAML provider names before mutating model configs. Model config
   # responses no longer include a provider name, so ai_provider_id is the stable key.
@@ -226,7 +226,7 @@ push_models() {
   done
 
   # Phase 2: delete configs not in desired by (ai_provider_id, model).
-  current="$(coder_get "$models_url")"
+  current="$(coder_get "$models_url" | jq '.models')"
   if ! jq -e '
     type == "array" and
     all(.[];
@@ -407,7 +407,7 @@ pull_all() {
   local models_url
  models_url="$(resolve_models_url)"
  coder_get "$models_url" | \
-    jq '{models: [.[] | {provider, model, display_name, enabled, is_default,
+    jq '{models: [.models[] | {provider, model, display_name, enabled, is_default,
                          context_limit, compression_threshold, model_config}
                   | with_entries(select(.value != null))]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/models.yaml.new"
