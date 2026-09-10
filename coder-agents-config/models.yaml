@@ -234,6 +234,7 @@ models:
         cache_write_price_per_million_tokens: "12.5"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -254,6 +255,7 @@ models:
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -274,6 +276,7 @@ models:
         cache_read_price_per_million_tokens: "0.25"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -294,6 +297,7 @@ models:
         cache_read_price_per_million_tokens: "0.1"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -314,6 +318,7 @@ models:
         cache_read_price_per_million_tokens: "0.5"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
@@ -334,6 +339,7 @@ models:
         cache_read_price_per_million_tokens: "0.075"
       provider_options:
         openai:
+          store: false
           web_search_enabled: true
           reasoning_summary: auto
 
