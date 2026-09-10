@@ -42,7 +42,7 @@ host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 ├── agentmemory/           # Persistent memory backend (built image, GHCR)
 ├── cliproxy/              # Claude Code + Codex + Gemini OAuth proxy (built image, GHCR)
-├── headroom/              # Local prompt compression proxy (compose-only)
+├── headroom/              # Upstream compression proxy + authenticated HTTP retrieval MCP (built image, GHCR)
 ├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
 └── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)
 
@@ -233,6 +233,34 @@ root and appends `/responses` directly. Headroom is root-mounted on
 `https://llm.tapiavala.com` for Anthropic/Google and `https://llm.tapiavala.com/v1`
 for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 `/responses` directly to the configured base).
+
+### Headroom retrieval for native Coder Agents
+
+`host-services/headroom/docker-compose.snippet.yml` runs one derived image,
+`ghcr.io/nyc-design/headroom:latest`, matching agentmemory's packaging pattern.
+It extends upstream Headroom without forking or patching its code. A Python
+entrypoint supervises the proxy and extracted FastMCP HTTP retrieval adapter;
+either child exiting stops the container, shutdown signals stop both process
+groups, and the healthcheck probes both listeners.
+
+Central MCP uses `https://llm.tapiavala.com/mcp`, slug `headroom`, and
+`availability: force_on`; chatd exposes `headroom__headroom_retrieve`. The adapter
+retrieves through `http://127.0.0.1:8787/v1/retrieve`, sharing the proxy CCR store.
+MCP requires `HEADROOM_MCP_SECRET` bearer authentication, with fail-closed startup
+and constant-time comparison. Central config fetches that secret from GCP.
+Explicit-priority Traefik routing sends `/mcp` to 8788, uses a model API allowlist (including `/p/<name>` aliases) on 8787, and
+sends all unmatched public paths to a 404 deny backend. Public dashboard and
+operational endpoints are intentionally unavailable; LLM authentication is unchanged. Localhost REST retrieval and internal healthchecks still work.
+All external clients share trusted retrieval access; provision the secret before
+deploying, as documented in the Headroom README.
+Native delegation and retrieval results are excluded from compression, document
+compaction is disabled, and synthetic retrieval injection is disabled.
+
+`build-headroom.yaml` runs native AMD64/ARM64 regression and lifecycle tests.
+PRs and feature-branch manual dispatches do not publish. Main-branch runs publish
+GHCR images; weekly rebuilds pull upstream updates and pin publication to the
+tested base digest. See `host-services/headroom/README.md` for migration steps,
+cache persistence, test commands, and deployment validation limits.
 
 ### Modeling Image Integration
 
