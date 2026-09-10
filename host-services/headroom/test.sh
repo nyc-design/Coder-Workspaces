@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+export HEADROOM_MCP_SECRET=headroom-integration-test-only
 IMAGE=${HEADROOM_TEST_IMAGE:-headroom:test}
 if [[ "${HEADROOM_SKIP_BUILD:-0}" != 1 ]]; then
   # Resolve the floating tag once. BuildKit's remote builder need not populate
@@ -20,7 +21,7 @@ config = json.loads(subprocess.check_output([
     "docker", "compose", "-f", "docker-compose.snippet.yml", "config", "--format", "json"]))
 env = config["services"]["headroom"]["environment"]
 args = ["docker", "run", "--rm", "--entrypoint", "python"]
-for key in ("HEADROOM_EXCLUDE_TOOLS", "HEADROOM_SMART_CRUSHER_COMPACTION"):
+for key in ("HEADROOM_EXCLUDE_TOOLS", "HEADROOM_SMART_CRUSHER_COMPACTION", "HEADROOM_MCP_SECRET"):
     args += ["-e", key + "=" + env[key]]
 args += ["-v", str(Path("test_integration.py").resolve()) + ":/tmp/test_integration.py:ro",
          os.environ["HEADROOM_TEST_IMAGE"], "/tmp/test_integration.py"]
@@ -28,3 +29,5 @@ raise SystemExit(subprocess.call(args))
 PY
 
 python3 test_lifecycle.py "$IMAGE"
+
+python3 test_routes.py

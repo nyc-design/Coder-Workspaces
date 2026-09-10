@@ -21,7 +21,7 @@ def run_case(case):
     name = "headroom-test-" + uuid.uuid4().hex[:10]
     try:
         docker("run", "-d", "--name", name, "--health-interval=1s", "--health-start-period=1s",
-               "--health-retries=1", image, "--host", "0.0.0.0", "--port", "8787",
+               "--health-retries=1", "-e", "HEADROOM_MCP_SECRET=headroom-integration-test-only", image, "--host", "0.0.0.0", "--port", "8787",
                "--no-ccr-inject-tool", "--disable-kompress", "--no-rate-limit")
         for _ in range(120):
             state = json.loads(docker("inspect", "--format", "{{json .State}}", name).stdout)
@@ -69,3 +69,18 @@ def run_case(case):
 
 for case in ("sigterm", "sigint", "proxy", "bridge", "proxy-health", "bridge-health"):
     run_case(case)
+
+# Missing secret must stop the entire packaged container, not leave a proxy-only service.
+name = "headroom-test-" + uuid.uuid4().hex[:10]
+try:
+    docker("run", "-d", "--name", name, image, "--disable-kompress")
+    for _ in range(40):
+        if docker("inspect", "--format", "{{.State.Running}}", name).stdout.strip() == "false":
+            break
+        time.sleep(.5)
+    else:
+        raise AssertionError("Missing secret did not fail closed")
+    wait_exit(name, 1)
+    print("PASS: missing secret fails closed", flush=True)
+finally:
+    docker("rm", "-f", name, check=False)

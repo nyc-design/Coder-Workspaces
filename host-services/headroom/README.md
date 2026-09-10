@@ -8,7 +8,7 @@ image: it does not build images or mount source code.
 ## Image source and rebuild policy
 
 **`ghcr.io/nyc-design/headroom:latest`** follows agentmemory's packaging pattern:
-one derived image, one container, a proxy and a private HTTP MCP bridge. The
+one derived image, one container, a proxy and a authenticated HTTP MCP bridge. The
 Dockerfile extends `ghcr.io/chopratejas/headroom:latest` and copies three small
 runtime files. It does not fork, patch, reinstall, or vendor upstream Headroom.
 The validated upstream baseline is Headroom 0.27.0, whose retrieval MCP server
@@ -70,7 +70,7 @@ settings: the installed proxy CLI does not read them.
 ## Actual retrieval in Coder Agents
 
 The packaged MCP bridge exposes only `headroom_retrieve` over
-Streamable HTTP at `http://headroom:8788/mcp`. It forwards retrieval to
+Streamable HTTP at `https://llm.tapiavala.com/mcp`. It forwards retrieval to
 `http://127.0.0.1:8787/v1/retrieve`, so it reads the same cache used by compression.
 It has no local compression store and no access to workspace files.
 
@@ -84,11 +84,57 @@ An optional `query` searches the original. Missing/expired hashes return a tool
 error. The proxy cache is stored at `/data/ccr_store.db` on `headroom-data`; entries
 retain the upstream default 30-minute TTL.
 
-Neither port is published on the host. Traefik routes only proxy port 8787;
-MCP port 8788 has no public ingress. Coder connects
-from the same Docker network, so the central entry uses `auth_type: none`.
-Do not expose this unauthenticated retrieval service to the public internet.
-Workspace Codex/Claude CLI MCP config files do not configure native Coder Agents.
+Neither port is published directly on the host. Traefik routes `/mcp` and its
+subpaths to port 8788 with explicit priority 100 and service `headroom-mcp`.
+The model-path allowlist router explicitly selects service `headroom` (8787),
+priority 10; its provider credential forwarding/authentication is unchanged.
+
+All MCP HTTP methods require `Authorization: Bearer <HEADROOM_MCP_SECRET>`.
+The bridge compares credentials in constant time and rejects missing, incorrect,
+or duplicate authorization headers before MCP dispatch. Missing/blank secrets
+stop the bridge and therefore the container. Only the public host and exact local
+health/test hosts are allowed; browser Origin, when supplied, must be
+`https://llm.tapiavala.com`. The bridge health endpoint stays internal: the public
+MCP router matches only `/mcp` and its subpaths, not `/healthz`.
+
+All external clients are trusted and share one secret and the same CCR store;
+this is not tenant isolation. Use TLS and keep the secret out of source control,
+logs, and chat. Central Coder MCP uses `auth_type: custom_headers` and the same
+bearer secret. Workspace CLI MCP configuration is separate.
+
+### Retrieval bypass audit
+
+The installed Headroom 0.27.0 proxy exposes unauthenticated POST `/v1/retrieve`,
+GET `/v1/retrieve/{hash_key}`, GET `/v1/retrieve/stats`, and POST
+`/v1/retrieve/tool_call`. Upstream project middleware also strips `/p/<name>` before routing, so blocking
+only the literal retrieval prefix is insufficient. Public proxy routing now uses
+an anchored model API allowlist, optionally preceded by one `/p/<name>` segment.
+It preserves messages/count_tokens/batches, chat completions, responses/Codex,
+model discovery, embeddings/moderations, images/audio, Gemini model/batch/cache
+APIs, Cloud Code generation, and Bedrock invocation paths. Unknown paths do not
+reach the upstream catch-all or its prefix-normalization middleware.
+
+The host-wide fallback router (priority 1) rewrites every unmatched request to
+`/public-denied` on the bridge, returning 404. Model traffic uses priority 10;
+authenticated MCP uses priority 100. This deterministically denies direct,
+project-prefixed, and future unknown sensitive endpoints. Public dashboard,
+statistics, metrics, health/admin/debug, compression, feedback, and telemetry
+routes are intentionally no longer available; use trusted internal access for
+operations. Localhost REST retrieval remains available to the bridge. LLM auth
+semantics are unchanged. Do not add alternate public catch-all proxy routers or
+publish port 8787 directly. New model endpoint families require allowlist review.
+
+### Secret provisioning prerequisite (operator action)
+
+Before deploying or syncing central config, provision a strong random
+`HEADROOM_MCP_SECRET` in GCP Secret Manager project `coder-nt`, grant the existing
+sync service account permission to read it, and provide the same value to the
+host Compose environment through the host's secret-management mechanism.
+The update workflow maps `HEADROOM_MCP_SECRET:coder-nt/HEADROOM_MCP_SECRET`,
+matching agentmemory's convention. Compose fails interpolation if it is unset
+or empty; the runtime independently fails closed. Rotate the host and client
+values together and recreate the container/sync central config. This change does
+not provision live secrets or deploy anything.
 
 ## Deployment and validation
 
@@ -124,3 +170,8 @@ On September 10, 2026, the native ARM64 derived image passed the full suite with
 Headroom 0.27.0 and MCP SDK 1.28.0. Ordinary output shrank from 84,290 to 2,569
 bytes and recovered exactly through MCP. All six lifecycle cases passed.
 AMD64 execution and GitHub Actions publication were not run locally.
+
+Authentication regression tests also cover absent/wrong bearer on GET, POST,
+DELETE, OPTIONS across initialize/list/call, public-deny backend REST paths, and
+missing-secret container failure. Traefik label invariants are statically checked;
+real deployed ingress remains an operator validation step.

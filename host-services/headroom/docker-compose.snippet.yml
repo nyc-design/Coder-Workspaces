@@ -1,4 +1,4 @@
-# One derived image, one container. MCP is private to the shared Docker network.
+# One image/container. Public MCP requires a shared bearer secret; no host ports.
 services:
   headroom:
     image: ghcr.io/nyc-design/headroom:latest
@@ -18,13 +18,29 @@ services:
       HEADROOM_SMART_CRUSHER_COMPACTION: 'false'
       HEADROOM_CCR_SQLITE_PATH: /data/ccr_store.db
       HEADROOM_EXCLUDE_TOOLS: spawn_agent,wait_agent,message_agent,interrupt_agent,list_agents,list_subagent_models,close_agent,headroom_retrieve,headroom__headroom_retrieve,mcp__headroom__headroom_retrieve
+      HEADROOM_MCP_SECRET: ${HEADROOM_MCP_SECRET:?HEADROOM_MCP_SECRET is required}
       HEADROOM_PROXY_URL: http://127.0.0.1:8787
     volumes:
     - headroom-data:/data
     labels:
     - traefik.enable=true
     - traefik.http.services.headroom.loadbalancer.server.port=8787
-    - traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`)
+    - traefik.http.routers.headroom.rule=Host(`llm.tapiavala.com`) && PathRegexp(`^(/p/[^/]+)?/(v1/(messages(/.*)?|chat/completions|responses(/.*)?|codex/responses(/.*)?|batches(/.*)?|models(/.*)?|embeddings|moderations|images/(generations|edits)|audio/(transcriptions|speech))|backend-api/(codex/)?responses(/.*)?|v1beta/(models(/.*)?|batches(/.*)?|cachedContents(/.*)?)|v1internal:[A-Za-z]+|v1/v1internal:[A-Za-z]+|model/.+/invoke(-with-response-stream)?)$`)
+    - traefik.http.routers.headroom.service=headroom
+    - traefik.http.routers.headroom.priority=10
+    - traefik.http.services.headroom-mcp.loadbalancer.server.port=8788
+    - traefik.http.routers.headroom-mcp.rule=Host(`llm.tapiavala.com`) && (Path(`/mcp`) || PathPrefix(`/mcp/`))
+    - traefik.http.routers.headroom-mcp.service=headroom-mcp
+    - traefik.http.routers.headroom-mcp.priority=100
+    - traefik.http.routers.headroom-mcp.entrypoints=websecure
+    - traefik.http.routers.headroom-mcp.tls.certresolver=le
+    - traefik.http.routers.headroom-retrieve-deny.rule=Host(`llm.tapiavala.com`)
+    - traefik.http.routers.headroom-retrieve-deny.service=headroom-mcp
+    - traefik.http.routers.headroom-retrieve-deny.priority=1
+    - traefik.http.routers.headroom-retrieve-deny.middlewares=headroom-public-deny
+    - traefik.http.middlewares.headroom-public-deny.replacepath.path=/public-denied
+    - traefik.http.routers.headroom-retrieve-deny.entrypoints=websecure
+    - traefik.http.routers.headroom-retrieve-deny.tls.certresolver=le
     - traefik.http.routers.headroom.entrypoints=websecure
     - traefik.http.routers.headroom.tls.certresolver=le
     - com.centurylinklabs.watchtower.enable=true

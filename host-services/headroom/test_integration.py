@@ -51,7 +51,7 @@ def payload(name, content, kind="function_call", stream=False):
 
 
 async def retrieve(hash_key):
-    async with streamablehttp_client("http://127.0.0.1:8788/mcp") as (read, write, _):
+    async with streamablehttp_client("http://127.0.0.1:8788/mcp", headers={"Authorization": "Bearer " + os.environ["HEADROOM_MCP_SECRET"]}) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             tools = await session.list_tools()
@@ -87,6 +87,31 @@ def main():
                     time.sleep(.25)
             else:
                 raise AssertionError("Proxy failed to become ready")
+
+            # Authentication is checked before JSON-RPC dispatch, including GET/DELETE.
+            for token in (None, "Bearer wrong"):
+                for method in ("GET", "POST", "DELETE", "OPTIONS"):
+                    for operation in ("initialize", "tools/list", "tools/call"):
+                        headers = {"Content-Type": "application/json"}
+                        if token:
+                            headers["Authorization"] = token
+                        request = urllib.request.Request("http://127.0.0.1:8788/mcp",
+                            data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": operation}).encode(),
+                            headers=headers, method=method)
+                        try:
+                            urllib.request.urlopen(request)
+                            raise AssertionError("Unauthorized MCP request accepted")
+                        except urllib.error.HTTPError as error:
+                            assert error.code == 401, error
+            for path in ("/v1/retrieve", "/v1/retrieve/stats", "/v1/retrieve/abc", "/v1/retrieve/tool_call"):
+                for method in ("GET", "POST"):
+                    request = urllib.request.Request("http://127.0.0.1:8788" + path, method=method)
+                    try:
+                        urllib.request.urlopen(request)
+                        raise AssertionError("Retrieval deny backend accepted request")
+                    except urllib.error.HTTPError as error:
+                        assert error.code == 404, error
+            print("PASS: absent/wrong bearer rejected for every MCP operation/method; REST deny backend", flush=True)
 
             report = json.dumps({"report": "Subagent evidence with file paths and findings. " * 200})
             exclusions = [name.strip() for name in os.environ["HEADROOM_EXCLUDE_TOOLS"].split(",")]
