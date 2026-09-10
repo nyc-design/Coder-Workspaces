@@ -75,8 +75,7 @@ Workspace Codex/Claude CLI MCP config files do not configure native Coder Agents
 
 1. Apply the host Compose snippet and start `headroom` and `headroom-mcp`.
 2. Sync the central MCP entry using the existing **Update Coder Agents central
-   config** workflow. Manual dispatch with `scope=headroom` applies only this
-   server; it does not change providers, models, prompts, or other MCP servers.
+   config** workflow and its normal configuration sync.
 3. Refresh the chat's MCP connections or start a new chat if an existing session
    retains its old tool inventory.
 

@@ -242,8 +242,7 @@ MCP adapter. `coder-agents-config/mcp-servers.yaml` registers the adapter as
 Native delegation tools and retrieval outputs are excluded from compression.
 The defective document-compaction path is disabled while normal compression
 remains active. See `host-services/headroom/README.md` for image provenance,
-cache persistence, deployment, and regression tests. The central-config workflow
-supports `scope=headroom` for an additive update of this server alone.
+cache persistence, deployment, and regression tests.
 
 ### Shared Install Scripts
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)

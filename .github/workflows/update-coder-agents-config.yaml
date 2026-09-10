@@ -8,12 +8,6 @@ on:
       - "coder-agents-config/**"
       - ".github/workflows/update-coder-agents-config.yaml"
   workflow_dispatch:
-    inputs:
-      scope:
-        description: Config to sync (Headroom-only leaves providers, models, and prompts untouched)
-        type: choice
-        options: [all, headroom]
-        default: all
 
 permissions:
   contents: read
@@ -59,16 +53,4 @@ jobs:
             AGENTMEMORY_SECRET:coder-nt/AGENTMEMORY_SECRET
 
       - name: Sync providers / models / MCP servers / system prompt / template-allowlist
-        env:
-          SYNC_SCOPE: ${{ inputs.scope || 'all' }}
-        run: |
-          if [ "$SYNC_SCOPE" = headroom ]; then
-            config_dir="$(mktemp -d)"
-            trap 'rm -rf "$config_dir"' EXIT
-            yq '.mcp_servers |= map(select(.slug == "headroom"))' \
-              coder-agents-config/mcp-servers.yaml > "$config_dir/mcp-servers.yaml"
-            test "$(yq '.mcp_servers | length' "$config_dir/mcp-servers.yaml")" -eq 1
-            ./coder-agents-config/sync.sh "$config_dir"
-          else
-            ./coder-agents-config/sync.sh coder-agents-config
-          fi
+        run: ./coder-agents-config/sync.sh coder-agents-config
