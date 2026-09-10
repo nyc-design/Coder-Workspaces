@@ -6,11 +6,12 @@ USER root
 # Core deps + Python + build tools
 # bubblewrap + uidmap are required by Codex's sandboxed exec (newuidmap/newgidmap).
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    ca-certificates curl git bash-completion \
+    ca-certificates curl git git-lfs bash-completion \
     python3 python3-pip python3-venv build-essential \
     tree ripgrep fd-find jq \
     bubblewrap uidmap \
     pre-commit httpie direnv \
+ && git lfs install --system --skip-repo \
  && rm -rf /var/lib/apt/lists/*
 
 # Google Cloud CLI (modern method + single RUN per Google's Docker tip)
