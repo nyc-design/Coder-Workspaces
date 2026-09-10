@@ -80,3 +80,15 @@ mcp_servers:
       Authorization: Bearer ${AGENTMEMORY_SECRET}
     enabled: true
     availability: default_on
+
+  # Coder (chatd) connects from the same host Docker network. No public ingress.
+  # force_on makes retrieval available wherever proxy compression is in use.
+  - slug: headroom
+    display_name: Headroom
+    description: Recover original tool output from Headroom compression references.
+    icon_url: /icon/database.svg
+    transport: streamable_http
+    url: http://headroom-mcp:8788/mcp
+    auth_type: none
+    enabled: true
+    availability: force_on

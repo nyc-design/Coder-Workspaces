@@ -1,144 +1,91 @@
-# headroom
+# Headroom for native Coder Agents
 
-[Headroom](https://github.com/chopratejas/headroom) — local prompt
-compression proxy for AI agent traffic. Compose-only service that pulls
-the upstream image directly from GHCR.
+The source of truth is this directory plus `coder-agents-config/mcp-servers.yaml`.
+Deploy both services from `docker-compose.snippet.yml` on the host Docker network
+shared by Coder and OmniRoute. The VM does not build an image or mount source code.
 
-## Role in the topology
+## Image source
 
-Headroom is the **single, centralized compression layer** for every
-outbound LLM call in the stack. All four protocol shapes hit Headroom,
-get compressed, and forward to OmniRoute, which handles the actual
-provider routing.
+Both services pull the **unmodified upstream image** from
+[`ghcr.io/chopratejas/headroom`](https://github.com/chopratejas/headroom), pinned to
+its multi-architecture digest:
 
 ```
-client → Traefik :443 (Host=llm.tapiavala.com) → headroom :8787 → omniroute :20128
-                                                                      │
-                                                                      ├─→ meridian (Claude Pro/Max)
-                                                                      ├─→ cliproxy (Claude Code / Codex / Gemini OAuth)
-                                                                      ├─→ Kiro (built-in)
-                                                                      └─→ direct API providers
+sha256:50b85d8e320cfcdf1b38919bb7ae067b93ff7a8de0a93f05b2c1246370200d1c
 ```
 
-Headroom is **root-mounted** on `llm.tapiavala.com` — every protocol path
-(`/v1/messages`, `/v1/chat/completions`, `/v1/responses`,
-`/v1beta/models/{model}:generateContent`, `/v1internal:streamGenerateContent`)
-hits Headroom first, gets compressed, and is forwarded to OmniRoute on the
-internal docker network.
+This image contains Headroom 0.27.0 and MCP SDK 1.28.0 for AMD64 and ARM64. There is
+no local `headroom-coder` image, source patch, custom Dockerfile, or separate image
+publication workflow in this setup. The MCP service's Compose command adapts the
+installed MCP SDK to HTTP; it does not install packages or modify the image.
+Watchtower is off for these digest-pinned services. Review and test a digest bump
+before deployment. If an upstream modification becomes necessary, add a GHCR
+build workflow in this repo following `build-cliproxy.yaml` rather than deploying
+a VM-only image.
 
-OmniRoute's own compression pipeline (RTK + Caveman) is left **disabled**
-on purpose — stacking compressors corrupts Anthropic prompt-cache markers
-and produces diminishing returns. See `host-services/omniroute/README.md`
-for the full rationale.
+## Compression and delegation
 
-## Routing (single-upstream)
+The LLM route remains:
 
-Headroom dispatches per request path; in our setup all four point at
-OmniRoute. OmniRoute then accepts each path natively and dispatches to
-the right backend internally:
+```
+Coder Agents → llm.tapiavala.com → Headroom :8787 → OmniRoute :20128
+```
 
-| Incoming path                                  | Headroom env var             | Resolves to        |
-|------------------------------------------------|------------------------------|--------------------|
-| `POST /v1/messages`                            | `ANTHROPIC_TARGET_API_URL`   | `omniroute:20128`  |
-| `POST /v1/chat/completions` + `/v1/responses`  | `OPENAI_TARGET_API_URL`      | `omniroute:20128`  |
-| `POST /v1beta/models/{model}:generateContent`  | `GEMINI_TARGET_API_URL`      | `omniroute:20128`  |
-| `POST /v1internal:streamGenerateContent`       | `CLOUDCODE_TARGET_API_URL`   | `omniroute:20128`  |
+The Anthropic, OpenAI, Gemini, and Cloud Code upstream environment variables all
+point to OmniRoute. Headroom forwards provider credentials; OmniRoute validates
+and replaces them for upstream providers. OmniRoute's own compression stays off.
 
-(All four env vars are real and used; verified in
-`headroom/providers/registry.py:97-106`. The official docs page omits
-`CLOUDCODE_TARGET_API_URL` but the source reads it.)
+General Headroom compression is enabled. `HEADROOM_EXCLUDE_TOOLS` protects the
+native chatd tools `spawn_agent`, `wait_agent`, `message_agent`, `interrupt_agent`,
+`list_agents`, `list_subagent_models`, the historical `close_agent` alias, and
+Headroom retrieval results. Ordinary `execute` output remains compressible.
+These names come from Coder's `coderd/x/chatd/subagent.go` and
+`subagent_catalog.go`; chatd uses named function tools, which the upstream
+Headroom exclusion path already supports.
 
-## Compression details
+`HEADROOM_SMART_CRUSHER_COMPACTION=false` disables the 0.27.0 document compactor.
+That path emits opaque string references whose originals are absent from its CCR
+store. SmartCrusher sampling still compresses output and stores originals under
+working retrieval hashes. Other compression strategies remain enabled.
+Experimental tool-result interception is left off.
 
-ContentRouter pipeline (SmartCrusher for JSON, CodeCompressor for AST,
-Kompress for prose) plus tool-result interceptors. No external LLM key
-required.
+Use the supported `--no-optimize` CLI flag for a deliberate temporary global
+bypass. Do not rely on the old `HEADROOM_DEFAULT_MODE` or `HEADROOM_OPTIMIZE`
+settings: the installed proxy CLI does not read them.
 
-**Tool-result interceptors must be explicitly enabled.** Upstream
-default is `intercept_tool_results: bool = False` (see
-`headroom/config.py`). We set `HEADROOM_INTERCEPT_ENABLED="1"` in the
-compose snippet to turn them on. Without that flag, ContentRouter
-selects the no-op pipeline for nearly every tool-result content block —
-which is the dominant content type in chatd-driven agent traffic.
-Observed effect of leaving it default: 8/36 requests compressed, 0.2%
-average savings, $0.00 compression dollar savings vs $0.55 prompt-cache
-savings. The fix is one env var, not a behavior tradeoff.
+## Actual retrieval in Coder Agents
 
-**Prompt cache stays safe.** `PrefixFreezeConfig.enabled` is `True` by
-default, so Headroom refuses to rewrite any portion of the request
-covered by an Anthropic `cache_control` marker. Turning on tool-result
-interceptors only widens what gets compressed in the *non-cached*
-suffix (new user turns, fresh tool results). The 90% prefix-cache
-discount is untouched.
+The separate `headroom-mcp` service exposes only `headroom_retrieve` over
+Streamable HTTP at `http://headroom-mcp:8788/mcp`. It forwards retrieval to
+`http://headroom:8787/v1/retrieve`, so it reads the same cache used by compression.
+It has no local compression store and no access to workspace files.
 
-**RTK clarification:** The full RTK shell-output rewriter only fires in
-`headroom wrap` mode (CLI tool wrapping). In proxy mode (what we run),
-only generic tool-result interceptors run — they can rewrite shell tool
-outputs but don't pull the full RTK pipeline. `headroom wrap` is not
-usable in our topology anyway, because chatd-based agents invoke tools
-over MCP (the `execute` MCP tool) rather than shelling out to a
-wrappable CLI. The chatd-architecture analogue of `headroom wrap` is
-`distill` running inside the workspace — see
-`workspace-images/base-dev/system_prompt.txt` for the agent-facing
-guidance.
+The central MCP entry uses slug `headroom`, `enabled: true`, and
+`availability: force_on`. Coder prefixes the tool as
+`headroom__headroom_retrieve`. Proxy-side synthetic tool injection is disabled
+with `--no-ccr-inject-tool`; only Coder's registered tool is advertised.
 
-LLMLingua-2 is not included in the upstream `[proxy]` image. Rebuild
-from source with `[proxy,ml]` if you need neural compression (~700 MB).
-Not recommended on the shared Oracle VM (4 vCPU / 24 GB RAM): CPU
-inference would contend with active workspaces, and prompt cache is
-already capturing the bulk of available savings.
+For `<<ccr:abc123,string,408B>>`, call the tool with `{"hash":"abc123"}`.
+An optional `query` searches the original. Missing/expired hashes return a tool
+error. The proxy cache is stored at `/data/ccr_store.db` on `headroom-data`; entries
+retain the upstream default 30-minute TTL.
 
-## Auth
+The MCP service publishes no host port and has no Traefik route. Coder connects
+from the same Docker network, so the central entry uses `auth_type: none`.
+Do not expose this unauthenticated retrieval service to the public internet.
+Workspace Codex/Claude CLI MCP config files do not configure native Coder Agents.
 
-Headroom is **transparent at this layer** — it does not validate or
-inject any credentials of its own. It forwards the client's
-`Authorization` / `x-api-key` / `x-goog-api-key` headers untouched to
-OmniRoute. OmniRoute is where the actual gatekeeping happens:
+## Deployment and validation
 
-- **Client-facing**: OmniRoute validates the inbound key against its
-  configured `LLM_GATEWAY_API_KEY` (dashboard-backed).
-- **Upstream-facing**: OmniRoute swaps in the matching per-upstream
-  key (`MERIDIAN_API_KEY` for meridian, `CLIPROXY_API_KEY` for cliproxy)
-  when dispatching, so the downstream service can validate the call.
+1. Apply the host Compose snippet and start `headroom` and `headroom-mcp`.
+2. Sync the central MCP entry using the existing **Update Coder Agents central
+   config** workflow. Manual dispatch with `scope=headroom` applies only this
+   server; it does not change providers, models, prompts, or other MCP servers.
+3. Refresh the chat's MCP connections or start a new chat if an existing session
+   retains its old tool inventory.
 
-Two important consequences:
-
-1. Clients only see one credential boundary — the `LLM_GATEWAY_API_KEY`.
-   They never need to know about `MERIDIAN_API_KEY` or `CLIPROXY_API_KEY`.
-2. Headroom does not need any secrets in its `.env` — its `Authorization`
-   header is forwarded verbatim. Adding key-handling here would just
-   duplicate OmniRoute's gate.
-
-See `host-services/omniroute/README.md` → "Auth model" for the full
-three-key diagram.
-
-## Optional bypass
-
-Clients can pass `X-Headroom-Optimize: false` to bypass compression for a
-single request (useful for debugging output diffs). Set
-`HEADROOM_OPTIMIZE: "false"` env to disable compression server-wide while
-keeping the routing proxy.
-
-## State persistence
-
-We deliberately do NOT set `HEADROOM_STATELESS=true` even though the
-rest of the stack is fairly ephemeral. That flag disables all filesystem
-writes — which would mean `proxy_savings.json` (the durable
-compression-savings ledger) vanishes every restart, and `--memory` would
-be useless. Instead we mount `/data` and set `HEADROOM_WORKSPACE_DIR=/data`
-so the savings ledger, TOIN telemetry, subscription state, and license
-cache survive image swaps from watchtower.
-
-Files Headroom writes (verified in `headroom/paths.py:56-66`):
-
-- `/data/proxy_savings.json` — cumulative tokens saved
-- `/data/toin.json` — TOIN telemetry
-- `/data/subscription_state.json` — Anthropic OAuth subscription window
-- `/data/license_cache.json`
-- `/data/memory.db` + `/data/memories/` — only when `--memory` is enabled
-
-## Telemetry
-
-Off by default (`HEADROOM_TELEMETRY=off`). Headroom exposes Prometheus
-metrics at `/metrics` if you flip telemetry on — useful for tracking
-compression ratios and per-route latency.
+Run `bash host-services/headroom/test.sh` from the repo root. It pulls the pinned
+upstream image and tests the actual Compose HTTP adapter with a mock model
+endpoint. No model API calls are made. The tests cover native tool exclusions,
+streaming/nonstreaming reports, ordinary `execute` compression, complete HTTP MCP
+retrieval, and preservation of the retrieved result on the next model request.

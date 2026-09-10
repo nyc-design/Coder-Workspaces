@@ -41,7 +41,7 @@ host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 ├── agentmemory/           # Persistent memory backend (built image, GHCR)
 ├── cliproxy/              # Claude Code + Codex + Gemini OAuth proxy (built image, GHCR)
-├── headroom/              # Local prompt compression proxy (compose-only)
+├── headroom/              # Upstream compression proxy + internal HTTP retrieval MCP (compose-only)
 ├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
 └── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)
 
@@ -231,6 +231,19 @@ root and appends `/responses` directly. Headroom is root-mounted on
 `https://llm.tapiavala.com` for Anthropic/Google and `https://llm.tapiavala.com/v1`
 for OpenAI (the `/v1` is required because Coder's OpenAI provider appends
 `/responses` directly to the configured base).
+
+### Headroom retrieval for native Coder Agents
+
+`host-services/headroom/docker-compose.snippet.yml` runs the unmodified,
+digest-pinned upstream image as both the compression proxy and an internal HTTP
+MCP adapter. `coder-agents-config/mcp-servers.yaml` registers the adapter as
+`headroom` with `availability: force_on`; chatd exposes
+`headroom__headroom_retrieve`. Workspace CLI MCP files do not configure chatd.
+Native delegation tools and retrieval outputs are excluded from compression.
+The defective document-compaction path is disabled while normal compression
+remains active. See `host-services/headroom/README.md` for image provenance,
+cache persistence, deployment, and regression tests. The central-config workflow
+supports `scope=headroom` for an additive update of this server alone.
 
 ### Shared Install Scripts
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)
