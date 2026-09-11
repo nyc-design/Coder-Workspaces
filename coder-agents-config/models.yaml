@@ -45,6 +45,27 @@ models:
           web_search_enabled: true
 
   - provider: anthropic
+    model: meridian/claude-fable-5-1
+    display_name: Claude Fable 5.1 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: anthropic
     model: meridian/claude-opus-5
     display_name: Claude Opus 5 — Meridian
     enabled: true
@@ -91,6 +112,27 @@ models:
     display_name: Claude Fable 5 — CLIProxyAPI Claude Code
     enabled: true
     is_default: true
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: anthropic
+    model: cliproxy-claude/claude-fable-5-1
+    display_name: Claude Fable 5.1 — CLIProxyAPI Claude Code
+    enabled: true
+    is_default: false
     context_limit: 1000000
     compression_threshold: 30
     model_config:
