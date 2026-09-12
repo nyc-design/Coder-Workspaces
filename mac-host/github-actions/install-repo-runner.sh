@@ -3,6 +3,10 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONTROL_SOURCE="$SCRIPT_DIR/../coder-mac-control"
+CONTROL_BIN="$HOME/.local/bin/coder-mac-control"
+
 if [[ $# -ne 1 ]]; then
   echo "usage: $0 OWNER/REPO" >&2
   exit 2
@@ -35,7 +39,9 @@ RUNNER_DIR="$HOME/actions-runners/$SLUG"
 RUNNER_NAME="$(scutil --get LocalHostName 2>/dev/null || hostname)-${REPO##*/}"
 LABELS="swift-ci,xcode,visionos"
 
-mkdir -p "$RUNNER_DIR"
+mkdir -p "$RUNNER_DIR" "$HOME/.local/bin"
+cp "$CONTROL_SOURCE" "$CONTROL_BIN"
+chmod 700 "$CONTROL_BIN"
 cd "$RUNNER_DIR"
 
 if [[ -f .runner ]]; then
@@ -60,6 +66,15 @@ REG_TOKEN="$(gh api -X POST "repos/$REPO/actions/runners/registration-token" --j
   --work _work
 
 ./svc.sh install
+
+# A prior controller invocation may have persisted this launchd label as
+# disabled. Resolve the generated service label from GitHub's .service file,
+# re-enable it, then start the runner.
+if [[ -f .service ]]; then
+  SERVICE_PLIST="$(cat .service)"
+  SERVICE_LABEL="$(basename "$SERVICE_PLIST" .plist)"
+  launchctl enable "gui/$(id -u)/$SERVICE_LABEL" >/dev/null 2>&1 || true
+fi
 ./svc.sh start
 
 cat <<EOF
@@ -69,7 +84,13 @@ Directory: $RUNNER_DIR
 Runner:    $RUNNER_NAME
 Labels:    self-hosted, macOS, ARM64, $LABELS
 
-Service status:
+Persistent controls for ALL configured runners:
+  $CONTROL_BIN github on
+  $CONTROL_BIN github off
+  $CONTROL_BIN github toggle
+  $CONTROL_BIN github status
+
+Service status for this runner:
   cd "$RUNNER_DIR" && ./svc.sh status
 
 Run this installer once for each repository that should be able to dispatch Xcode CI to this Mac. Personal GitHub accounts do not have organization-level runners shared across all repositories.
