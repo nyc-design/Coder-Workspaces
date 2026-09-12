@@ -21,8 +21,9 @@
 #     id; no install if we're already current.
 #
 # Older versions of the same id are NEVER uninstalled here; other workspaces
-# may still reference them via their own pin or symlink. Cleanup is handled
-# by the TTL prune below.
+# may still reference them. Cleanup is handled by 31-extensions-prune.sh,
+# which runs after 30-extensions-activate.sh has recorded this workspace's
+# lease and only removes versions no workspace on the host is leasing.
 
 set -euo pipefail
 
@@ -33,7 +34,6 @@ SHARED_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
 VSCODE_WEB_DIR="${VSCODE_WEB_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web}"
 CODE_SERVER="${CODE_SERVER_BIN:-/opt/code-server/bin/code-server}"
 VSCODE_WEB="${VSCODE_WEB_BIN:-/opt/vscode-web/bin/code-server}"
-EXTENSIONS_TTL_DAYS="${EXTENSIONS_TTL_DAYS:-30}"
 
 if [ ! -d "$MANIFEST_DIR" ]; then
   log "no manifest dir at $MANIFEST_DIR; nothing to install"
@@ -195,63 +195,6 @@ install_marketplace_targeted_extension() {
   rm -f "$vsix"
 }
 
-# Prune <dir>: per id, delete `<id>-<oldver>-*/` whose mtime is older than
-# EXTENSIONS_TTL_DAYS, but only if a newer version of the same id is present.
-# This keeps active (symlinked, touched by 30) and recently-installed versions
-# while reaping abandoned ones.
-prune_old_versions() {
-  local dir="$1"
-  [ -d "$dir" ] || return 0
-  local ttl="$EXTENSIONS_TTL_DAYS"
-  [ -z "$ttl" ] || [ "$ttl" -le 0 ] && return 0
-
-  shopt -s nullglob
-  declare -A latest_mtime
-  declare -A latest_path
-
-  # First pass: find the newest mtime per id.
-  for entry in "$dir"/*/; do
-    entry="${entry%/}"
-    local base="$(basename "$entry")"
-    case "$base" in _*) continue ;; esac
-    # Strip trailing -<ver>-<arch> (e.g. "-1.2.3-universal" or "-1.2.3-linux-x64").
-    local id_lc
-    id_lc="$(printf '%s' "$base" | sed -E 's/-[0-9][0-9A-Za-z.+-]*(-[a-z0-9_]+(-[a-z0-9_]+)?)?$//' | tr '[:upper:]' '[:lower:]')"
-    [ -z "$id_lc" ] && continue
-    local m
-    m="$(stat -c '%Y' "$entry" 2>/dev/null || echo 0)"
-    if [ -z "${latest_mtime[$id_lc]:-}" ] || [ "$m" -gt "${latest_mtime[$id_lc]}" ]; then
-      latest_mtime[$id_lc]="$m"
-      latest_path[$id_lc]="$entry"
-    fi
-  done
-
-  # Second pass: delete older entries past TTL.
-  local cutoff
-  cutoff="$(date -d "$ttl days ago" +%s 2>/dev/null || echo 0)"
-  [ "$cutoff" -le 0 ] && return 0
-  local pruned=0
-  for entry in "$dir"/*/; do
-    entry="${entry%/}"
-    local base="$(basename "$entry")"
-    case "$base" in _*) continue ;; esac
-    local id_lc
-    id_lc="$(printf '%s' "$base" | sed -E 's/-[0-9][0-9A-Za-z.+-]*(-[a-z0-9_]+(-[a-z0-9_]+)?)?$//' | tr '[:upper:]' '[:lower:]')"
-    [ -z "$id_lc" ] && continue
-    # Keep the newest version regardless of age.
-    [ "$entry" = "${latest_path[$id_lc]:-}" ] && continue
-    local m
-    m="$(stat -c '%Y' "$entry" 2>/dev/null || echo 0)"
-    if [ "$m" -lt "$cutoff" ]; then
-      rm -rf -- "$entry"
-      pruned=$((pruned + 1))
-      log "pruned stale $(basename "$entry")"
-    fi
-  done
-  [ "$pruned" -gt 0 ] && log "pruned $pruned stale entries from $dir"
-  return 0
-}
-
 shopt -s nullglob
 manifests=("$MANIFEST_DIR"/*.json)
 if [ ${#manifests[@]} -eq 0 ]; then
@@ -274,8 +217,5 @@ for manifest in "${manifests[@]}"; do
     install_extension "$VSCODE_WEB" "$VSCODE_WEB_DIR" "$spec" "vscode-web" latest_marketplace
   done < <(jq -r '(.vscode_web_only // [])[]' "$manifest")
 done
-
-prune_old_versions "$SHARED_DIR"
-prune_old_versions "$VSCODE_WEB_DIR"
 
 log "done"
