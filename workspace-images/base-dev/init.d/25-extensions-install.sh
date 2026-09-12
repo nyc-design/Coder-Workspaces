@@ -176,7 +176,10 @@ install_marketplace_targeted_extension() {
     return 0
   fi
 
-  vsix="$(mktemp /tmp/extension-vsix.XXXXXX)"
+  # The VS Code CLI only treats an argument as a local package when it ends in
+  # .vsix; without the suffix it resolves the path as a Marketplace extension ID
+  # and fails with "Extension '<path>' not found".
+  vsix="$(mktemp /tmp/extension-vsix.XXXXXX.vsix)"
   if ! curl -sSfL --max-time 120 -o "$vsix" "$url"; then
     log "[shared-marketplace] FAILED downloading $id@$version"
     rm -f "$vsix"
