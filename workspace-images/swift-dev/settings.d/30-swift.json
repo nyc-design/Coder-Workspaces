@@ -7,7 +7,6 @@
       "editor.tabSize": 4
     },
     "swift.path": "/usr/local/swift/bin",
-    "swift.runtimePath": "/usr/local/swift/lib/swift/linux",
     "swift.sourcekit-lsp.serverPath": "/usr/local/swift/bin/sourcekit-lsp",
     "swift.sourcekit-lsp.backgroundIndexing": "on",
     "swift.enableTerminalEnvironment": true,
