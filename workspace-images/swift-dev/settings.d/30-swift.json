@@ -1,0 +1,25 @@
+{
+  "_comment": "Tier 2 settings manifest (swift-dev). Points the official Swift extension at the baked /usr/local/swift toolchain and wires sourcekit-lsp + swift-format. Every key below was verified against swiftlang.swift-vscode 2.17.20260904's contributed configuration. .machine because these are template-enforced wirings tied to baked binaries.",
+  "machine": {
+    "[swift]": {
+      "editor.defaultFormatter": "swiftlang.swift-vscode",
+      "editor.insertSpaces": true,
+      "editor.tabSize": 4
+    },
+    "swift.path": "/usr/local/swift/bin",
+    "swift.runtimePath": "/usr/local/swift/lib/swift/linux",
+    "swift.sourcekit-lsp.serverPath": "/usr/local/swift/bin/sourcekit-lsp",
+    "swift.sourcekit-lsp.backgroundIndexing": "on",
+    "swift.enableTerminalEnvironment": true,
+    "swift.diagnostics": true,
+    "swift.autoGenerateLaunchConfigurations": false,
+    "swift.disableSwiftlyInstallPrompt": true,
+    "swift.showBuildStatus": "swiftStatus",
+    "swift.actionAfterBuildError": "Focus Problems",
+    "files.associations": {
+      "Package.resolved": "json",
+      ".swiftlint.yml": "yaml",
+      ".swift-format": "json"
+    }
+  }
+}

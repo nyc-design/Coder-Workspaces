@@ -11,7 +11,8 @@ This repository contains Docker build files and initialization scripts for Coder
 ├── build-fullstack-dev.yaml  # Full-stack development image build
 ├── build-vite-dev.yaml   # Vite/React development image build
 ├── build-python-dev.yaml # Python development image build
-└── build-rust-dev.yaml   # Rust development image build
+├── build-rust-dev.yaml   # Rust development image build
+└── build-swift-dev.yaml  # Swift development image build
 
 workspace-images/          # Docker images for different development stacks
 ├── base-dev/             # Foundation image with core tools (Docker, GCP CLI, Node.js, AI CLIs, RTK)
@@ -24,7 +25,8 @@ workspace-images/          # Docker images for different development stacks
 ├── playwright-dev/       # Browser testing with VNC support
 ├── python-dev/           # Python development environment (uses python-shared/scripts/install-python.sh)
 ├── modeling-dev/         # Python-based modeling environment with Blender (extends python-dev)
-└── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
+├── rust-dev/             # Rust development environment (rustup, cargo, clippy, rustfmt)
+└── swift-dev/            # Swift development environment (swift.org Linux toolchain, SwiftLint)
 
 workspace-templates/       # Coder workspace template definitions
 ├── windows-server-gcp/    # Windows VM on GCP with browser-based RDP access
@@ -65,6 +67,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 │   └── fullstack-dev (uses python-shared/scripts/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 ├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
+├── swift-dev (swift.org Linux toolchain + SwiftLint; no Apple SDKs)
 └── playwright-dev
 ```
 
@@ -374,6 +377,7 @@ base-dev → python-dev → modeling-dev
 base-dev → vite-dev → fullstack-dev
 base-dev → cpp-dev
 base-dev → rust-dev
+base-dev → swift-dev
 ```
 
 ### Build Triggers

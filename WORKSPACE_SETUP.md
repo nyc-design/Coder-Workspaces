@@ -37,7 +37,8 @@ workspace-images/
 ├── vite-dev/                   # Vite/React development image
 ├── playwright-dev/             # Playwright testing image
 ├── python-dev/                 # Python development image
-└── rust-dev/                   # Rust development image
+├── rust-dev/                   # Rust development image
+└── swift-dev/                  # Swift development image (Linux toolchain only)
 
 workspace-templates/            # Coder workspace template definitions
 └── repo-devcontainer/         # Repository-based devcontainer template
