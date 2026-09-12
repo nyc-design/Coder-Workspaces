@@ -1,0 +1,6 @@
+{
+  "_comment": "Tier 2 extensions manifest (swift-dev). Layers on top of base-dev's 10-base.json. swiftlang.swift-vscode is the official Swift extension and is published on OpenVSX (verified 2026-09-12).",
+  "shared": [
+    "swiftlang.swift-vscode"
+  ]
+}

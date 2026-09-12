@@ -59,6 +59,7 @@ The template automatically selects the appropriate Docker image based on project
 - **python-dev**: Python-focused with uv, ruff, basedpyright, pytest, ipython
 - **vite-dev**: Frontend development with Vite/React, TypeScript, Biome, Vitest, Playwright
 - **rust-dev**: Rust development with rustup, cargo, clippy, rustfmt, rust-analyzer, cargo-binstall
+- **swift-dev**: Swift development with the swift.org Linux toolchain, SwiftPM, sourcekit-lsp, swift-format, SwiftLint. Linux only — no Xcode, Apple SDKs or simulators, so iOS/visionOS app layers are authored here and built on a Mac. Selected through a repository devcontainer; there is no `swift` new-project scaffold yet.
 - **cpp-dev**: C++ development with compilers, CMake, vcpkg, debugging tools
 - **fullstack-dev**: Combined Python backend + Vite/React frontend environment
 
