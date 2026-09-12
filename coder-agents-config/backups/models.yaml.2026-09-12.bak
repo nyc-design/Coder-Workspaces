@@ -13,19 +13,99 @@
 # Cost values are USD per 1M tokens in Coder's model_config.cost schema,
 # sourced from LiteLLM's public pricing map
 # (BerriAI/litellm model_prices_and_context_window.json) for the underlying
-# model tier. These are display/estimate values: the cliproxy-*
+# model tier. These are display/estimate values: the meridian/*, cliproxy-*
 # paths are subscription-OAuth-backed (Claude Pro/Max, ChatGPT/Codex), so
 # actual billing is the flat subscription, not per-token.
-#
-# The meridian/* Claude entries were removed on 2026-09-12; the full prior
-# file is preserved at backups/models.yaml.2026-09-12.bak (not read by
-# sync.sh, which only loads the exact filenames above).
 #
 # context_limit values are the live `context_length` reported by OmniRoute.
 # compression_threshold is a uniform 30 (compress at 30% of context).
 
 models:
   # ── Claude Code subscription paths (Anthropic Messages API) ────────────────
+
+  - provider: anthropic
+    model: meridian/claude-fable-5
+    display_name: Claude Fable 5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: anthropic
+    model: meridian/claude-fable-5-1
+    display_name: Claude Fable 5.1 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "10"
+        output_price_per_million_tokens: "50"
+        cache_read_price_per_million_tokens: "1"
+        cache_write_price_per_million_tokens: "12.5"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: anthropic
+    model: meridian/claude-opus-5
+    display_name: Claude Opus 5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "5"
+        output_price_per_million_tokens: "25"
+        cache_read_price_per_million_tokens: "0.5"
+        cache_write_price_per_million_tokens: "6.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: anthropic
+    model: meridian/claude-sonnet-5
+    display_name: Claude Sonnet 5 — Meridian
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: max
+      cost:
+        input_price_per_million_tokens: "3"
+        output_price_per_million_tokens: "15"
+        cache_read_price_per_million_tokens: "0.3"
+        cache_write_price_per_million_tokens: "3.75"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
 
   - provider: anthropic
     model: cliproxy-claude/claude-fable-5
