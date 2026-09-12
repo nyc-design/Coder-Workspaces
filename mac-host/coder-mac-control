@@ -1,0 +1,202 @@
+#!/bin/zsh
+set -euo pipefail
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+UID_NUM="$(id -u)"
+GUI_DOMAIN="gui/$UID_NUM"
+XCODE_LABEL="com.nyc-design.xcodebuildmcp"
+XCODE_PLIST="$HOME/Library/LaunchAgents/$XCODE_LABEL.plist"
+RUNNERS_ROOT="$HOME/actions-runners"
+
+usage() {
+  cat <<'EOF'
+usage: coder-mac-control <xcode|github|all> <on|off|toggle|status>
+
+Examples:
+  coder-mac-control xcode toggle
+  coder-mac-control github toggle
+  coder-mac-control all off
+  coder-mac-control all status
+
+`github` controls every configured GitHub Actions runner under
+~/actions-runners. A toggle turns all runners off if any are currently on;
+otherwise it turns all runners on.
+EOF
+}
+
+loaded() {
+  launchctl print "$GUI_DOMAIN/$1" >/dev/null 2>&1
+}
+
+xcode_status_word() {
+  if loaded "$XCODE_LABEL"; then
+    printf 'on'
+  else
+    printf 'off'
+  fi
+}
+
+xcode_on() {
+  [[ -f "$XCODE_PLIST" ]] || {
+    echo "XcodeBuildMCP LaunchAgent not installed: $XCODE_PLIST" >&2
+    return 1
+  }
+  launchctl enable "$GUI_DOMAIN/$XCODE_LABEL" >/dev/null 2>&1 || true
+  if ! loaded "$XCODE_LABEL"; then
+    launchctl bootstrap "$GUI_DOMAIN" "$XCODE_PLIST"
+  fi
+  launchctl kickstart -k "$GUI_DOMAIN/$XCODE_LABEL"
+  echo "XcodeBuildMCP: ON"
+}
+
+xcode_off() {
+  launchctl bootout "$GUI_DOMAIN/$XCODE_LABEL" >/dev/null 2>&1 || true
+  launchctl disable "$GUI_DOMAIN/$XCODE_LABEL"
+  echo "XcodeBuildMCP: OFF"
+}
+
+runner_dirs() {
+  [[ -d "$RUNNERS_ROOT" ]] || return 0
+  for dir in "$RUNNERS_ROOT"/*; do
+    [[ -d "$dir" && -x "$dir/svc.sh" && -f "$dir/.runner" ]] || continue
+    printf '%s\n' "$dir"
+  done
+}
+
+runner_label() {
+  local dir="$1" service_file plist
+  service_file="$dir/.service"
+  [[ -f "$service_file" ]] || return 1
+  plist="$(cat "$service_file")"
+  [[ -n "$plist" ]] || return 1
+  basename "$plist" .plist
+}
+
+runner_is_on() {
+  local dir="$1" label
+  label="$(runner_label "$dir" 2>/dev/null || true)"
+  [[ -n "$label" ]] && loaded "$label"
+}
+
+runner_on() {
+  local dir="$1" label
+  label="$(runner_label "$dir" 2>/dev/null || true)"
+  [[ -n "$label" ]] || {
+    echo "Runner service is not installed in $dir; run ./svc.sh install first." >&2
+    return 1
+  }
+  launchctl enable "$GUI_DOMAIN/$label" >/dev/null 2>&1 || true
+  if runner_is_on "$dir"; then
+    echo "$(basename "$dir"): ON"
+    return 0
+  fi
+  (cd "$dir" && ./svc.sh start >/dev/null)
+  echo "$(basename "$dir"): ON"
+}
+
+runner_off() {
+  local dir="$1" label
+  label="$(runner_label "$dir" 2>/dev/null || true)"
+  [[ -n "$label" ]] || {
+    echo "Runner service is not installed in $dir; nothing to stop." >&2
+    return 0
+  }
+  (cd "$dir" && ./svc.sh stop >/dev/null 2>&1) || true
+  launchctl disable "$GUI_DOMAIN/$label"
+  echo "$(basename "$dir"): OFF"
+}
+
+collect_runners() {
+  RUNNER_DIRS=()
+  while IFS= read -r dir; do
+    [[ -n "$dir" ]] && RUNNER_DIRS+=("$dir")
+  done < <(runner_dirs)
+}
+
+github_any_on() {
+  local dir
+  collect_runners
+  for dir in "${RUNNER_DIRS[@]}"; do
+    if runner_is_on "$dir"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+github_on() {
+  local dir
+  collect_runners
+  (( ${#RUNNER_DIRS[@]} > 0 )) || {
+    echo "No GitHub Actions runners found under $RUNNERS_ROOT" >&2
+    return 1
+  }
+  for dir in "${RUNNER_DIRS[@]}"; do
+    runner_on "$dir"
+  done
+}
+
+github_off() {
+  local dir
+  collect_runners
+  (( ${#RUNNER_DIRS[@]} > 0 )) || {
+    echo "No GitHub Actions runners found under $RUNNERS_ROOT" >&2
+    return 1
+  }
+  for dir in "${RUNNER_DIRS[@]}"; do
+    runner_off "$dir"
+  done
+}
+
+github_status() {
+  local dir state
+  collect_runners
+  if (( ${#RUNNER_DIRS[@]} == 0 )); then
+    echo "GitHub Actions runners: none installed"
+    return 0
+  fi
+  for dir in "${RUNNER_DIRS[@]}"; do
+    state="OFF"
+    runner_is_on "$dir" && state="ON"
+    echo "$(basename "$dir"): $state"
+  done
+}
+
+control_xcode() {
+  case "$1" in
+    on) xcode_on ;;
+    off) xcode_off ;;
+    toggle)
+      if loaded "$XCODE_LABEL"; then xcode_off; else xcode_on; fi
+      ;;
+    status) echo "XcodeBuildMCP: $(xcode_status_word | tr '[:lower:]' '[:upper:]')" ;;
+    *) usage; return 2 ;;
+  esac
+}
+
+control_github() {
+  case "$1" in
+    on) github_on ;;
+    off) github_off ;;
+    toggle)
+      if github_any_on; then github_off; else github_on; fi
+      ;;
+    status) github_status ;;
+    *) usage; return 2 ;;
+  esac
+}
+
+[[ $# -eq 2 ]] || { usage; exit 2; }
+TARGET="$1"
+ACTION="$2"
+
+case "$TARGET" in
+  xcode) control_xcode "$ACTION" ;;
+  github) control_github "$ACTION" ;;
+  all)
+    control_xcode "$ACTION"
+    control_github "$ACTION"
+    ;;
+  *) usage; exit 2 ;;
+esac
