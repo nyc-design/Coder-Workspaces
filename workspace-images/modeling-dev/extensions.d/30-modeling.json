@@ -1,1 +1,4 @@
-[]
+{
+  "_comment": "Tier 2 extensions manifest (modeling-dev). Layers on top of base-dev's 10-base.json and python-shared's 30-python.json. No modeling-specific extensions yet; keep the object shape so 25-extensions-install.sh can index it.",
+  "shared": []
+}

@@ -9,8 +9,14 @@ if command -v gcloud >/dev/null 2>&1; then
     DEFAULT_GCP_PROJECT="coder-nt"
     log "no CODER_GCP_PROJECT specified; using default GCP project ${DEFAULT_GCP_PROJECT}"
 
-    # Set gcloud project
-    gcloud config set project "${DEFAULT_GCP_PROJECT}"
+    # `gcloud config set project` validates the project through the Resource
+    # Manager API, so it fails whenever the shared credentials in
+    # /home/coder/.config/gcloud need an interactive reauth. That must not abort
+    # the rest of this script (which installs gcp-refresh-secrets), and the
+    # env vars below are what tools actually read.
+    if ! gcloud config set project "${DEFAULT_GCP_PROJECT}" 2>/dev/null; then
+      log "WARNING: could not validate project ${DEFAULT_GCP_PROJECT} with gcloud (credentials likely need 'gcloud auth login'); continuing"
+    fi
 
     # Make it visible to tools (Gemini, SDKs, etc.)
     export GOOGLE_CLOUD_PROJECT="${DEFAULT_GCP_PROJECT}"
