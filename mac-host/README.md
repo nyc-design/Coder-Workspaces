@@ -8,6 +8,55 @@ The three execution paths are intentionally independent:
 2. **Coder external workspace** — attach the Mac itself as a native `darwin/arm64` workspace when an entire Coder Agent session should execute on macOS.
 3. **GitHub Actions self-hosted runner** — CI build/test execution from ordinary Linux `swift-dev` workspaces.
 
+## One-click service controls
+
+Both Mac background execution paths are deliberately toggleable. Installing either XcodeBuildMCP or a GitHub runner installs the shared controller at:
+
+```text
+~/.local/bin/coder-mac-control
+```
+
+Commands:
+
+```bash
+coder-mac-control xcode on
+coder-mac-control xcode off
+coder-mac-control xcode toggle
+coder-mac-control xcode status
+
+coder-mac-control github on
+coder-mac-control github off
+coder-mac-control github toggle
+coder-mac-control github status
+
+coder-mac-control all on
+coder-mac-control all off
+coder-mac-control all status
+```
+
+`github` controls all configured runners under `~/actions-runners`. `github toggle` turns them all off when any runner is currently on; when none are running it turns them all on.
+
+The off state is persistent across logout/reboot. The controller uses launchd's enable/disable override rather than merely killing a process, so an intentionally disabled service does not come back at the next login.
+
+### Dock buttons
+
+After installing the services, generate two native macOS applet buttons:
+
+```bash
+bash mac-host/install-toggle-apps.sh
+```
+
+This creates:
+
+```text
+~/Applications/Coder Mac Controls/Toggle XcodeBuildMCP.app
+~/Applications/Coder Mac Controls/Toggle GitHub Runners.app
+```
+
+Drag them into the Dock. Each click toggles its service(s) and posts a macOS notification showing the resulting ON/OFF state. No third-party menu-bar utility is required.
+
+If preferred, the same `coder-mac-control ... toggle` commands can be placed in macOS Shortcuts and exposed from the Shortcuts Menu Bar or Control Center collections.
+
 ## XcodeBuildMCP service
 
 `xcodebuildmcp/install.sh` installs Sentry's XcodeBuildMCP with Homebrew, installs `mcp-proxy`, generates an API key, and creates a per-user LaunchAgent.
