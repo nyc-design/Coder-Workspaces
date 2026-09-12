@@ -111,7 +111,7 @@ jobs:
           fi
 
           set +e
-          xcodebuild "$XCODE_ACTION" "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+          xcodebuild "${args[@]}" "$XCODE_ACTION" 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
           status=${PIPESTATUS[0]}
           set -e
           exit "$status"
