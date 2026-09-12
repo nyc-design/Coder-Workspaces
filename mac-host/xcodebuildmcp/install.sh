@@ -4,6 +4,8 @@ set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONTROL_SOURCE="$SCRIPT_DIR/../coder-mac-control"
+CONTROL_BIN="$HOME/.local/bin/coder-mac-control"
 INSTALL_ROOT="$HOME/.local/share/coder-mac/xcodebuildmcp"
 CONFIG_DIR="$HOME/.config/coder-mac"
 CONFIG_FILE="$CONFIG_DIR/xcodebuildmcp.env"
@@ -34,9 +36,11 @@ if ! command -v mcp-proxy >/dev/null; then
   npm install -g mcp-proxy@latest
 fi
 
-mkdir -p "$INSTALL_ROOT" "$CONFIG_DIR" "$LOG_DIR" "$HOME/Library/LaunchAgents"
+mkdir -p "$INSTALL_ROOT" "$CONFIG_DIR" "$LOG_DIR" "$HOME/Library/LaunchAgents" "$HOME/.local/bin"
 cp "$SCRIPT_DIR/run.sh" "$INSTALL_ROOT/run.sh"
 chmod 700 "$INSTALL_ROOT/run.sh"
+cp "$CONTROL_SOURCE" "$CONTROL_BIN"
+chmod 700 "$CONTROL_BIN"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
   API_KEY="$(openssl rand -hex 32)"
@@ -77,6 +81,9 @@ cat > "$PLIST" <<EOF
 EOF
 chmod 600 "$PLIST"
 
+# Reinstalling should explicitly restore the service to ON even if a previous
+# toggle persisted it as disabled in launchd's override database.
+launchctl enable "gui/$(id -u)/com.nyc-design.xcodebuildmcp" >/dev/null 2>&1 || true
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl kickstart -k "gui/$(id -u)/com.nyc-design.xcodebuildmcp"
@@ -92,7 +99,13 @@ Coder MCP auth header:
 
 The proxy itself uses API-key authentication. Put the endpoint behind an encrypted/private transport (for example Tailscale Serve) before registering it with a remote Coder deployment.
 
-Useful commands:
+Persistent service controls:
+  $CONTROL_BIN xcode on
+  $CONTROL_BIN xcode off
+  $CONTROL_BIN xcode toggle
+  $CONTROL_BIN xcode status
+
+Useful diagnostics:
   launchctl print gui/$(id -u)/com.nyc-design.xcodebuildmcp
   tail -f "$LOG_DIR/xcodebuildmcp.stderr.log"
 EOF
