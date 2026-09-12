@@ -32,6 +32,8 @@ service_account: coder-gha-secrets@coder-nt.iam.gserviceaccount.com
 | `CONTEXT7_API_KEY` | `update-coder-agents-config.yaml` |
 | `GH_PAT_FOR_MCP` | `update-coder-agents-config.yaml` (mapped to env `GITHUB_PAT` in YAML substitution) |
 | `AGENTMEMORY_SECRET` | `update-coder-agents-config.yaml` (substituted into `mcp-servers.yaml`); host `.env` (gates agentmemory REST + MCP via Bearer auth) |
+| `HEADROOM_MCP_SECRET` | `update-coder-agents-config.yaml` (substituted into `mcp-servers.yaml`); host `.env` (gates Headroom retrieval MCP via Bearer auth) |
+| `XCODEBUILDMCP_API_KEY` | `update-coder-agents-config.yaml` (substituted into `mcp-servers.yaml` as the `X-API-Key` header). This is MCPProxy's own `api_key` from `~/.mcpproxy/mcp_config.json` on the MacBook Pro — rotate by regenerating it there (`mcpproxy status --show-key`) and adding a new secret version. |
 | `GCP_PROJECT` | `coder-workspace-launch.yaml` |
 
 Plus the workspace-side secrets unchanged: `GH_PAT`, `DOCKER_CONFIG`,
