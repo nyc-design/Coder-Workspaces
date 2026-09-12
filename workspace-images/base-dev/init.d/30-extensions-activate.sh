@@ -43,8 +43,16 @@ CURSOR_SERVER_EXTENSIONS_DIR="${CURSOR_SERVER_EXTENSIONS_DIR:-/home/coder/.curso
 LEASES_DIR="${EXTENSIONS_LEASES_DIR:-$SHARED_EXTENSIONS_DIR/_leases}"
 LEASE_REFRESH_INTERVAL="${EXTENSIONS_LEASE_REFRESH_INTERVAL:-6h}"
 LEASE_REFRESH_PIDFILE="${EXTENSIONS_LEASE_REFRESH_PIDFILE:-/tmp/extensions-lease-refresh.pid}"
+# Written only after a fully successful run. 31-extensions-prune.sh refuses to
+# delete anything unless it finds this marker, so a crashed or partial activate
+# can never license a prune against a cache whose leases were not refreshed.
+ACTIVATE_OK_MARKER="${EXTENSIONS_ACTIVATE_OK_MARKER:-/tmp/extensions-activate.ok}"
 
 log() { printf '[extensions-activate] %s\n' "$*"; }
+
+# The marker is removed up front: if anything below fails, it stays absent and
+# the pruner stands down.
+rm -f "$ACTIVATE_OK_MARKER"
 
 # ---------------------------------------------------------------------------
 # Name parsing. Versioned dirs look like `<publisher>.<name>-<ver>[-<arch>]`,
@@ -69,8 +77,8 @@ ext_version() {
 # Manifest collection: ids (lowercased) and pins.
 # ---------------------------------------------------------------------------
 
-declare -A manifest_set
-declare -A manifest_pin
+declare -A manifest_set=()
+declare -A manifest_pin=()
 
 add_manifest_id() {
   local spec="$1" id ver
@@ -414,3 +422,6 @@ lease_vscode_web_real_dirs
 LEASE_PATH=""
 write_lease
 start_lease_refresher "$LEASE_PATH"
+
+printf '%s\n' "$LEASE_PATH" > "$ACTIVATE_OK_MARKER"
+log "activate completed; prune is cleared to run"
