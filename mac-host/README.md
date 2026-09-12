@@ -53,8 +53,9 @@ The reusable workflow at `.github/workflows/macos-xcode-ci.yaml` can then be cal
 name: Apple CI
 
 on:
-  pull_request:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   visionos:
@@ -69,3 +70,7 @@ jobs:
 For tests, set `action: test` and use a concrete simulator destination supported by the installed Xcode, for example a specific Apple Vision Pro simulator name/OS combination.
 
 The reusable workflow uploads `xcodebuild.log` and `XcodeResult.xcresult` as seven-day artifacts even when the build fails.
+
+### Self-hosted runner security
+
+A self-hosted runner executes repository workflow code directly on the Mac. Do not route untrusted fork pull requests to it. For public repositories, use trusted-branch/manual dispatch policies (or a separate disposable runner) instead of automatically running arbitrary PR code on your personal Mac.
