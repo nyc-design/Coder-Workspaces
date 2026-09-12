@@ -288,6 +288,30 @@ See [MODELING_WORKSPACE.md](MODELING_WORKSPACE.md) for validation limits and int
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)
 - Eliminates duplication: both images COPY and RUN the same script
 
+### Shared extension cache lifecycle
+
+All workspaces on a VM share one extension cache: `~/.vscode-extensions/shared`
+and `~/.vscode-extensions/vscode-web` are host bind mounts
+(`workspace-modules/workspace-runtime/main.tf`). Each editor's own extensions
+dir (`~/.vscode-extensions/code-server`, `~/.vscode-server/extensions`,
+`~/.cursor-server/extensions`) is per-workspace and contains only symlinks into
+the shared cache. Three init scripts manage the lifecycle:
+
+| Script | Role |
+|---|---|
+| `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. |
+| `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir; write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
+| `31-extensions-prune.sh` | Reap versions nobody needs. A versioned dir is deleted only if it is not the newest for its id, not pinned by an image manifest, and not listed in any fresh lease (any workspace's). Leases untouched for `EXTENSIONS_LEASE_STALE_DAYS` (45) are treated as abandoned and removed. |
+
+Leases live *inside* the host-bound cache, so every workspace's pruner sees
+every other workspace's lease — a workspace on an older version is protected
+by its own lease regardless of what image or manifest the pruning workspace
+has. There is no time-based aging of extension versions themselves. A
+workspace whose lease went stale (stopped for >45 days) simply re-downloads
+what it needs on its next start. Knobs: `EXTENSIONS_PRUNE=0` disables the
+pruner, `EXTENSIONS_PRUNE_DRY_RUN=1` logs without deleting. Tests:
+`workspace-images/base-dev/tests/test-extensions-cache.sh`.
+
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
 - Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
@@ -421,7 +445,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 
 - **Update base tools**: Modify `base-dev/Dockerfile` or specific `init.d/*.sh` script, push to trigger build
 - **Update Python packages**: Edit `workspace-images/python-shared/scripts/install-python.sh` (rebuilds both python-dev and fullstack-dev)
-- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track latest, queried from the registry on each workspace start) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces; older-than-target versions are TTL-pruned (default 30 days) per id. `30-extensions-activate.sh` then symlinks the active manifest set into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that.
+- **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track latest, queried from the registry on each workspace start) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces. `30-extensions-activate.sh` then resolves exactly one active version per manifest id (the pin if present, else the highest version number) and symlinks only that into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested and never has multiple versions of one extension to choose from. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that. See "Shared extension cache lifecycle" (under Key Architecture Concepts) for how old versions are reaped.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
 - **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output
