@@ -16,7 +16,23 @@ The three execution paths are intentionally independent:
 bash mac-host/xcodebuildmcp/install.sh
 ```
 
-The local endpoint is `http://127.0.0.1:8765/mcp` conceptually, although `mcp-proxy` may listen on additional local interfaces. Do not register a plain HTTP LAN endpoint with remote Coder. Put it behind an encrypted/private transport (for example Tailscale Serve) and retain the `X-API-Key` header.
+The local endpoint is `http://127.0.0.1:8765/mcp` conceptually, although `mcp-proxy` may listen on additional local interfaces. Do not register a plain HTTP LAN endpoint with remote Coder. Put it behind an encrypted/private transport and retain the `X-API-Key` header.
+
+If the Coder deployment is also on your tailnet, prefer Tailscale Serve:
+
+```bash
+tailscale serve --bg 8765
+tailscale serve status
+```
+
+The resulting HTTPS node URL is tailnet-only; append `/mcp` when registering the MCP server. If Coder cannot join the tailnet, Tailscale Funnel can expose the same endpoint over public HTTPS while `mcp-proxy` still enforces the API key:
+
+```bash
+tailscale funnel --bg 8765
+tailscale funnel status
+```
+
+Serve is preferred because it does not make the endpoint internet-accessible.
 
 The generated secret is stored at:
 
