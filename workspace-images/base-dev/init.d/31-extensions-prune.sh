@@ -35,11 +35,22 @@ LEASES_DIR="${EXTENSIONS_LEASES_DIR:-$SHARED_EXTENSIONS_DIR/_leases}"
 LEASE_STALE_DAYS="${EXTENSIONS_LEASE_STALE_DAYS:-45}"
 PRUNE_ENABLED="${EXTENSIONS_PRUNE:-1}"
 DRY_RUN="${EXTENSIONS_PRUNE_DRY_RUN:-0}"
+ACTIVATE_OK_MARKER="${EXTENSIONS_ACTIVATE_OK_MARKER:-/tmp/extensions-activate.ok}"
 
 log() { printf '[extensions-prune] %s\n' "$*"; }
 
 if [ "$PRUNE_ENABLED" != "1" ]; then
   log "disabled (EXTENSIONS_PRUNE=$PRUNE_ENABLED)"
+  exit 0
+fi
+
+# Interlock: 30-extensions-activate.sh writes this marker only on a fully
+# successful run. Without it we cannot trust that this workspace's lease -- or
+# any lease this boot -- was refreshed, and deleting on that basis could pull a
+# version out from under a running editor. Stand down instead.
+if [ ! -f "$ACTIVATE_OK_MARKER" ]; then
+  log "SKIP: $ACTIVATE_OK_MARKER absent (30-extensions-activate.sh did not complete)"
+  log "SKIP: refusing to prune without a fresh lease; fix activate and restart"
   exit 0
 fi
 
@@ -72,7 +83,10 @@ if [ -d "$MANIFEST_DIR" ] && command -v jq >/dev/null 2>&1; then
 fi
 
 read_leases() {
-  [ -d "$LEASES_DIR" ] || { log "no leases dir at $LEASES_DIR; nothing is protected beyond newest+pinned"; return 0; }
+  if [ ! -d "$LEASES_DIR" ]; then
+    log "no leases dir at $LEASES_DIR; nothing is protected beyond newest+pinned"
+    return 0
+  fi
   local cutoff now fresh=0 stale=0
   now="$(date +%s)"
   cutoff=$((now - LEASE_STALE_DAYS * 86400))
