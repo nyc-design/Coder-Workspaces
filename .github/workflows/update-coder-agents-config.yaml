@@ -52,6 +52,7 @@ jobs:
             GH_PAT_FOR_MCP:coder-nt/GH_PAT_FOR_MCP
             AGENTMEMORY_SECRET:coder-nt/AGENTMEMORY_SECRET
             HEADROOM_MCP_SECRET:coder-nt/HEADROOM_MCP_SECRET
+            XCODEBUILDMCP_API_KEY:coder-nt/XCODEBUILDMCP_API_KEY
 
       - name: Sync providers / models / MCP servers / system prompt / template-allowlist
         run: ./coder-agents-config/sync.sh coder-agents-config

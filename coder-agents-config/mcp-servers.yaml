@@ -94,3 +94,26 @@ mcp_servers:
       Authorization: Bearer ${HEADROOM_MCP_SECRET}
     enabled: true
     availability: force_on
+
+  # MCPProxy (smart-mcp-proxy/mcpproxy-go) fronting XcodeBuildMCP on the
+  # MacBook Pro, reachable only over the Tailscale tailnet. Notes:
+  #   - `X-API-Key` is mcpproxy's own auth header (not XcodeBuildMCP's); the
+  #     value is mcpproxy's `api_key` from ~/.mcpproxy/mcp_config.json.
+  #   - `/mcp/all` bypasses mcpproxy's retrieve_tools search and exposes every
+  #     upstream tool directly, so the full XcodeBuildMCP surface lands in the
+  #     chat. That is why this is default_off rather than default_on: it is a
+  #     large tool set, it is only relevant to Apple-platform work, and the Mac
+  #     is not always awake. Toggle it on per chat when doing Xcode work.
+  #   - Availability depends on the laptop being online and joined to the
+  #     tailnet; expect connection errors when it is asleep.
+  - slug: xcodebuildmcp
+    display_name: XcodeBuildMCP
+    description: 'Native Xcode tooling on the MacBook Pro over Tailscale: build, test, run, and debug iOS/macOS targets, drive simulators and devices, inspect schemes and build settings. Requires the Mac to be awake and on the tailnet.'
+    icon_url: /icon/code.svg
+    transport: streamable_http
+    url: https://neils-macbook-pro.tail8f5bea.ts.net/mcp/all
+    auth_type: custom_headers
+    custom_headers:
+      X-API-Key: ${XCODEBUILDMCP_API_KEY}
+    enabled: true
+    availability: default_off
