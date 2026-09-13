@@ -93,7 +93,10 @@ mcp_servers:
       x-api-key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     availability: default_off
-    allow_in_plan_mode: true
+    # The only server withheld from plan mode. Its tools mutate gateway state
+    # (providers, API keys, policies, rate limits, routing) rather than just
+    # reading it, and planning has no reason to reach for them.
+    allow_in_plan_mode: false
     forward_coder_headers: false
 
   - slug: agentmemory
