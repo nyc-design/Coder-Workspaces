@@ -129,23 +129,29 @@ mcp_servers:
     allow_in_plan_mode: true
     forward_coder_headers: false
 
-  # MCPProxy (smart-mcp-proxy/mcpproxy-go) fronting XcodeBuildMCP on the
-  # MacBook Pro, reachable only over the Tailscale tailnet. Notes:
-  #   - `X-API-Key` is mcpproxy's own auth header (not XcodeBuildMCP's); the
-  #     value is mcpproxy's `api_key` from ~/.mcpproxy/mcp_config.json.
-  #   - `/mcp/all` bypasses mcpproxy's retrieve_tools search and exposes every
-  #     upstream tool directly, so the full XcodeBuildMCP surface lands in the
-  #     chat. That is why this is default_off rather than default_on: it is a
-  #     large tool set, it is only relevant to Apple-platform work, and the Mac
-  #     is not always awake. Toggle it on per chat when doing Xcode work.
+  # MCPProxy (smart-mcp-proxy/mcpproxy-go) on the MacBook Pro, reachable only
+  # over the Tailscale tailnet. It fronts both XcodeBuildMCP (structured Xcode,
+  # simulator/device/debug tooling) and Desktop Commander (general Mac shell,
+  # filesystem and process control). Notes:
+  #   - `X-API-Key` is mcpproxy's own auth header; the value is mcpproxy's
+  #     `api_key` from ~/.mcpproxy/mcp_config.json.
+  #   - Use `/mcp`, not `/mcp/all`. MCPProxy is configured for `retrieve_tools`
+  #     routing, so chats receive a small stable discovery/call surface instead
+  #     of every upstream schema. Agents should use `retrieve_tools`, then the
+  #     returned exact `name` + `call_with`; use `describe_tool` when a returned
+  #     signature is lossy (`~`) or otherwise unclear. The proxy's own tool
+  #     descriptions document this flow, so no global system-prompt rule is
+  #     needed just to repeat it.
   #   - Availability depends on the laptop being online and joined to the
   #     tailnet; expect connection errors when it is asleep.
   - slug: xcodebuildmcp
-    display_name: XcodeBuildMCP
-    description: 'Native Xcode tooling on the MacBook Pro over Tailscale: build, test, run, and debug iOS/macOS targets, drive simulators and devices, inspect schemes and build settings. Requires the Mac to be awake and on the tailnet.'
+    # Keep the slug stable so sync updates the existing Coder MCP config rather
+    # than creating a second server. Display name reflects the broader surface.
+    display_name: Mac Development
+    description: 'MacBook Pro development tools over Tailscale via MCPProxy: Desktop Commander provides terminal, git, filesystem and process control; XcodeBuildMCP provides structured Xcode builds/tests, simulators, physical devices, debugging and UI automation. Discover tools with retrieve_tools and invoke the exact returned name/call_with. Requires the Mac to be awake and on the tailnet.'
     icon_url: /icon/code.svg
     transport: streamable_http
-    url: https://neils-macbook-pro.tail8f5bea.ts.net/mcp/all
+    url: https://neils-macbook-pro.tail8f5bea.ts.net/mcp
     auth_type: custom_headers
     custom_headers:
       X-API-Key: ${XCODEBUILDMCP_API_KEY}

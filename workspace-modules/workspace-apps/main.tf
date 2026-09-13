@@ -81,3 +81,17 @@ resource "coder_app" "codex_usage" {
   external     = true
   order        = 2
 }
+
+# The workspace's repository on github.com. Only rendered when the template
+# supplies a URL, which it does for existing-repo workspaces; new projects are
+# scaffolded from Project-Scaffolds and have no repo of their own to link to.
+resource "coder_app" "github_repo" {
+  count        = var.enable_apps && var.enable_repo_link && var.repo_html_url != "" ? 1 : 0
+  agent_id     = var.agent_id
+  slug         = "github-repo"
+  display_name = "GitHub Repository"
+  icon         = "/icon/github.svg"
+  url          = var.repo_html_url
+  external     = true
+  order        = 3
+}

@@ -124,9 +124,17 @@ install_cli_skills() {
       fi
       printf "[agent-skills] installing CLI skill %s\n" "$pkg"
       # --global → ~/.agents/skills, --skill '*' → take everything the package
-      # ships, --yes → no prompts. Step 3 normalizes provider symlinks, so we
-      # don't care what (if anything) the CLI does to ~/.claude/skills etc.
-      if ! skills add "$pkg" --global --skill '*' --yes; then
+      # ships, --yes → no prompts.
+      #
+      # --agent universal is load-bearing. Without it the CLI fans the install
+      # out to every agent target it knows (~70), and `promptscript` rejects
+      # global installs outright — one "✗ <skill> → PromptScript: PromptScript
+      # does not support global skill installation" line per skill, which reads
+      # like a failure but isn't (`skills add` still exits 0 and every other
+      # target succeeds). `universal` resolves to ~/.agents/skills, which is
+      # exactly our canonical, and step 3 below publishes the per-skill
+      # provider symlinks itself — so we never wanted the fan-out.
+      if ! skills add "$pkg" --global --skill '*' --agent universal --yes; then
         printf "[agent-skills] WARNING: skills add %s failed (continuing)\n" "$pkg"
       fi
     done < <(jq -r 'if type=="array" then .[] else empty end' "$list" 2>/dev/null)

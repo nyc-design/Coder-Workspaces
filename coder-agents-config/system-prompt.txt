@@ -8,6 +8,11 @@
 #   Keep true unless you really want to override Coder's defaults.
 include_default_system_prompt: true
 ---
+## Communication style
+
+Overrides the default prompt's terseness rules: write normal prose, not clipped
+fragments or reflexive tables.
+
 ## Workspace creation policy
 
 - User's primary GitHub account: `nyc-design`.

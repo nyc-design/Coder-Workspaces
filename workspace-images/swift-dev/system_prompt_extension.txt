@@ -1,81 +1,54 @@
--- Swift (Linux toolchain only) --
+-- Swift / Apple-platform development --
 
-READ THIS BEFORE PLANNING ANY SWIFT WORK.
+This workspace itself is Linux with the open-source swift.org toolchain. Locally
+there is no Xcode, Apple SDK, Simulator, device bridge, or code signing. SwiftPM,
+Foundation, sourcekit-lsp, swift-format and SwiftLint are available, so build and
+test portable Swift code here normally. Apple-framework targets (SwiftUI,
+RealityKit, UIKit, AppKit, Metal, visionOS, etc.) cannot be compiled locally.
 
-This workspace runs Linux with the open-source swift.org toolchain. There is
-NO macOS, NO Xcode, NO Apple SDK, NO iOS/tvOS/watchOS/visionOS simulator, and
-no code signing. That is a hard platform limit, not a missing install.
+Do NOT turn that local limitation into "no Apple access". Apple work has two
+remote execution paths when configured:
 
-You CANNOT build, run, preview, screenshot or test any of the following here:
-- SwiftUI, UIKit, AppKit
-- RealityKit, ARKit, SceneKit, SpriteKit, Metal
-- visionOS / RealityView / immersive spaces
-- CoreData, CloudKit, AVFoundation, MapKit, HealthKit and the rest of the
-  closed-source Apple frameworks
-- `.xcodeproj` / `.xcworkspace` builds, `xcodebuild`, `xcrun`, `simctl`
-Attempting to import these modules will fail at compile time. Do not add them
-to any target you intend to build in this workspace.
+1. MAC DEVELOPMENT MCP — Mac shell + Xcode
+   When the Mac Development MCP is enabled and the Mac is online, use it instead
+   of asking the user to prepare the Mac manually. It fronts:
+   - Desktop Commander for terminal, git, filesystem and process work on the Mac
+     (clone/pull/checkout, submodules, xcodegen/Tuist, brew, scripts, inspection).
+   - XcodeBuildMCP for structured Xcode builds/tests, simulators, physical
+     devices, app install/launch, debugging and UI automation.
 
-What IS available: the Swift compiler and stdlib, SwiftPM, swift-testing and
-XCTest, Foundation (swift-corelibs-foundation), Dispatch, sourcekit-lsp,
-swift-format, SwiftLint, and the cross-platform server/core ecosystem
-(swift-argument-parser, swift-collections, swift-algorithms, swift-log,
-swift-nio, Vapor/Hummingbird, etc.).
+   MCPProxy intentionally exposes a small retrieval surface rather than every
+   upstream schema. Use `retrieve_tools` to find what you need, then invoke the
+   exact returned `name` using the returned `call_with` tool. If the signature is
+   lossy (`~`) or unclear, use `describe_tool` first. Do not infer that a Mac
+   capability is unavailable merely because its upstream tool is not directly
+   present in the current callable list.
 
-ARCHITECTURE RULE for any Apple app project. Split the codebase in two:
-1. A cross-platform SwiftPM core — models, business logic, parsing, state
-   machines, networking, persistence abstractions, algorithms, codegen. Pure
-   Swift + Foundation only, no Apple-framework imports. This layer is fully
-   buildable and testable HERE, and is where the great majority of the work
-   and all of the tests should live.
-2. A thin Apple-only app layer — SwiftUI/UIKit/RealityKit views, entitlements,
-   Info.plist, asset catalogs, the Xcode project. Author it here as source
-   text, but THE USER BUILDS AND RUNS IT ON THEIR MAC. Keep it as thin as
-   possible: view code that delegates to the core package.
-Guard any unavoidable platform-specific code with `#if canImport(UIKit)` /
-`#if os(macOS)` / `#if canImport(RealityKit)` so the package still compiles on
-Linux. Declare `platforms:` in Package.swift for the Apple targets only.
+   For Apple builds, prepare the checkout on the Mac first (including submodules
+   and generated Xcode projects), then use XcodeBuildMCP for the actual Xcode
+   operation. A successful XcodeBuildMCP build/test is real Apple-platform
+   verification even though this Linux workspace did not perform it locally.
 
-XCODE PROJECT CONVENTION: never hand-edit or generate a `.xcodeproj` /
-`.xcworkspace` here. Check in a declarative XcodeGen `project.yml` (or a Tuist
-manifest) that references the SwiftPM core package, add `*.xcodeproj` to
-`.gitignore`, and let the Mac side run `xcodegen generate` then build. A
-pbxproj is unmergeable binary-ish state that Linux can neither validate nor
-repair; the manifest is plain YAML you can review and diff.
+2. XCODE CLOUD / APP STORE CONNECT — remote CI and release execution
+   `asc` is installed and talks to App Store Connect from Linux. Use it to
+   trigger/inspect Xcode Cloud builds and to drive TestFlight/App Store Connect
+   workflows. Typical commands include:
+     `asc xcode-cloud run --workflow-id <id> --wait`
+     `asc xcode-cloud status --run-id <id> --wait`
+     `asc xcode-cloud doctor --run-id <id>`
+   Use `asc --help` / subcommand help for the rest rather than guessing syntax.
+   Credentials come from `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY`.
+   If they are unset, say so; do not run interactive `asc auth login`.
 
-JAVASCRIPT ENGINES (Pokémon Showdown-style simulators, rules engines, etc.):
-if the project embeds a JavaScript/TypeScript engine, that engine and its
-contract/protocol tests run under Node here (`node`, `pnpm`, vitest/jest are
-in the image). The Swift<->JS bridge is Apple-layer: `JavaScriptCore` is an
-Apple framework and does not exist on Linux, so never `import JavaScriptCore`
-in a target you build here, and do not attempt a Swift port of a JS engine as
-a workaround. Define the message contract (JSON schema / protocol strings)
-once, test the Swift codec against fixtures generated by the Node side, and
-hand the JSCore glue to the Mac. Engine-specific guidance belongs in the
-project's own `.agents/skills/`, not in this image.
+VALIDATION RULES:
+- Validate portable code locally with `swift build`, `swift test`, SwiftLint and
+  swift-format as appropriate.
+- For Apple targets, use the Mac Development MCP for the fast development loop;
+  use Xcode Cloud for clean CI/archive/TestFlight/release validation.
+- Attribute validation to the environment that actually ran it (Linux, Mac/Xcode,
+  or Xcode Cloud) rather than claiming everything ran locally.
+- Only fall back to "the user must do this on a Mac" when the Mac Development MCP
+  and Xcode Cloud cannot perform the required step.
 
-APPLE API REFERENCE: you cannot compile against SwiftUI, RealityKit or
-visionOS here, so do not write Apple-layer code from memory. Before authoring
-or reviewing it, pull current docs with Context7 (`ctx7 library swiftui`,
-`ctx7 docs <id> "<question>"`; likewise `realitykit`, `visionos`,
-`swift-testing`), or the Context7 MCP if it is wired into your agent. Cite
-the API you looked up in the handoff so the user can spot drift when it
-compiles on the Mac.
-
-VALIDATION DISCIPLINE:
-- Validate everything you actually can: `swift build`, `swift test`,
-  `swift build -c release`, `swiftlint lint`, `swift-format lint`, and any
-  code generation — on the platform-independent modules.
-- Run `swift test` after every meaningful change to the core. A change is not
-  done until the core package builds and its tests pass.
-- NEVER claim you built, ran, previewed, simulated, or validated anything on a
-  device, a simulator, or in Xcode. You cannot. Say plainly which parts you
-  verified on Linux and which parts require the user to build on their Mac,
-  and list exactly what they should check there.
-- When you hand off Apple-layer code, state that it is unbuilt and unverified.
-
-Conventions:
-- Package manager: SwiftPM. `swift build` / `swift test` / `swift run`.
-- Lint: `swiftlint lint` (add a project `.swiftlint.yml` when rules need tuning).
-- Format: `swift-format format -i -r Sources Tests` — ships with the toolchain.
-- Editor LSP is sourcekit-lsp; it indexes SwiftPM packages, not Xcode projects.
+Conventions: SwiftPM for portable packages; sourcekit-lsp indexes SwiftPM code;
+`swiftlint lint` and `swift-format` are installed.

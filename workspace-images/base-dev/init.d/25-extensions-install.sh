@@ -59,10 +59,14 @@ has_version() {
 }
 
 # Resolve latest version from OpenVSX for `<publisher>.<name>`.
+# stderr is dropped: extensions we publish ourselves (e.g. nyc-design.*) are not
+# on OpenVSX, so curl prints a raw `curl: (22) ... 404` that looks like a
+# failure. The caller already logs a clear "could not resolve latest version"
+# line and falls back to installing unpinned.
 latest_openvsx() {
   local id="$1" pub name
   pub="${id%%.*}"; name="${id#*.}"
-  curl -sSfL --max-time 10 "https://open-vsx.org/api/${pub}/${name}" \
+  curl -sSfL --max-time 10 "https://open-vsx.org/api/${pub}/${name}" 2>/dev/null \
     | jq -r '.version // empty' 2>/dev/null
 }
 
@@ -74,7 +78,7 @@ marketplace_versions() {
     -H 'Accept: application/json;api-version=3.0-preview.1' \
     -H 'Content-Type: application/json' \
     -X POST 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' \
-    -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"${id}\"}]}],\"flags\":914}"
+    -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"${id}\"}]}],\"flags\":914}" 2>/dev/null
 }
 
 latest_marketplace() {

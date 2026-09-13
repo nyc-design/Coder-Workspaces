@@ -1,6 +1,8 @@
 {
   "_comment": "Tier 1 extension manifest (global). Owned by base-dev; applied to every workspace. Each child image (python-dev, vite-dev, fullstack-dev) drops its own Tier 2 manifest into the same dir; tier order is by filename sort. Settings live in a sibling settings.d/ tree.",
 
+  "_comment_copilot": "GitHub.copilot is deliberately absent. It is an extension PACK (ExtensionPack = GitHub.copilot-chat,GitHub.copilot), and vscode-web already ships GitHub.copilot-chat as a BUILT-IN at 0.65.0 (see /opt/vscode-web/extensions/copilot/package.json, displayName 'GitHub Copilot', bundling @github/copilot). Installing the pack pulls Marketplace stable copilot-chat 0.48.1, which the installer refuses as a downgrade of the built-in, failing the whole install. The built-in already provides Copilot in vscode-web, so the manifest entry was redundant as well as broken.",
+
   "shared": [
     "GitHub.vscode-github-actions",
     "GitHub.vscode-pull-request-github",
@@ -23,7 +25,6 @@
     "nyc-design.neils-themes"
   ],
   "vscode_web_only": [
-    "GitHub.copilot",
     "Google.geminicodeassist"
   ]
 }

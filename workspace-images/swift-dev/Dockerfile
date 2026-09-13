@@ -45,6 +45,18 @@ RUN chmod +x /tmp/install-swiftlint.sh \
  && SWIFTLINT_VERSION=0.65.1 /tmp/install-swiftlint.sh \
  && rm -f /tmp/install-swiftlint.sh
 
+# `asc` — third-party App Store Connect CLI (MIT). The only way this Linux
+# image can reach Xcode Cloud, TestFlight and App Store Connect; Apple ships no
+# Linux CLI of its own. Pinned + SHA-256 verified rather than curl|bash.
+COPY workspace-images/swift-dev/scripts/install-asc.sh /tmp/install-asc.sh
+RUN chmod +x /tmp/install-asc.sh \
+ && ASC_VERSION=5.3.0 /tmp/install-asc.sh \
+ && rm -f /tmp/install-asc.sh
+
+# asc phones home with pseudonymous command-usage telemetry by default. Off for
+# every workspace; a user who wants it can `asc telemetry enable`.
+ENV ASC_TELEMETRY_DISABLED=1
+
 # Build-time smoke gate: compile + test a throwaway SwiftPM package and assert
 # swiftlint / swift-format actually run. Fails the build if the toolchain is
 # broken. Entirely offline (no package dependencies), so it stays installed as

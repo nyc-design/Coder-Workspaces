@@ -67,7 +67,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 │   └── fullstack-dev (uses python-shared/scripts/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 ├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
-├── swift-dev (swift.org Linux toolchain + SwiftLint; no Apple SDKs)
+├── swift-dev (swift.org Linux toolchain + SwiftLint + asc; no Apple SDKs)
 └── playwright-dev
 ```
 
@@ -314,6 +314,36 @@ workspace whose lease went stale (stopped for >45 days) simply re-downloads
 what it needs on its next start. Knobs: `EXTENSIONS_PRUNE=0` disables the
 pruner, `EXTENSIONS_PRUNE_DRY_RUN=1` logs without deleting. Tests:
 `workspace-images/base-dev/tests/test-extensions-cache.sh`.
+
+### Xcode Cloud from Linux (swift-dev)
+
+Apple ships no Xcode Cloud CLI for Linux, only the App Store Connect REST API.
+`swift-dev` bakes in [`asc`](https://github.com/rorkai/App-Store-Connect-CLI),
+the third-party App Store Connect CLI, pinned and SHA-256 verified by
+`workspace-images/swift-dev/scripts/install-asc.sh` (upstream's `curl
+asccli.sh/install | bash` resolves "latest" at build time, so it isn't
+reproducible). That gives a Linux workspace `asc xcode-cloud run/status/doctor`
+plus products, workflows, build-runs, actions and artifacts — it can trigger and
+monitor real Xcode Cloud builds without touching a Mac — as well as the
+TestFlight and App Store release commands. Telemetry is disabled image-wide via
+`ASC_TELEMETRY_DISABLED=1`.
+
+Credentials are **not** in the image, and they do **not** come through
+`04-gcp.sh` — that path is for a repo's own runtime secrets out of whatever GCP
+project the workspace was created against. `asc` credentials are dev-environment
+secrets, so they follow the same route as `GH_PAT`: read from `coder-nt` by
+`workspace-modules/workspace-secrets` and injected as container env by
+`workspace-templates/project-workspace/main.tf`. `asc` has an environment fast
+path, so `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY` (raw `.p8` PEM) are
+enough — no `asc auth login`, no keychain, no config file. Verify with `asc auth
+doctor`.
+
+All three secrets must exist in `coder-nt` before the template is pushed. The
+`google_secret_manager_secret_version` data sources are unconditional, so a
+missing secret fails the plan for *every* workspace, not just swift-dev ones.
+For the same reason these land in every workspace's environment regardless of
+image: Terraform doesn't know which image a workspace resolves to, since that
+comes from the repo's `.devcontainer/devcontainer.json` at envbuilder time.
 
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
