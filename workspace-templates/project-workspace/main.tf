@@ -179,6 +179,10 @@ locals {
   existing_repo_url = local.is_new_project ? "" : "https://github.com/${local.github_username}/${data.coder_parameter.repo_name[0].value}.git"
 
   repo_url = local.is_new_project ? local.new_repo_url : local.existing_repo_url
+
+  # Browser URL for the GitHub Repository app. Empty for new projects: those
+  # clone Project-Scaffolds, so there is no repo of the workspace's own yet.
+  repo_html_url = local.is_new_project ? "" : trimsuffix(local.existing_repo_url, ".git")
 }
 
 module "workspace_envbuilder" {
@@ -281,6 +285,7 @@ module "workspace_apps" {
   source             = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
   agent_id           = coder_agent.main.id
   project_name       = local.project_name
+  repo_html_url      = local.repo_html_url
   enable_apps        = true
   enable_vscode_web  = false
   enable_neovim      = false

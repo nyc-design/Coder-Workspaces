@@ -63,3 +63,15 @@ variable "enable_codex_usage" {
   type        = bool
   default     = true
 }
+
+variable "enable_repo_link" {
+  description = "Whether to create the GitHub repository link app"
+  type        = bool
+  default     = true
+}
+
+variable "repo_html_url" {
+  description = "Browser URL of the workspace's GitHub repository (no .git suffix). Empty disables the repository link app."
+  type        = string
+  default     = ""
+}
