@@ -9,23 +9,25 @@ RealityKit, UIKit, AppKit, Metal, visionOS, etc.) cannot be compiled locally.
 Do NOT turn that local limitation into "no Apple access". Apple work has two
 remote execution paths when configured:
 
-1. XCODEBUILDMCP — interactive Mac/Xcode execution
-   When XcodeBuildMCP is enabled for the chat and the Mac is online, use it for
-   real Xcode builds/tests, simulators, physical devices, app install/launch,
-   debugging and UI automation. Prefer this over asking the user to run Xcode
-   commands manually. Set/discover the project/workspace, scheme and destination
-   or device before building.
+1. MAC DEVELOPMENT MCP — Mac shell + Xcode
+   When the Mac Development MCP is enabled and the Mac is online, use it instead
+   of asking the user to prepare the Mac manually. It fronts:
+   - Desktop Commander for terminal, git, filesystem and process work on the Mac
+     (clone/pull/checkout, submodules, xcodegen/Tuist, brew, scripts, inspection).
+   - XcodeBuildMCP for structured Xcode builds/tests, simulators, physical
+     devices, app install/launch, debugging and UI automation.
 
-   MCPProxy may expose `describe_tool`. Use it when you need the exact schema or
-   readiness of an XcodeBuildMCP tool. `describe_tool` describes tools; it does
-   not make an otherwise unbound tool callable. If a required tool is advertised
-   but not actually callable, report that tool-binding limitation precisely — do
-   not conclude that the Mac or XcodeBuildMCP itself is unavailable.
+   MCPProxy intentionally exposes a small retrieval surface rather than every
+   upstream schema. Use `retrieve_tools` to find what you need, then invoke the
+   exact returned `name` using the returned `call_with` tool. If the signature is
+   lossy (`~`) or unclear, use `describe_tool` first. Do not infer that a Mac
+   capability is unavailable merely because its upstream tool is not directly
+   present in the current callable list.
 
-   XcodeBuildMCP is structured Xcode tooling, not a general Mac shell. If a
-   project first needs `xcodegen generate`, Tuist, or another arbitrary shell
-   step, run that through CI/a Mac workspace or another shell-capable path before
-   asking XcodeBuildMCP to build the generated project.
+   For Apple builds, prepare the checkout on the Mac first (including submodules
+   and generated Xcode projects), then use XcodeBuildMCP for the actual Xcode
+   operation. A successful XcodeBuildMCP build/test is real Apple-platform
+   verification even though this Linux workspace did not perform it locally.
 
 2. XCODE CLOUD / APP STORE CONNECT — remote CI and release execution
    `asc` is installed and talks to App Store Connect from Linux. Use it to
@@ -41,13 +43,12 @@ remote execution paths when configured:
 VALIDATION RULES:
 - Validate portable code locally with `swift build`, `swift test`, SwiftLint and
   swift-format as appropriate.
-- For Apple targets, use XcodeBuildMCP when available for the fast development
-  loop; use Xcode Cloud for clean CI/archive/TestFlight/release validation.
-- A successful Mac/XcodeBuildMCP or Xcode Cloud build is real Apple-platform
-  verification. Attribute it to that remote environment; never claim it ran
-  locally in this Linux workspace.
-- Only fall back to "the user must build this on a Mac" when neither remote path
-  is available.
+- For Apple targets, use the Mac Development MCP for the fast development loop;
+  use Xcode Cloud for clean CI/archive/TestFlight/release validation.
+- Attribute validation to the environment that actually ran it (Linux, Mac/Xcode,
+  or Xcode Cloud) rather than claiming everything ran locally.
+- Only fall back to "the user must do this on a Mac" when the Mac Development MCP
+  and Xcode Cloud cannot perform the required step.
 
 Conventions: SwiftPM for portable packages; sourcekit-lsp indexes SwiftPM code;
 `swiftlint lint` and `swift-format` are installed.
