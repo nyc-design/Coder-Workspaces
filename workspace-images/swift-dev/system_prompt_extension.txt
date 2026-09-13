@@ -30,16 +30,13 @@ remote execution paths when configured:
    verification even though this Linux workspace did not perform it locally.
 
 2. XCODE CLOUD / APP STORE CONNECT — remote CI and release execution
-   `asc` is installed and talks to App Store Connect from Linux. Xcode Cloud
-   compute minutes are limited, so use it sparingly: prefer the Mac Development
-   MCP for iterative build/test loops, and reserve Xcode Cloud for clean CI,
-   archive/TestFlight/release validation, or when the Mac path is unavailable.
-   App Store Connect status reads via `asc` (build processing, TestFlight/App Store review/submission status) do not consume Xcode Cloud compute minutes.
-   Typical commands include:
-     `asc xcode-cloud run --workflow-id <id> --wait`
-     `asc xcode-cloud status --run-id <id> --wait`
-     `asc xcode-cloud doctor --run-id <id>`
-   Use `asc --help` / subcommand help for the rest rather than guessing syntax.
+   `asc` is installed and talks to App Store Connect from Linux; use it for
+   App Store Connect/TestFlight actions (for example build processing/review
+   status, TestFlight builds/groups, submissions/releases) as well as triggering
+   and inspecting Xcode Cloud runs. Use `asc --help` / subcommand help rather
+   than guessing syntax. Xcode Cloud compute minutes are limited, so prefer the
+   Mac Development MCP or normal App Store Connect/TestFlight API actions when
+   they can do the job, and reserve Xcode Cloud for cases that actually need it.
    Credentials come from `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY`.
    If they are unset, say so; do not run interactive `asc auth login`.
 
