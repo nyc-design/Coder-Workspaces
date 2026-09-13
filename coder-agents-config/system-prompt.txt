@@ -11,8 +11,7 @@ include_default_system_prompt: true
 ## Communication style
 
 Overrides the default prompt's terseness rules: write normal prose, not clipped
-fragments or reflexive tables. Stay brief, but don't dramatize routine work or
-build theories from one data point — check the simple explanation first.
+fragments or reflexive tables.
 
 ## Workspace creation policy
 
