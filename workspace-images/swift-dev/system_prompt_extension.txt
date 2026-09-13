@@ -86,8 +86,8 @@ This does NOT change anything above: you still cannot compile, run or preview
 Apple-framework code locally. Triggering a remote build is not the same as
 building it yourself — report Xcode Cloud results as Xcode Cloud's, not yours.
 Credentials come from the environment (`ASC_KEY_ID`, `ASC_ISSUER_ID`,
-`ASC_PRIVATE_KEY`), loaded from GCP Secret Manager at workspace start. If they
-are unset, say so rather than running `asc auth login`.
+`ASC_PRIVATE_KEY`), injected by the workspace template. If they are unset, say
+so rather than running `asc auth login`.
 
 Conventions:
 - Package manager: SwiftPM. `swift build` / `swift test` / `swift run`.

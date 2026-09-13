@@ -328,14 +328,22 @@ monitor real Xcode Cloud builds without touching a Mac — as well as the
 TestFlight and App Store release commands. Telemetry is disabled image-wide via
 `ASC_TELEMETRY_DISABLED=1`.
 
-Credentials are **not** in the image. `asc` has an environment fast path, and
-`04-gcp.sh` already exports every secret in the workspace's GCP project, so the
-integration is just naming the secrets correctly in `coder-nt`: `ASC_KEY_ID`,
-`ASC_ISSUER_ID`, and one private-key source — `ASC_PRIVATE_KEY` (raw `.p8` PEM),
-`ASC_PRIVATE_KEY_B64`, or `ASC_PRIVATE_KEY_PATH`. Add `ASC_KEY_TYPE=individual`
-for an individual key; team keys need no `ASC_KEY_TYPE`. The workspace must be
-created with `gcp_project_name` set, otherwise `04-gcp.sh` skips secret loading
-entirely. Verify with `asc auth doctor`.
+Credentials are **not** in the image, and they do **not** come through
+`04-gcp.sh` — that path is for a repo's own runtime secrets out of whatever GCP
+project the workspace was created against. `asc` credentials are dev-environment
+secrets, so they follow the same route as `GH_PAT`: read from `coder-nt` by
+`workspace-modules/workspace-secrets` and injected as container env by
+`workspace-templates/project-workspace/main.tf`. `asc` has an environment fast
+path, so `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY` (raw `.p8` PEM) are
+enough — no `asc auth login`, no keychain, no config file. Verify with `asc auth
+doctor`.
+
+All three secrets must exist in `coder-nt` before the template is pushed. The
+`google_secret_manager_secret_version` data sources are unconditional, so a
+missing secret fails the plan for *every* workspace, not just swift-dev ones.
+For the same reason these land in every workspace's environment regardless of
+image: Terraform doesn't know which image a workspace resolves to, since that
+comes from the repo's `.devcontainer/devcontainer.json` at envbuilder time.
 
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.

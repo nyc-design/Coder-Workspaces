@@ -253,6 +253,9 @@ module "workspace_runtime" {
       "SIGNOZ_URL=${module.workspace_secrets.signoz_url}",
       "SIGNOZ_API_KEY=${module.workspace_secrets.signoz_api_key}",
       "CODESTRAL_API_KEY=${module.workspace_secrets.codestral_api_key}",
+      "ASC_KEY_ID=${module.workspace_secrets.asc_key_id}",
+      "ASC_ISSUER_ID=${module.workspace_secrets.asc_issuer_id}",
+      "ASC_PRIVATE_KEY=${module.workspace_secrets.asc_private_key}",
     ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",

@@ -26,3 +26,18 @@ output "codestral_api_key" {
   value     = data.google_secret_manager_secret_version.codestral_api_key.secret_data
   sensitive = true
 }
+
+output "asc_key_id" {
+  value     = data.google_secret_manager_secret_version.asc_key_id.secret_data
+  sensitive = true
+}
+
+output "asc_issuer_id" {
+  value     = data.google_secret_manager_secret_version.asc_issuer_id.secret_data
+  sensitive = true
+}
+
+output "asc_private_key" {
+  value     = data.google_secret_manager_secret_version.asc_private_key.secret_data
+  sensitive = true
+}
