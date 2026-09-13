@@ -121,7 +121,17 @@ jobs:
 
       - name: Get latest commit hash
         id: latest_commit
-        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          set -euo pipefail
+          hash="$(git rev-parse --short HEAD)"
+          # Coder rejects a duplicate template version name, and a version that
+          # failed to provision still holds its name. Without a suffix, every
+          # re-run of a failed push collides with the attempt that created it,
+          # so a transient failure can only be cleared by a new commit.
+          if [ "${{ github.run_attempt }}" != "1" ]; then
+            hash="${hash}-r${{ github.run_attempt }}"
+          fi
+          echo "hash=${hash}" >> "$GITHUB_OUTPUT"
 
       - name: Get commit title
         id: commit_title
