@@ -341,14 +341,9 @@ doctor`.
 All three secrets must exist in `coder-nt` before the template is pushed. The
 `google_secret_manager_secret_version` data sources are unconditional, so a
 missing secret fails the plan for *every* workspace, not just swift-dev ones.
-
-Injection is opt-in per workspace via the `enable_app_store_connect` boolean
-parameter (default off, mutable). It can't be derived from the image: envbuilder
-resolves that from the repo's `.devcontainer/devcontainer.json` at build time,
-long after the plan, and Terraform only knows `fallback_image`. Note this limits
-ambient exposure, not access — every workspace bind-mounts the same
-`~/.config/gcloud` credential, which holds project-level `secretAccessor` on
-`coder-nt` and can read these secrets directly regardless of the parameter.
+For the same reason these land in every workspace's environment regardless of
+image: Terraform doesn't know which image a workspace resolves to, since that
+comes from the repo's `.devcontainer/devcontainer.json` at envbuilder time.
 
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.

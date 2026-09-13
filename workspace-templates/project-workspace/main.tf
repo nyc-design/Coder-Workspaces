@@ -107,16 +107,6 @@ data "coder_parameter" "gcp_project_name" {
   order        = 2
 }
 
-data "coder_parameter" "enable_app_store_connect" {
-  name         = "enable_app_store_connect"
-  display_name = "App Store Connect / Xcode Cloud"
-  type         = "bool"
-  default      = "false"
-  mutable      = true
-  description  = "Inject App Store Connect API credentials (ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY) for the `asc` CLI. Only swift-dev ships asc, and the private key can sign and publish releases, so leave this off unless the project actually does Apple release work."
-  order        = 3
-}
-
 data "coder_parameter" "new_project_type" {
   count        = data.coder_parameter.is_existing_project.value == "new" ? 1 : 0
   name         = "new_project_type"
@@ -175,14 +165,6 @@ locals {
 
   # GCP project (optional)
   gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
-
-  # App Store Connect credentials are opt-in per workspace. They are only
-  # useful in swift-dev (the one image with `asc`), and ASC_PRIVATE_KEY can
-  # sign and publish releases, so it should not be ambient everywhere.
-  # Terraform can't gate this on the image itself: envbuilder resolves the
-  # image from the repo's .devcontainer/devcontainer.json at build time, long
-  # after the plan, and all Terraform knows is fallback_image.
-  asc_enabled = tobool(data.coder_parameter.enable_app_store_connect.value)
 
   # Container and builder configuration
   git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
@@ -271,12 +253,10 @@ module "workspace_runtime" {
       "SIGNOZ_URL=${module.workspace_secrets.signoz_url}",
       "SIGNOZ_API_KEY=${module.workspace_secrets.signoz_api_key}",
       "CODESTRAL_API_KEY=${module.workspace_secrets.codestral_api_key}",
-    ],
-    local.asc_enabled ? [
       "ASC_KEY_ID=${module.workspace_secrets.asc_key_id}",
       "ASC_ISSUER_ID=${module.workspace_secrets.asc_issuer_id}",
       "ASC_PRIVATE_KEY=${module.workspace_secrets.asc_private_key}",
-    ] : [],
+    ],
     local.is_new_project ? [
       "CODER_NEW_PROJECT=true",
       "NEW_PROJECT_TYPE=${local.project_type}",
