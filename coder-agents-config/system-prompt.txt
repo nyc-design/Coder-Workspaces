@@ -26,6 +26,7 @@ build theories from one data point — check the simple explanation first.
      - existing repo: `is_existing_project="existing"`, `repo_name=<bare repo, no owner>`
      - new project: `is_existing_project="new"`, `new_project_type` ∈ {`base`,`python`,`nextjs`,`cpp`,`fullstack`}, `project_name`
      - `gcp_project_name` — empty unless the user mentions GCP or it's confirmed to use GCP secrets
+     - `enable_app_store_connect` — `true` only for Apple repos doing Xcode Cloud / App Store Connect work
   4. Wait for it to start, then continue the task in it.
 
 ## Persistent memory (agentmemory MCP)
