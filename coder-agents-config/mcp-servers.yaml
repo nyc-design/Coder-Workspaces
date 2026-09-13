@@ -21,6 +21,25 @@
 #   Availability                   availability (force_on | default_on | default_off)
 #                                  separate from enabled — controls whether the tool is ON for new
 #                                  chats by default; enabled controls whether the server exists at all.
+#   Allow all tools in root        allow_in_plan_mode (BOOL)
+#     plan mode                    Only consulted while a chat is in plan mode. Outside plan mode every
+#                                  server is available regardless. In a ROOT chat in plan mode, only
+#                                  servers with this set survive the filter. In a SUBAGENT in plan mode
+#                                  external MCP servers are stripped entirely and this flag has no
+#                                  effect — hence "root" in the UI label. Per-server, not per-tool:
+#                                  enabling it exposes every tool the server offers, including
+#                                  mutating ones. See coderd/x/chatd/chatd.go
+#                                  filterExternalMCPConfigsForTurn.
+#   Forward Coder headers          forward_coder_headers (BOOL)
+#                                  Adds X-Coder-Owner-Id / -Chat-Id / -Subchat-Id / -Workspace-Id to
+#                                  every outgoing request so the server can correlate a tool call back
+#                                  to the originating chat. Leaks chat identity, so upstream defaults
+#                                  it off and documents it as first-party / trusted servers only.
+#
+# NOTE: both flags default to false server-side and PATCH treats an absent field
+# as no-change, so anything set in the admin GUI but omitted here persists
+# invisibly. Declare them explicitly on every server so this file stays the
+# source of truth.
 
 mcp_servers:
   - slug: context7
@@ -34,6 +53,8 @@ mcp_servers:
       CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}
     enabled: true
     availability: default_on
+    allow_in_plan_mode: true
+    forward_coder_headers: false
 
   - slug: grep
     display_name: Grep
@@ -44,6 +65,8 @@ mcp_servers:
     auth_type: none
     enabled: true
     availability: default_on
+    allow_in_plan_mode: true
+    forward_coder_headers: false
 
   - slug: github
     display_name: GitHub
@@ -56,6 +79,8 @@ mcp_servers:
       Authorization: Bearer ${GH_PAT_FOR_MCP}
     enabled: true
     availability: default_on
+    allow_in_plan_mode: true
+    forward_coder_headers: false
 
   - slug: omniroute
     display_name: OmniRoute
@@ -68,6 +93,8 @@ mcp_servers:
       x-api-key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     availability: default_off
+    allow_in_plan_mode: true
+    forward_coder_headers: false
 
   - slug: agentmemory
     display_name: AgentMemory
@@ -80,6 +107,8 @@ mcp_servers:
       Authorization: Bearer ${AGENTMEMORY_SECRET}
     enabled: true
     availability: default_on
+    allow_in_plan_mode: true
+    forward_coder_headers: true
 
   # Trusted clients share authenticated public retrieval access.
   # force_on makes retrieval available wherever proxy compression is in use.
@@ -94,6 +123,8 @@ mcp_servers:
       Authorization: Bearer ${HEADROOM_MCP_SECRET}
     enabled: true
     availability: force_on
+    allow_in_plan_mode: true
+    forward_coder_headers: false
 
   # MCPProxy (smart-mcp-proxy/mcpproxy-go) fronting XcodeBuildMCP on the
   # MacBook Pro, reachable only over the Tailscale tailnet. Notes:
@@ -117,3 +148,5 @@ mcp_servers:
       X-API-Key: ${XCODEBUILDMCP_API_KEY}
     enabled: true
     availability: default_off
+    allow_in_plan_mode: true
+    forward_coder_headers: true
