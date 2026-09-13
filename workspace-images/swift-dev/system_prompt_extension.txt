@@ -74,6 +74,21 @@ VALIDATION DISCIPLINE:
   and list exactly what they should check there.
 - When you hand off Apple-layer code, state that it is unbuilt and unverified.
 
+APP STORE CONNECT / XCODE CLOUD: the `asc` CLI is installed and is the one
+Apple-side capability you do have here. It talks to the App Store Connect REST
+API, so it works without a Mac: `asc xcode-cloud run --workflow-id <id> --wait`
+triggers a real Xcode Cloud build (which compiles the Apple layer on Apple's
+machines), `asc xcode-cloud status --run-id <id> --wait` follows it, `asc
+xcode-cloud doctor --run-id <id>` pulls failure logs, and `products`,
+`workflows`, `build-runs`, `actions` and `artifacts` cover the rest. TestFlight
+and release commands (`asc builds`, `asc testflight`, `asc publish`) work too.
+This does NOT change anything above: you still cannot compile, run or preview
+Apple-framework code locally. Triggering a remote build is not the same as
+building it yourself — report Xcode Cloud results as Xcode Cloud's, not yours.
+Credentials come from the environment (`ASC_KEY_ID`, `ASC_ISSUER_ID`,
+`ASC_PRIVATE_KEY`), loaded from GCP Secret Manager at workspace start. If they
+are unset, say so rather than running `asc auth login`.
+
 Conventions:
 - Package manager: SwiftPM. `swift build` / `swift test` / `swift run`.
 - Lint: `swiftlint lint` (add a project `.swiftlint.yml` when rules need tuning).

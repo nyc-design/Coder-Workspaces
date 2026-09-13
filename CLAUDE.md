@@ -67,7 +67,7 @@ base-dev (core tools, Docker, Git, GCP, AI CLIs)
 │   └── fullstack-dev (uses python-shared/scripts/install-python.sh + fastapi/uvicorn)
 ├── cpp-dev
 ├── rust-dev (rustup stable + clippy + rustfmt + cargo-binstall)
-├── swift-dev (swift.org Linux toolchain + SwiftLint; no Apple SDKs)
+├── swift-dev (swift.org Linux toolchain + SwiftLint + asc; no Apple SDKs)
 └── playwright-dev
 ```
 
@@ -314,6 +314,28 @@ workspace whose lease went stale (stopped for >45 days) simply re-downloads
 what it needs on its next start. Knobs: `EXTENSIONS_PRUNE=0` disables the
 pruner, `EXTENSIONS_PRUNE_DRY_RUN=1` logs without deleting. Tests:
 `workspace-images/base-dev/tests/test-extensions-cache.sh`.
+
+### Xcode Cloud from Linux (swift-dev)
+
+Apple ships no Xcode Cloud CLI for Linux, only the App Store Connect REST API.
+`swift-dev` bakes in [`asc`](https://github.com/rorkai/App-Store-Connect-CLI),
+the third-party App Store Connect CLI, pinned and SHA-256 verified by
+`workspace-images/swift-dev/scripts/install-asc.sh` (upstream's `curl
+asccli.sh/install | bash` resolves "latest" at build time, so it isn't
+reproducible). That gives a Linux workspace `asc xcode-cloud run/status/doctor`
+plus products, workflows, build-runs, actions and artifacts — it can trigger and
+monitor real Xcode Cloud builds without touching a Mac — as well as the
+TestFlight and App Store release commands. Telemetry is disabled image-wide via
+`ASC_TELEMETRY_DISABLED=1`.
+
+Credentials are **not** in the image. `asc` has an environment fast path, and
+`04-gcp.sh` already exports every secret in the workspace's GCP project, so the
+integration is just naming the secrets correctly in `coder-nt`: `ASC_KEY_ID`,
+`ASC_ISSUER_ID`, and one private-key source — `ASC_PRIVATE_KEY` (raw `.p8` PEM),
+`ASC_PRIVATE_KEY_B64`, or `ASC_PRIVATE_KEY_PATH`. Add `ASC_KEY_TYPE=individual`
+for an individual key; team keys need no `ASC_KEY_TYPE`. The workspace must be
+created with `gcp_project_name` set, otherwise `04-gcp.sh` skips secret loading
+entirely. Verify with `asc auth doctor`.
 
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
