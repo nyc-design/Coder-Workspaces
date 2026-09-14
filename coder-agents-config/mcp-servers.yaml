@@ -21,6 +21,11 @@
 #   Availability                   availability (force_on | default_on | default_off)
 #                                  separate from enabled — controls whether the tool is ON for new
 #                                  chats by default; enabled controls whether the server exists at all.
+#   Tool allow list                tool_allow_list (list of upstream MCP tool names)
+#   Tool deny list                 tool_deny_list (list of upstream MCP tool names)
+#                                  An empty allow list means expose all tools. Use explicit allow
+#                                  lists for broad MCPs so every schema does not consume the model's
+#                                  first-class tool budget on every turn.
 #   Allow all tools in root        allow_in_plan_mode (BOOL)
 #     plan mode                    Only consulted while a chat is in plan mode. Outside plan mode every
 #                                  server is available regardless. In a ROOT chat in plan mode, only
@@ -36,10 +41,9 @@
 #                                  to the originating chat. Leaks chat identity, so upstream defaults
 #                                  it off and documents it as first-party / trusted servers only.
 #
-# NOTE: both flags default to false server-side and PATCH treats an absent field
-# as no-change, so anything set in the admin GUI but omitted here persists
-# invisibly. Declare them explicitly on every server so this file stays the
-# source of truth.
+# NOTE: PATCH treats absent fields as no-change, so anything set in the admin
+# GUI but omitted here persists invisibly. Declare booleans and tool filters
+# explicitly so this file stays the source of truth.
 
 mcp_servers:
   - slug: context7
@@ -53,6 +57,8 @@ mcp_servers:
       CONTEXT7_API_KEY: ${CONTEXT7_API_KEY}
     enabled: true
     availability: default_on
+    tool_allow_list: []
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: false
 
@@ -65,6 +71,8 @@ mcp_servers:
     auth_type: none
     enabled: true
     availability: default_on
+    tool_allow_list: []
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: false
 
@@ -79,6 +87,11 @@ mcp_servers:
       Authorization: Bearer ${GH_PAT_FOR_MCP}
     enabled: true
     availability: default_on
+    # Keep the full GitHub surface. It is broad, but unlike AgentMemory most
+    # of these tools are directly useful for repo discovery, PR review, issue
+    # work, and remote GitHub operations before a workspace exists.
+    tool_allow_list: []
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: false
 
@@ -93,6 +106,8 @@ mcp_servers:
       x-api-key: ${LLM_GATEWAY_API_KEY}
     enabled: true
     availability: default_off
+    tool_allow_list: []
+    tool_deny_list: []
     # The only server withheld from plan mode. Its tools mutate gateway state
     # (providers, API keys, policies, rate limits, routing) rather than just
     # reading it, and planning has no reason to reach for them.
@@ -101,7 +116,7 @@ mcp_servers:
 
   - slug: agentmemory
     display_name: AgentMemory
-    description: 'Per-project persistent memory: save observations, recall via smart search, list/audit sessions, manage lessons + sentinels. Always pass `project` derived from the repo (basename of `git remote get-url origin .git`) so memory scopes per repo and survives workspace recreate.'
+    description: 'Per-project persistent memory: search/recall saved context, save durable observations, inspect session/file/commit history, and manage learned lessons. Always pass `project` derived from the repo so memory scopes per repo and survives workspace recreate.'
     icon_url: /icon/database.svg
     transport: streamable_http
     url: https://memory.tapiavala.com/mcp
@@ -110,6 +125,26 @@ mcp_servers:
       Authorization: Bearer ${AGENTMEMORY_SECRET}
     enabled: true
     availability: default_on
+    # AgentMemory currently advertises 54 tools. Coder's normal memory workflow
+    # only needs the retrieval/save/history/lesson subset below; orchestration
+    # features such as actions, checkpoints, leases, sentinels, mesh sync,
+    # sketches, slots, team sharing, graph maintenance, and exports stay hidden
+    # so they do not consume first-class tool slots on every chat turn.
+    tool_allow_list:
+      - memory_smart_search
+      - memory_recall
+      - memory_save
+      - memory_sessions
+      - memory_audit
+      - memory_file_history
+      - memory_commit_lookup
+      - memory_commits
+      - memory_lesson_recall
+      - memory_lesson_save
+      - memory_lesson_delete
+      - memory_timeline
+      - memory_verify
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: true
 
@@ -126,6 +161,8 @@ mcp_servers:
       Authorization: Bearer ${HEADROOM_MCP_SECRET}
     enabled: true
     availability: force_on
+    tool_allow_list: []
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: false
 
@@ -157,5 +194,17 @@ mcp_servers:
       X-API-Key: ${XCODEBUILDMCP_API_KEY}
     enabled: true
     availability: default_off
+    # Keep only MCPProxy's execution/discovery surface. Registry management,
+    # upstream reconfiguration, quarantine administration, and session profiles
+    # are operational controls rather than normal Mac development capabilities.
+    tool_allow_list:
+      - retrieve_tools
+      - describe_tool
+      - call_tool_read
+      - call_tool_write
+      - call_tool_destructive
+      - code_execution
+      - read_cache
+    tool_deny_list: []
     allow_in_plan_mode: true
     forward_coder_headers: true
