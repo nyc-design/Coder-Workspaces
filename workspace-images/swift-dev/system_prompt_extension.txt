@@ -18,11 +18,9 @@ remote execution paths when configured:
      devices, app install/launch, debugging and UI automation.
 
    MCPProxy intentionally exposes a small retrieval surface rather than every
-   upstream schema. Use `retrieve_tools` to find what you need, then invoke the
-   exact returned `name` using the returned `call_with` tool. If the signature is
-   lossy (`~`) or unclear, use `describe_tool` first. Do not infer that a Mac
-   capability is unavailable merely because its upstream tool is not directly
-   present in the current callable list.
+   upstream schema. Call its `retrieve_tools` / `describe_tool` tools directly;
+   never route them through `call_tool_*` or `code_execution`. Only tools returned
+   by `retrieve_tools` are upstream tools for `call_tool_*`.
 
    For Apple builds, prepare the checkout on the Mac first (including submodules
    and generated Xcode projects), then use XcodeBuildMCP for the actual Xcode
