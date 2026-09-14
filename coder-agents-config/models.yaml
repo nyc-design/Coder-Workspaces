@@ -183,7 +183,7 @@ models:
     display_name: GPT-6 Astra — CLIProxyAPI Codex
     enabled: true
     is_default: false
-    context_limit: 1050000
+    context_limit: 828400
     compression_threshold: 80
     model_config:
       openai_config:
