@@ -144,9 +144,7 @@ mcp_servers:
   #     needed just to repeat it.
   #   - Availability depends on the laptop being online and joined to the
   #     tailnet; expect connection errors when it is asleep.
-  - slug: xcodebuildmcp
-    # Keep the slug stable so sync updates the existing Coder MCP config rather
-    # than creating a second server. Display name reflects the broader surface.
+  - slug: macdev
     display_name: Mac Development
     description: 'MacBook Pro development tools over Tailscale via MCPProxy: Desktop Commander provides terminal, git, filesystem and process control; XcodeBuildMCP provides structured Xcode builds/tests, simulators, physical devices, debugging and UI automation. Discover tools with retrieve_tools and invoke the exact returned name/call_with. Requires the Mac to be awake and on the tailnet.'
     icon_url: /icon/code.svg

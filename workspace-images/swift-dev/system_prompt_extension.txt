@@ -11,18 +11,11 @@ remote execution paths when configured:
 
 1. MAC DEVELOPMENT MCP — Mac shell + Xcode
    When the Mac Development MCP is enabled and the Mac is online, use it instead
-   of asking the user to prepare the Mac manually. It fronts:
-   - Desktop Commander for terminal, git, filesystem and process work on the Mac
-     (clone/pull/checkout, submodules, xcodegen/Tuist, brew, scripts, inspection).
-   - XcodeBuildMCP for structured Xcode builds/tests, simulators, physical
-     devices, app install/launch, debugging and UI automation.
+   of asking the user to prepare the Mac manually. It fronts Desktop Commander
+   for Mac shell/files and XcodeBuildMCP for Xcode/simulator/device operations.
 
-   MCPProxy intentionally exposes a small retrieval surface rather than every
-   upstream schema. Use `retrieve_tools` to find what you need, then invoke the
-   exact returned `name` using the returned `call_with` tool. If the signature is
-   lossy (`~`) or unclear, use `describe_tool` first. Do not infer that a Mac
-   capability is unavailable merely because its upstream tool is not directly
-   present in the current callable list.
+   Call `macdev__retrieve_tools` / `macdev__describe_tool` directly after tool
+   discovery. Only names returned by `retrieve_tools` go through `call_tool_*`.
 
    For Apple builds, prepare the checkout on the Mac first (including submodules
    and generated Xcode projects), then use XcodeBuildMCP for the actual Xcode
