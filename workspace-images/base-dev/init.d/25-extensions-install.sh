@@ -58,16 +58,45 @@ has_version() {
   [ "${#hits[@]}" -gt 0 ]
 }
 
-# Resolve latest version from OpenVSX for `<publisher>.<name>`.
+# Resolve the version to install from OpenVSX for `<publisher>.<name>`.
+#
+# Prefers the newest STABLE release. OpenVSX's `latest` alias is not always a
+# stable one: biomejs.biome publishes nightlies under CalVer versions (e.g.
+# 2026.8.190716) that carry BOTH the `latest` and `pre-release` aliases, so
+# reading `.version` off the namespace endpoint silently tracked nightly
+# builds. The v2 query endpoint exposes a per-version `preRelease` flag.
+#
+# `sortBy=timestamp` matters: the default list order is not chronological (it
+# sorts CalVer strings above semver ones), so "first entry with preRelease ==
+# false" only means "newest stable" once the list is ordered by publish time.
+#
+# Extensions with no stable release in the queried window fall back to the
+# `latest` alias, i.e. today's behaviour. eamodio.gitlens is the live example:
+# every one of its last 100 OpenVSX publishes is an insiders build, and its
+# newest stable is far enough back that pinning to it would be a downgrade.
+#
 # stderr is dropped: extensions we publish ourselves (e.g. nyc-design.*) are not
 # on OpenVSX, so curl prints a raw `curl: (22) ... 404` that looks like a
 # failure. The caller already logs a clear "could not resolve latest version"
 # line and falls back to installing unpinned.
 latest_openvsx() {
-  local id="$1" pub name
+  local id="$1" pub name ver
   pub="${id%%.*}"; name="${id#*.}"
-  curl -sSfL --max-time 10 "https://open-vsx.org/api/${pub}/${name}" 2>/dev/null \
-    | jq -r '.version // empty' 2>/dev/null
+
+  ver="$(curl -sSfL --max-time 10 \
+    "https://open-vsx.org/api/v2/-/query?namespaceName=${pub}&extensionName=${name}&includeAllVersions=true&size=100&sortBy=timestamp" 2>/dev/null \
+    | jq -r 'first(.extensions[]? | select(.preRelease == false) | .version) // empty' 2>/dev/null)"
+
+  if [ -z "$ver" ]; then
+    ver="$(curl -sSfL --max-time 10 "https://open-vsx.org/api/${pub}/${name}" 2>/dev/null \
+      | jq -r '.version // empty' 2>/dev/null)"
+    # stderr: this function's stdout is captured by the caller as the version.
+    if [ -n "$ver" ]; then
+      log "[openvsx] $id has no stable release; falling back to latest ($ver)" >&2
+    fi
+  fi
+
+  printf '%s' "$ver"
 }
 
 # Query VS Code Marketplace metadata for `<publisher>.<name>`.
