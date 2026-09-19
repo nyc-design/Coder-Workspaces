@@ -1,4 +1,2 @@
--- Fullstack (FastAPI backend + Vite/React frontend) --
-- Builds on the Vite/React frontend setup above. Backend uses FastAPI; package/run via the project's standard `uv` / `python -m` commands.
-- API contracts: Pydantic request/response models for every endpoint, written as stubs before implementation. These are the single source of truth between backend and frontend — the frontend's TS types are generated from the FastAPI OpenAPI spec via `openapi-typescript`.
-- Backend implementation: each endpoint must validate against its Pydantic contract and return correct responses before moving to the next.
+-- Fullstack / FastAPI + Vite/React --
+Use project-standard uv / python -m commands for the backend. Define Pydantic request/response contracts as stubs before implementing endpoints; these drive the frontend OpenAPI types described above. Validate each endpoint's inputs and responses before moving on.
