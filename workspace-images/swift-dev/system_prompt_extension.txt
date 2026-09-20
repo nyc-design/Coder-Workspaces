@@ -1,47 +1,5 @@
--- Swift / Apple-platform development --
-
-This workspace itself is Linux with the open-source swift.org toolchain. Locally
-there is no Xcode, Apple SDK, Simulator, device bridge, or code signing. SwiftPM,
-Foundation, sourcekit-lsp, swift-format and SwiftLint are available, so build and
-test portable Swift code here normally. Apple-framework targets (SwiftUI,
-RealityKit, UIKit, AppKit, Metal, visionOS, etc.) cannot be compiled locally.
-
-Do NOT turn that local limitation into "no Apple access". Apple work has two
-remote execution paths when configured:
-
-1. MAC DEVELOPMENT MCP — Mac shell + Xcode
-   When the Mac Development MCP is enabled and the Mac is online, use it instead
-   of asking the user to prepare the Mac manually. It fronts Desktop Commander
-   for Mac shell/files and XcodeBuildMCP for Xcode/simulator/device operations.
-
-   Call `macdev__retrieve_tools` / `macdev__describe_tool` directly after tool
-   discovery. Only names returned by `retrieve_tools` go through `call_tool_*`.
-
-   For Apple builds, prepare the checkout on the Mac first (including submodules
-   and generated Xcode projects), then use XcodeBuildMCP for the actual Xcode
-   operation. A successful XcodeBuildMCP build/test is real Apple-platform
-   verification even though this Linux workspace did not perform it locally.
-
-2. XCODE CLOUD / APP STORE CONNECT — remote CI and release execution
-   `asc` is installed and talks to App Store Connect from Linux; use it for
-   App Store Connect/TestFlight actions (for example build processing/review
-   status, TestFlight builds/groups, submissions/releases) as well as triggering
-   and inspecting Xcode Cloud runs. Use `asc --help` / subcommand help rather
-   than guessing syntax. Xcode Cloud compute minutes are limited, so prefer the
-   Mac Development MCP or normal App Store Connect/TestFlight API actions when
-   they can do the job, and reserve Xcode Cloud for cases that actually need it.
-   Credentials come from `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY`.
-   If they are unset, say so; do not run interactive `asc auth login`.
-
-VALIDATION RULES:
-- Validate portable code locally with `swift build`, `swift test`, SwiftLint and
-  swift-format as appropriate.
-- For Apple targets, use the Mac Development MCP for the fast development loop;
-  use Xcode Cloud only when its stronger CI/archive/release isolation is useful.
-- Attribute validation to the environment that actually ran it (Linux, Mac/Xcode,
-  or Xcode Cloud) rather than claiming everything ran locally.
-- Only fall back to "the user must do this on a Mac" when the Mac Development MCP
-  and Xcode Cloud cannot perform the required step.
-
-Conventions: SwiftPM for portable packages; sourcekit-lsp indexes SwiftPM code;
-`swiftlint lint` and `swift-format` are installed.
+-- Swift / Apple platforms --
+This Linux workspace has SwiftPM, Foundation, sourcekit-lsp, swift-format, and SwiftLint, but no Xcode, Apple SDKs, Simulator, device bridge, or signing. Build/test portable Swift locally; Apple-framework targets require remote execution. Do not confuse local limits with unavailable Apple access.
+- Mac Development MCP: when enabled and online, use it for the Apple development loop rather than asking the user to prepare a Mac. It fronts Desktop Commander (shell/files) and XcodeBuildMCP (Xcode/simulator/device). Call macdev__retrieve_tools / macdev__describe_tool directly after discovery; only returned tool names go through call_tool_*. Prepare the Mac checkout, submodules, and generated Xcode projects before XcodeBuildMCP builds/tests.
+- asc: App Store Connect/TestFlight status, builds/groups, submissions/releases, and Xcode Cloud runs from Linux. Check subcommand help instead of guessing. Credentials: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY; report missing credentials, never run interactive asc auth login. Prefer Mac MCP or ordinary API actions; reserve limited Xcode Cloud minutes for needed CI/archive/release isolation.
+- Validate portable code with `swift build`, `swift test`, `swiftlint lint`, and `swift-format` as appropriate; sourcekit-lsp indexes SwiftPM. Attribute Apple validation to Mac/Xcode or Xcode Cloud, not Linux. Ask the user to perform Mac steps only when neither remote path can do them.

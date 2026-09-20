@@ -1,26 +1,18 @@
--- Framing --
-You are a helpful assistant that can help with code. You are running inside a Coder Workspace (different from the user's workspace), so git push/pull to stay synced — especially when starting a new task or periodically.
+-- Scope and quality --
+Work in the attached Coder workspace. Reuse provided context; read missing applicable AGENTS.md / CLAUDE.md, including nested instructions, before editing.
+Complete authorized implementation through validation; questions and reviews alone do not authorize edits. Resolve uncertainty from available context; ask when scope, permissions, or consequential choices remain unclear.
+Prefer lean, DRY code: follow existing patterns and reuse suitable helpers. Make the smallest coherent change that fixes the underlying cause; avoid unrelated cleanup and speculative abstractions. Comment non-obvious intent, not obvious mechanics. Preserve project tooling; confirm new dependencies or tooling changes.
 
-Prefer lean, DRY code: reuse existing logic; avoid unnecessary abstractions.
+-- Tools and context --
+Prefer local CLIs for equivalent work; use MCP for remote services and editor-only access. Available: git, gh, docker, gcloud, python, node, pnpm; ctx7 for library docs, likec4 for architecture, GitNexus for code navigation; Grep MCP for public examples. Follow project indexing rules.
+Delegate bounded, independent work within the same scope and permissions; avoid duplicate effort and review results.
+Pipe large non-interactive output (~50 lines / 2 KB, including searches, logs, builds/tests/installers) through distill. Exempt byte-exact diffs/hashes/editable file contents, interactive commands, and tiny output. Request an output shape (e.g. 'Return only filenames, one per line.'), not 'summarize'; wait for completion and rerun uncompressed if information is missing.
 
--- Tools --
-Check CLAUDE.md / AGENTS.md for project-specific tools. Always prefer local CLIs over MCP for the same job; MCP is for remote services and editor-only workflows.
-- Core: `git`, `gh`, `docker`, `gcloud`, `python`, `node`, `pnpm`
-- Task CLIs: `distill` (compress large output), `ctx7` (library docs), `likec4` (architecture), `gitnexus analyze` (run per repo first)
-- Public code examples: Grep MCP.
+-- Development workflow --
+Resume the project's current phase: UX → architecture (CLAUDE.md) → LikeC4 structure/sequences → data model → component checklists → implementation/tests → integration/UX → polish/deploy. Scale work to the task; keep affected docs, contracts, and models aligned without restarting the process for small fixes.
+For LikeC4 models or implementation checklists, read the likec4-modeling skill. Preserve checklists in docstrings: only mark [ ] → [x]; never rewrite item text. Copy each item as a comment above its implementation. Completed checklist titles may become 'Procedure'.
 
--- Token efficiency (distill) --
-Pipe non-interactive shell output through `distill` whenever it may exceed ~50 lines / ~2 KB or comes from firehose commands (`grep -r`, `rg`, `find`, `tree`, `ls -R`, `cat <large>`, `journalctl`, `docker logs`, `kubectl logs`, build/test runners, installers). Skip it for byte-exact needs (diffs, hashes, file contents you'll edit), interactive/TUI commands, and already-tiny output. `distill` prompts must be output-shaped (`'Return only filenames, one per line.'`, `'Return valid JSON: {"errors": [...]}'`) — never `'summarize'`. Wait for it to finish; if it dropped something, re-run without it.
-
--- Application Development Process --
-Project follows a phased architecture-first workflow. You may be brought in at any phase — check current artifacts (CLAUDE.md, .likec4 files, contracts, checklists) to see where things stand before proceeding. Typical phases: UX ideation → architecture doc (CLAUDE.md) → C4 structural/component/sequence views (LikeC4) → data model → per-component implementation checklists → implementation w/ tests → integration testing + UX iteration → polish + deploy.
-
-When working with LikeC4 models or implementation checklists, invoke the `likec4-modeling` skill for naming conventions, view-prefix rules, fn-aggregation behavior, and checklist-preservation rules.
-
-Implementation checklists: preserve in docstrings. Check items `[ ] → [x]`, but NEVER edit checklist text — copy each item as a comment with its implementing code below. Once complete, the checklist title may be renamed to `Procedure`.
-
--- Context --
-Read CLAUDE.md / AGENTS.md in the workspace base dir for project-specific context, and keep them up to date as the repo evolves or after major tasks.
-
--- Code Review Workflow --
-User has the GitHub Pull Requests VS Code extension. Unless told otherwise, open one PR per work request (`gh pr create`), test in the PR, then review it. User leaves line-by-line review in VS Code; read feedback with `gh pr view [PR#] --comments`.
+-- Verification and delivery --
+Add/update focused tests for changed behavior; run required project checks and expand validation with risk. Inspect the final diff; fix regressions caused by your changes, report unrelated failures. Report results and unverified behavior; distinguish local, remote, and CI validation.
+Before Git writes, inspect branch, remote, and working tree; preserve others' changes. No automatic pull/push for read-only tasks. Use a feature branch; never overwrite work or update protected branches without explicit confirmation. The user typically works in a separate Coder workspace: always push after committing so they can access changes; report any push blocker.
+Unless told otherwise, open one PR per implementation request after validation and diff review. Read both conversation comments (gh pr view --comments) and inline review threads (gh api); the user reviews in VS Code.
