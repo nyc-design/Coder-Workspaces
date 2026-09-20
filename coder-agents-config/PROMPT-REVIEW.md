@@ -41,7 +41,7 @@ synthesized, not copied wholesale.
 | Comments | Explain non-obvious intent rather than narrating code. Preserve our explicit checklist-as-comments convention; do not import the baseline's blanket inline-comment prohibition. |
 | Tooling | Preserve project tooling; describe image tools as defaults rather than mandates. Non-mutating checks precede scoped autofixes. |
 | Architecture | Preserve the architecture-first phases, LikeC4 skill, contracts, and checklist rules; resume the current phase rather than restarting it for every small fix. |
-| Git/review | Replace periodic unconditional push/pull pressure with scope-aware Git safety. One PR per implementation request, after validation/review; explicitly include inline review threads, not only conversation comments. |
+| Git/review | Replace periodic unconditional push/pull pressure with scope-aware Git safety. Always push after committing because the user typically works in a separate workspace; report push blockers. One PR per implementation request, after validation/review; explicitly include inline review threads, not only conversation comments. |
 | Context efficiency | Reuse supplied context, shorten tool inventories and repeated explanations, retain distill's exact-content exemptions and fallback. Keep specialized instructions in image layers. |
 | Provisioning | Preserve naming, account, template, modes, and parameter mapping. Resolve scaffold choices from the template instead of maintaining a stale enum (`nextjs` was not supported). Require confirmed project-secret scope before setting the GCP project. |
 | Memory | Preserve recall/save/history intent and skill pointers. Use `project` only where exposed by tool schemas; qualify queries and verify returned scope otherwise. |
@@ -65,7 +65,7 @@ prompt caching, total context size, or billed savings.
 | Prompt | Before | After | Reduction |
 |---|---:|---:|---:|
 | Central body | 553 | 318 | 235 |
-| Base | 639 | 569 | 70 |
+| Base | 639 | 595 | 44 |
 | Vite | 298 | 171 | 127 |
 | Fullstack | 128 | 61 | 67 |
 | Python shared | 105 | 40 | 65 |
@@ -74,10 +74,10 @@ prompt caching, total context size, or billed savings.
 
 Representative Coder custom stacks (central + relevant image fragments):
 
-- Base: 1,192 → 887 (~26% smaller).
-- Fullstack: 1,723 → 1,159 (~33% smaller).
-- Swift: 1,816 → 1,196 (~34% smaller).
-- Modeling: 1,687 → 1,317 (~22% smaller).
+- Base: 1,192 → 913 (~23% smaller).
+- Fullstack: 1,723 → 1,185 (~31% smaller).
+- Swift: 1,816 → 1,222 (~33% smaller).
+- Modeling: 1,687 → 1,343 (~20% smaller).
 
 Standalone CLIs do not automatically receive the central prompt. Their savings
 are the image-fragment reductions only, and only once their instruction paths

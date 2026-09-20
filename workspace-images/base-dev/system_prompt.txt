@@ -14,5 +14,5 @@ For LikeC4 models or implementation checklists, read the likec4-modeling skill. 
 
 -- Verification and delivery --
 Add/update focused tests for changed behavior; run required project checks and expand validation with risk. Inspect the final diff; fix regressions caused by your changes, report unrelated failures. Report results and unverified behavior; distinguish local, remote, and CI validation.
-Before Git writes, inspect branch, remote, and working tree; preserve others' changes. No automatic pull/push for read-only tasks. Use a feature branch; never overwrite work or update protected branches without explicit confirmation.
+Before Git writes, inspect branch, remote, and working tree; preserve others' changes. No automatic pull/push for read-only tasks. Use a feature branch; never overwrite work or update protected branches without explicit confirmation. The user typically works in a separate Coder workspace: always push after committing so they can access changes; report any push blocker.
 Unless told otherwise, open one PR per implementation request after validation and diff review. Read both conversation comments (gh pr view --comments) and inline review threads (gh api); the user reviews in VS Code.
