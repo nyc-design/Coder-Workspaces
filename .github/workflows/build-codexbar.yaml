@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: "22"
       - name: Test monthly bridge
-        run: node --test host-services/codexbar/tests/bridge.test.mjs
+        run: node --test host-services/codexbar/tests/*.test.mjs
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3

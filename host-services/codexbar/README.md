@@ -13,7 +13,7 @@ CodexBar's native Alibaba parser also rejects monthly-only responses.
 The service uses the existing **LLM Proxy** provider instead:
 
 ```text
-Browser → Traefik → CodexBar :8080
+Browser → Traefik → presentation proxy :8080 → CodexBar 127.0.0.1:8082
                      ├─ Codex/Claude: existing OAuth credential mounts
                      └─ LLM Proxy → bearer-authenticated 127.0.0.1:8081
                                       └─ bl → Alibaba console usage endpoint
@@ -38,14 +38,21 @@ must be in the future, at most 62 days away. The real reset timestamp is preserv
 no weekly mapping or made-up credit totals are used. CodexBar has its own cache and
 may display previously successful data as stale during failures.
 
-### Display limitations
+### Dashboard presentation
 
-The stock card name is **LLM Proxy**, and the useful primary bar is **Quota**.
-The provider does not expose a custom card-title setting. The `alibaba` group name
-cannot rename that card. Its additional Requests/Sonnet/provider counters default
-to zero because this API does not supply those metrics; **those are not actual
-Alibaba request/token measurements**. Use the primary Quota bar and reset only.
-This bridge does not repair `bl usage token-plan` or the native Alibaba provider.
+A Node HTTP proxy listens publicly on 8080; stock CodexBar listens only on
+127.0.0.1:8082. The proxy enforces the existing dashboard bearer token for data
+routes (loopback CodexBar bypasses its own auth gate). Static assets and health
+remain accessible as before.
+
+Only successful `/dashboard/v1/snapshot` responses are adapted: the `llmproxy`
+card is named **Alibaba Token Plan**, its plan subtitle is **Personal · Monthly**,
+and only its real **Quota** window remains. Default Requests/Sonnet/provider rows
+are hidden. Percentages, reset timestamps, error/staleness fields, provider IDs,
+and all other providers remain unchanged. Raw `/usage` and `/cost` responses are
+not rewritten. Invalid snapshots fail with a generic 502; buffers are bounded.
+The built-in provider itself has no custom title setting; this is a scoped web
+presentation override, not a rename of the native CLI provider.
 
 ## Deploy
 
@@ -55,8 +62,8 @@ This bridge does not repair `bl usage token-plan` or the native Alibaba provider
    `docker compose up -d codexbar`.
 3. Authenticate `bl` from a workspace if necessary. Its shared `.bailian` session
    is reused; no browser cookie or additional host secret is required.
-4. Open the existing AI Usage app. Expect **LLM Proxy / Quota**, not the native
-   Alibaba card. `CODEXBAR_ALIBABA_REGION` is no longer used; remove it if present.
+4. Open the existing AI Usage app. Expect **Alibaba Token Plan / Personal · Monthly**, with only the
+   Quota bar. `CODEXBAR_ALIBABA_REGION` is no longer used; remove it if present.
 
 Do not expose port 8081 or mount host credentials into another service. The image
 healthcheck probes both listeners, not Alibaba availability. SIGTERM/SIGINT close
@@ -65,7 +72,7 @@ a forced shutdown follows after three seconds if necessary.
 
 ## Validation
 
-`node --test host-services/codexbar/tests/bridge.test.mjs` runs offline regression
+`node --test host-services/codexbar/tests/*.test.mjs` runs offline regression
 tests for monthly normalization, auth, routing, cache/single-flight behavior,
 private errors, and response extraction. Existing agent-tools CI runs these on
 AMD64 and ARM64; the publishing workflow runs them before its build too.
@@ -73,4 +80,5 @@ AMD64 and ARM64; the publishing workflow runs them before its build too.
 Local ARM64 checks: Docker build; synthetic 25%-used quota through the real stock
 CodexBar `/usage` and `/dashboard/v1/snapshot` (75% remaining, reset preserved);
 live workspace Bailian session yields valid monthly fields without logging values.
-Host deployment and a real browser render remain to be checked after rollout.
+Public bearer gating and presentation were tested with the stock binary after
+adding the proxy. Host deployment and a real browser render remain to be checked after rollout.

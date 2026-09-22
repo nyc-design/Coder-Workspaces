@@ -25,7 +25,7 @@ jobs:
           node-version: '22'
       - name: Test initialization and installers
         run: |
-          node --test host-services/codexbar/tests/bridge.test.mjs
+          node --test host-services/codexbar/tests/*.test.mjs
           bash workspace-images/base-dev/tests/test-agent-tools-init.sh
           bash workspace-images/base-dev/tests/test-bailian-install.sh
           bash workspace-images/base-dev/tests/test-codexbar-install.sh
