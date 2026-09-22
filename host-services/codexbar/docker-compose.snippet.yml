@@ -1,0 +1,49 @@
+# Append this service to the host docker-compose on the Coder VM.
+#
+# codexbar runs `codexbar serve`: one unified usage dashboard for Codex,
+# Claude and the Alibaba Token Plan, exposed via Traefik at
+# https://usage.tapiavala.com and linked from every workspace's "AI Usage" app.
+#
+# The image holds the static CodexBar binary plus Node + the pinned `bl` CLI
+# (CodexBar's only non-cookie Alibaba path). It reads the same host-shared
+# credential dirs the workspaces mount; logging in still happens in the
+# workspaces (`codex login`, `claude`, `bl auth login`). A stale token shows
+# as a per-provider error in the dashboard, never a crash.
+#
+# Required env in the host .env:
+#   CODEXBAR_DASHBOARD_TOKEN  — bearer gating /usage, /cost and the dashboard
+#                               snapshot. `openssl rand -hex 32`; the browser
+#                               UI prompts for it once and keeps it in
+#                               localStorage. `/` and `/health` stay open.
+# Optional env in the host .env:
+#   CODEXBAR_ALIBABA_REGION   — intl-personal (default). `bl` only reports
+#                               Personal/Solo usage; Team would need the
+#                               cookie path (ALIBABA_TOKEN_PLAN_COOKIE).
+
+services:
+  codexbar:
+    image: ghcr.io/nyc-design/codexbar:latest
+    container_name: codexbar
+    restart: unless-stopped
+    environment:
+      CODEXBAR_DASHBOARD_TOKEN: ${CODEXBAR_DASHBOARD_TOKEN:?set in .env}
+      CODEXBAR_ALIBABA_REGION: ${CODEXBAR_ALIBABA_REGION:-intl-personal}
+    volumes:
+      # Same host dirs the workspaces mount; read-only here. The image user is
+      # UID 1000 (build arg CODEXBAR_UID) to match the secrets owner, and it
+      # must stay a passwd user: CodexBar resolves $HOME via /etc/passwd.
+      - /home/ubuntu/secrets/.codex:/home/codexbar/.codex:ro
+      - /home/ubuntu/secrets/.claude:/home/codexbar/.claude:ro
+      # rw like the workspaces: `bl` owns this dir and may refresh its session.
+      - /home/ubuntu/secrets/.bailian:/home/codexbar/.bailian
+      - codexbar-cache:/home/codexbar/.cache
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.codexbar.loadbalancer.server.port=8080"
+      - "traefik.http.routers.codexbar.rule=Host(`usage.tapiavala.com`)"
+      - "traefik.http.routers.codexbar.entrypoints=websecure"
+      - "traefik.http.routers.codexbar.tls.certresolver=le"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  codexbar-cache:

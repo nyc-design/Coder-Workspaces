@@ -54,7 +54,9 @@ codexbar usage --provider claude --source oauth
 codexbar usage --provider alibaba-token-plan
 ```
 
-Alibaba usage requires console authentication, not just a model API key. In CodexBar provider configuration select the matching international variant: `intl` for Team or `intl-personal` for Personal/Solo. This tier is not yet confirmed, so no account-specific config is overwritten or silently defaulted by init. Use `codexbar config --help` and the upstream configuration reference for provider settings. Configuration normally lives in `~/.config/codexbar/config.json` (per-workspace home persistence, unlike the host-shared native CLI credentials).
+Alibaba usage requires console authentication, not just a model API key. In CodexBar provider configuration select the matching international variant: `intl-personal` (the plan in use is Personal/Solo) or `intl` for Team. Init never writes account-specific config. Use `codexbar config --help` and the upstream configuration reference for provider settings. Configuration normally lives in `~/.config/codexbar/config.json` (per-workspace home persistence, unlike the host-shared native CLI credentials).
+
+The host runs the same providers as a dashboard (`host-services/codexbar/`, linked as the "AI Usage" workspace app); in-workspace `codexbar usage` is for deliberate checks.
 
 CodexBar auto tries signed-in `bl` first, then supported cookies. For Team subscriptions, explicitly configure the cookie usage source rather than relying on an incompatible successful personal CLI response. Live session validity, account tier compatibility, browser-login access and endpoint permissions must be verified after user login. No background poller is installed. Qwen Cloud is a separate provider; do not select it merely because the coding harness is Qwen Code.
 

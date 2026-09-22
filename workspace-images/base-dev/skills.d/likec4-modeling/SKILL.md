@@ -6,7 +6,7 @@ description: Author and maintain LikeC4 architecture models — system context, 
 # Authoring & maintaining LikeC4 models
 
 LikeC4 models live under `.likec4/` in the project repo and back the
-architecture diagrams referenced by `CLAUDE.md`. They are the source of
+architecture diagrams referenced by the repo's architecture doc (linked from `AGENTS.md`). They are the source of
 truth for the C4 structural/component/sequence views, and they must stay
 in sync with the code.
 
