@@ -1,0 +1,128 @@
+name: Reusable macOS Xcode CI
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Relative path to an .xcodeproj. Set exactly one of project or workspace.
+        required: false
+        type: string
+        default: ""
+      workspace:
+        description: Relative path to an .xcworkspace. Set exactly one of project or workspace.
+        required: false
+        type: string
+        default: ""
+      scheme:
+        description: Xcode scheme to build or test.
+        required: true
+        type: string
+      destination:
+        description: xcodebuild destination, for example generic/platform=visionOS Simulator.
+        required: true
+        type: string
+      configuration:
+        description: Xcode build configuration.
+        required: false
+        type: string
+        default: Debug
+      action:
+        description: xcodebuild action such as build, test, or build-for-testing.
+        required: false
+        type: string
+        default: build
+      xcode_path:
+        description: Path to the Xcode.app bundle on the self-hosted Mac.
+        required: false
+        type: string
+        default: /Applications/Xcode.app
+      code_signing_allowed:
+        description: Whether xcodebuild may perform code signing. Simulator CI normally leaves this false.
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  xcode:
+    runs-on: [self-hosted, macOS, ARM64, swift-ci]
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: ${{ inputs.xcode_path }}/Contents/Developer
+      XCODE_PROJECT: ${{ inputs.project }}
+      XCODE_WORKSPACE: ${{ inputs.workspace }}
+      XCODE_SCHEME: ${{ inputs.scheme }}
+      XCODE_DESTINATION: ${{ inputs.destination }}
+      XCODE_CONFIGURATION: ${{ inputs.configuration }}
+      XCODE_ACTION: ${{ inputs.action }}
+      CODE_SIGNING_ALLOWED_INPUT: ${{ inputs.code_signing_allowed }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Apple toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Build or test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$XCODE_PROJECT" && -n "$XCODE_WORKSPACE" ]]; then
+            echo "Set only one of project or workspace." >&2
+            exit 2
+          fi
+          if [[ -z "$XCODE_PROJECT" && -z "$XCODE_WORKSPACE" ]]; then
+            echo "Set one of project or workspace." >&2
+            exit 2
+          fi
+
+          case "$XCODE_ACTION" in
+            build|test|build-for-testing|test-without-building|analyze|archive) ;;
+            *)
+              echo "Unsupported action: $XCODE_ACTION" >&2
+              exit 2
+              ;;
+          esac
+
+          selector=()
+          if [[ -n "$XCODE_PROJECT" ]]; then
+            selector=(-project "$XCODE_PROJECT")
+          else
+            selector=(-workspace "$XCODE_WORKSPACE")
+          fi
+
+          args=(
+            "${selector[@]}"
+            -scheme "$XCODE_SCHEME"
+            -configuration "$XCODE_CONFIGURATION"
+            -destination "$XCODE_DESTINATION"
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+            -resultBundlePath "$RUNNER_TEMP/XcodeResult.xcresult"
+          )
+
+          if [[ "$CODE_SIGNING_ALLOWED_INPUT" != "true" ]]; then
+            args+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+          fi
+
+          set +e
+          xcodebuild "${args[@]}" "$XCODE_ACTION" 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+
+      - name: Upload Xcode diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcode-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/XcodeResult.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
