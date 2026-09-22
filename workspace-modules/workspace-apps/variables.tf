@@ -52,16 +52,10 @@ variable "enable_filebrowser" {
   default     = true
 }
 
-variable "enable_claude_usage" {
-  description = "Whether to create the Claude usage link app"
-  type        = bool
-  default     = true
-}
-
-variable "enable_codex_usage" {
-  description = "Whether to create the Codex usage link app"
-  type        = bool
-  default     = true
+variable "ai_usage_url" {
+  description = "URL of the codexbar usage dashboard (host-services/codexbar). Empty disables the AI Usage app."
+  type        = string
+  default     = "https://usage.tapiavala.com"
 }
 
 variable "enable_repo_link" {

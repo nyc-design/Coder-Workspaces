@@ -60,26 +60,17 @@ module "filebrowser" {
   order         = 4
 }
 
-resource "coder_app" "claude_usage" {
-  count        = var.enable_apps && var.enable_claude_usage ? 1 : 0
+# Unified Codex / Claude / Alibaba usage dashboard served by
+# host-services/codexbar (replaces the per-provider vendor links).
+resource "coder_app" "ai_usage" {
+  count        = var.enable_apps && var.ai_usage_url != "" ? 1 : 0
   agent_id     = var.agent_id
-  slug         = "claude-usage"
-  display_name = "Claude Usage"
-  icon         = "/icon/claude.svg"
-  url          = "https://claude.ai/settings/usage"
+  slug         = "ai-usage"
+  display_name = "AI Usage"
+  icon         = "/icon/widgets.svg"
+  url          = var.ai_usage_url
   external     = true
   order        = 1
-}
-
-resource "coder_app" "codex_usage" {
-  count        = var.enable_apps && var.enable_codex_usage ? 1 : 0
-  agent_id     = var.agent_id
-  slug         = "codex-usage"
-  display_name = "Codex Usage"
-  icon         = "/icon/openai.svg"
-  url          = "https://chatgpt.com/codex/cloud/settings/analytics#usage"
-  external     = true
-  order        = 2
 }
 
 # The workspace's repository on github.com. Only rendered when the template

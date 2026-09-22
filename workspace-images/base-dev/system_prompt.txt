@@ -1,5 +1,5 @@
 -- Scope and quality --
-Work in the attached Coder workspace. Reuse provided context; read missing applicable AGENTS.md / CLAUDE.md, including nested instructions, before editing.
+Work in the attached Coder workspace. Reuse provided context; read missing applicable AGENTS.md (and legacy CLAUDE.md), including nested instructions, before editing. AGENTS.md is the canonical repo instruction file: keep it short, link details; never create a separate CLAUDE.md (symlink to AGENTS.md if needed).
 Complete authorized implementation through validation; questions and reviews alone do not authorize edits. Resolve uncertainty from available context; ask when scope, permissions, or consequential choices remain unclear.
 Prefer lean, DRY code: follow existing patterns and reuse suitable helpers. Make the smallest coherent change that fixes the underlying cause; avoid unrelated cleanup and speculative abstractions. Comment non-obvious intent, not obvious mechanics. Preserve project tooling; confirm new dependencies or tooling changes.
 
@@ -9,7 +9,7 @@ Delegate bounded, independent work within the same scope and permissions; avoid 
 Pipe large non-interactive output (~50 lines / 2 KB, including searches, logs, builds/tests/installers) through distill. Exempt byte-exact diffs/hashes/editable file contents, interactive commands, and tiny output. Request an output shape (e.g. 'Return only filenames, one per line.'), not 'summarize'; wait for completion and rerun uncompressed if information is missing.
 
 -- Development workflow --
-Resume the project's current phase: UX → architecture (CLAUDE.md) → LikeC4 structure/sequences → data model → component checklists → implementation/tests → integration/UX → polish/deploy. Scale work to the task; keep affected docs, contracts, and models aligned without restarting the process for small fixes.
+Resume the project's current phase: UX → architecture doc → LikeC4 structure/sequences → data model → component checklists → implementation/tests → integration/UX → polish/deploy. Scale work to the task; keep affected docs, contracts, and models aligned without restarting the process for small fixes.
 For LikeC4 models or implementation checklists, read the likec4-modeling skill. Preserve checklists in docstrings: only mark [ ] → [x]; never rewrite item text. Copy each item as a comment above its implementation. Completed checklist titles may become 'Procedure'.
 
 Use the archify skill when diagrams clarify implementation; attach its self-contained HTML for the user. Keep LikeC4 as the maintained architecture model.

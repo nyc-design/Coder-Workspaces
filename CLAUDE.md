@@ -44,6 +44,7 @@ host-services/             # docker-compose snippets that run on the host VM
 ├── coder-pwa/             # Traefik-fronted PWA installer page
 ├── agentmemory/           # Persistent memory backend (built image, GHCR)
 ├── cliproxy/              # Claude Code + Codex + Gemini OAuth proxy (built image, GHCR)
+├── codexbar/              # CodexBar `serve` usage dashboard for Codex/Claude/Alibaba (built image, GHCR)
 ├── headroom/              # Upstream compression proxy + authenticated HTTP retrieval MCP (built image, GHCR)
 ├── meridian/              # Claude Pro/Max subscription proxy (compose-only)
 └── omniroute/             # Multi-provider AI gateway incl. Kiro (compose-only)
@@ -354,6 +355,13 @@ The base skill manifest adds upstream LikeC4 DSL and Archify (explanatory HTML,
 not a replacement for maintained LikeC4 models). See
 `workspace-images/base-dev/AGENT_TOOLS.md` for international Token Plan login,
 CodexBar usage-auth boundaries, host-directory prerequisites, validation and rollout.
+`host-services/codexbar/` runs `codexbar serve` on the host VM against the same
+read-only credential dirs; `usage.tapiavala.com` is the "AI Usage" workspace app
+(`workspace-apps` `ai_usage_url`), replacing the per-vendor usage links.
+
+Repo instruction files: `AGENTS.md` is canonical (short, links to detailed docs);
+the base prompt tells agents never to create a separate `CLAUDE.md`. This repo's
+`CLAUDE.md` predates that rule and is kept as-is.
 
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
