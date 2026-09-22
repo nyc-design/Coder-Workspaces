@@ -59,8 +59,10 @@ presentation override, not a rename of the native CLI provider.
 The public homepage is branded **Tapiavala AI Usage** with a locally generated
 SVG T/spark mark and favicon, no third-party assets or fonts. A scoped stylesheet
 keeps the stock responsive grid and JavaScript behavior while adding charcoal
-surfaces, teal/neon-green accents, rounded cards, focus states and reduced-motion
-support. Light/dark themes follow the device preference. Codex bars are teal,
+surfaces, teal/neon-green header, logo and control accents, rounded cards, focus states and reduced-motion
+support. Dark grey is the default, independent of the device preference. A visible header
+button switches between light and dark, persists the selection locally, and applies
+it before page paint. Storage restrictions do not prevent toggling. Codex bars are teal,
 Claude warm amber, and Alibaba lime; warning/error indicators remain semantic.
 The upstream version retains a small “Powered by CodexBar” attribution.
 
