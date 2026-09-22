@@ -29,6 +29,9 @@ test('only Alibaba presentation changes; quota, errors, staleness and other prov
 
 test('proxy preserves bearer gate, assets and raw APIs, transforms only successful snapshots', async t => {
   const upstream = http.createServer((req, res) => {
+    if (req.headers.host !== `127.0.0.1:${upstream.address().port}`) {
+      res.writeHead(403).end('forbidden host'); return;
+    }
     if (req.url === '/asset') { res.end('asset'); return; }
     if (req.headers.authorization !== 'Bearer test') { res.writeHead(401).end('unauthorized'); return; }
     if (req.url === '/usage') { res.end('raw usage'); return; }
@@ -42,8 +45,8 @@ test('proxy preserves bearer gate, assets and raw APIs, transforms only successf
   t.after(() => {proxy.stop(); upstream.closeAllConnections(); upstream.close();});
   const base = `http://127.0.0.1:${proxy.address().port}`;
   assert.equal((await fetch(base+'/dashboard/v1/snapshot')).status, 401);
-  assert.equal(await (await fetch(base+'/asset')).text(), 'asset');
-  const headers = {authorization:'Bearer test'};
+  assert.equal(await (await fetch(base+'/asset', {headers: {host: 'usage.tapiavala.com'}})).text(), 'asset');
+  const headers = {authorization:'Bearer test', host: 'usage.tapiavala.com'};
   assert.equal(await (await fetch(base+'/usage', {headers})).text(), 'raw usage');
   const response = await fetch(base+'/dashboard/v1/snapshot?provider=llmproxy', {headers});
   assert.equal(response.headers.get('etag'), null);

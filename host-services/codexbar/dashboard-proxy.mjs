@@ -29,7 +29,7 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
       }
     }
     const upstream = http.request({hostname: '127.0.0.1', port: upstreamPort,
-      method: req.method, path: req.url, headers: {...req.headers, 'accept-encoding': 'identity'}}, incoming => {
+      method: req.method, path: req.url, headers: {...req.headers, host: `127.0.0.1:${upstreamPort}`, 'accept-encoding': 'identity'}}, incoming => {
       const snapshot = req.method === 'GET' &&
         req.url.split('?')[0] === '/dashboard/v1/snapshot' && incoming.statusCode === 200;
       if (!snapshot) {
