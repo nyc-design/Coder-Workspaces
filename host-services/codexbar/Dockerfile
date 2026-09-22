@@ -2,8 +2,8 @@
 #
 # codexbar — CodexBar CLI `serve` as a lean host service. Codex/Claude usage is
 # read straight from their mounted credential files (no CLIs); Alibaba Token
-# Plan usage is fetched via the pinned `bl` CLI (CodexBar has no file reader
-# for it), which is why Node is present. Login/refresh stays in the workspaces.
+# Plan monthly usage is bridged through the pinned `bl` CLI and stock LLM Proxy
+# provider, using the existing Node runtime. Login stays in the workspaces.
 #
 # Multi-arch: linux/amd64 + linux/arm64. Build context is the repo root so the
 # pinned, checksum-verified installer shared with base-dev is reused.
@@ -39,22 +39,21 @@ COPY --from=fetch /opt/codexbar/lib/codexbar /usr/local/lib/codexbar
 COPY --from=bl /opt/bl /usr/local/share/bl
 RUN ln -s /usr/local/lib/codexbar/codexbar /usr/local/bin/codexbar \
  && ln -s /usr/local/share/bl/bin/bl /usr/local/bin/bl
+COPY host-services/codexbar/*.mjs host-services/codexbar/*.cjs /usr/local/lib/codexbar-bridge/
 COPY host-services/codexbar/config.json /etc/codexbar/config.template.json
 COPY host-services/codexbar/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 
 USER codexbar
-# `bl` reads ~/.bailian via HOME (CodexBar passes only PATH/HOME/locale/proxy
-# through to it); region is international Personal/Solo.
+# The bridge launches `bl` with HOME so it reuses the mounted console session.
 ENV HOME=/home/codexbar \
     CODEXBAR_CONFIG=/home/codexbar/.config/codexbar/config.json \
     CODEX_HOME=/home/codexbar/.codex \
-    CLAUDE_CONFIG_DIR=/home/codexbar/.claude \
-    CODEXBAR_ALIBABA_REGION=intl-personal
+    CLAUDE_CONFIG_DIR=/home/codexbar/.claude
 VOLUME ["/home/codexbar/.cache"]
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/health >/dev/null && wget -qO- http://127.0.0.1:8081/health >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

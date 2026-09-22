@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'workspace-images/base-dev/**'
+      - 'host-services/codexbar/**'
       - '.github/workflows/test-agent-tools.yaml'
   workflow_dispatch:
 
@@ -24,6 +25,7 @@ jobs:
           node-version: '22'
       - name: Test initialization and installers
         run: |
+          node --test host-services/codexbar/tests/bridge.test.mjs
           bash workspace-images/base-dev/tests/test-agent-tools-init.sh
           bash workspace-images/base-dev/tests/test-bailian-install.sh
           bash workspace-images/base-dev/tests/test-codexbar-install.sh
