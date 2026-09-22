@@ -10,6 +10,8 @@ architecture diagrams referenced by `CLAUDE.md`. They are the source of
 truth for the C4 structural/component/sequence views, and they must stay
 in sync with the code.
 
+Read the upstream `likec4-dsl` skill for DSL syntax and references; this skill defines our project conventions.
+
 ## When to invoke
 
 - Adding, renaming, or removing a function, endpoint, service, scanner,

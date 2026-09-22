@@ -1,0 +1,44 @@
+name: Test base agent tools
+
+on:
+  pull_request:
+    paths:
+      - 'workspace-images/base-dev/**'
+      - '.github/workflows/test-agent-tools.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test initialization and installers
+        run: |
+          bash workspace-images/base-dev/tests/test-agent-tools-init.sh
+          bash workspace-images/base-dev/tests/test-bailian-install.sh
+          bash workspace-images/base-dev/tests/test-codexbar-install.sh
+      - name: Smoke-test native CLI packages without credentials
+        env:
+          NPM_CONFIG_PREFIX: ${{ runner.temp }}/agent-tools
+          CODEXBAR_INSTALL_PREFIX: ${{ runner.temp }}/agent-tools
+        run: |
+          npm install --global --no-audit --no-fund @qwen-code/qwen-code@0.24.3
+          bash workspace-images/base-dev/scripts/install-bailian.sh
+          bash workspace-images/base-dev/scripts/install-codexbar.sh
+          export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+          export HOME="$(mktemp -d)"
+          qwen --version
+          bl --version
+          bl auth status --output json > "$RUNNER_TEMP/bailian-status.json"
+          codexbar --version
+          codexbar --help > /dev/null

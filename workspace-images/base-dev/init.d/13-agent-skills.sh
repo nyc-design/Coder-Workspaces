@@ -42,6 +42,7 @@
 #        ~/.claude/skills/<name>   → ~/.agents/skills/<name>
 #        ~/.codex/skills/<name>    → ~/.agents/skills/<name>
 #        ~/.gemini/skills/<name>   → ~/.agents/skills/<name>
+#        ~/.qwen/skills/<name>     → ~/.agents/skills/<name>
 #        ~/.coder/skills/<name>    → ~/.agents/skills/<name>
 #      Stale symlinks (pointing at ~/.agents/skills/<gone>) are cleaned up
 #      first. Non-symlink entries (user-authored or hand-edited skills) are
@@ -198,6 +199,7 @@ publish_provider_symlinks() {
 publish_provider_symlinks "$HOME/.claude/skills"
 publish_provider_symlinks "$HOME/.codex/skills"
 publish_provider_symlinks "$HOME/.gemini/skills"
+publish_provider_symlinks "$HOME/.qwen/skills"
 publish_provider_symlinks "$HOME/.coder/skills"
 
 printf "[agent-skills] Done.\n"

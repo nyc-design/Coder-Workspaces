@@ -24,6 +24,8 @@ locals {
     { container_path = "/home/coder/.pencil", host_path = "/home/ubuntu/secrets/.pencil", read_only = false },
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
     { container_path = "/home/coder/.codex", host_path = "/home/ubuntu/secrets/.codex", read_only = false },
+    { container_path = "/home/coder/.qwen", host_path = "/home/ubuntu/secrets/.qwen", read_only = false },
+    { container_path = "/home/coder/.bailian", host_path = "/home/ubuntu/secrets/.bailian", read_only = false },
     # ~/.agents is intentionally NOT bind-mounted. The skills catalog is
     # rebuilt per-workspace by workspace-images/base-dev/init.d/13-agent-skills.sh
     # from the image's /usr/local/share/workspace-skills.d/ (SKILL.md dirs)
