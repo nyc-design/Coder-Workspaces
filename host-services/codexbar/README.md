@@ -1,53 +1,76 @@
-# codexbar
+# CodexBar host dashboard
 
-[CodexBar CLI](https://github.com/steipete/CodexBar) `serve` as a host
-service: one dashboard at `https://usage.tapiavala.com` for Codex, Claude and
-the international Alibaba Token Plan, linked from every workspace as the
-"AI Usage" Coder app.
+Stock CodexBar 0.64.0 on Node 22 Alpine, with the pinned Bailian 2.0.0 CLI.
+The existing multi-arch GHCR workflow builds from the repository root. No new
+npm dependencies or Swift compilation are required.
 
-Published to GHCR by `.github/workflows/build-codexbar.yaml`
-(`ghcr.io/nyc-design/codexbar:{latest,sha-<commit>}`, amd64 + arm64). Build
-context is the repo root so the image reuses the pinned, checksum-verified
-`workspace-images/base-dev/scripts/install-codexbar.sh`.
+## Monthly Alibaba usage
 
-## What is in the image
+Alibaba international Personal subscriptions can return only
+`per1MonthPercentage` and `per1MonthResetTime`. Bailian drops those fields;
+CodexBar's native Alibaba parser also rejects monthly-only responses.
 
-`node:22-alpine` + the static-musl CodexBar binary + the pinned `bl` CLI +
-`tzdata`. No `codex`/`claude` CLIs: CodexBar reads their credential files
-directly. Node is there only because CodexBar's non-cookie Alibaba path is to
-spawn `bl` (there is no file reader for Token Plan credentials).
+The service uses the existing **LLM Proxy** provider instead:
 
-| Provider | Source | Input |
-|---|---|---|
-| codex | `oauth` | `/home/ubuntu/secrets/.codex/auth.json` (ro mount) |
-| claude | `oauth` | `/home/ubuntu/secrets/.claude/.credentials.json` (ro mount) |
-| alibabatokenplan | `cli` | `bl usage token-plan` against `/home/ubuntu/secrets/.bailian` (rw mount: `bl` writes state there); `CODEXBAR_ALIBABA_REGION=intl-personal` |
+```text
+Browser → Traefik → CodexBar :8080
+                     ├─ Codex/Claude: existing OAuth credential mounts
+                     └─ LLM Proxy → bearer-authenticated 127.0.0.1:8081
+                                      └─ bl → Alibaba console usage endpoint
+```
 
-CodexBar never refreshes tokens. Log in from a workspace (`codex login`,
-`claude`, `bl auth login`); the dashboard shows a per-provider error until then.
-`bl` only reports Personal/Solo usage (the plan in use); a Team plan would need
-the `ALIBABA_TOKEN_PLAN_COOKIE` path instead. The Claude token must carry the `user:profile` scope, which
-Claude Code sign-in provides.
+`serve.mjs` supervises CodexBar and the loopback HTTP bridge in one container.
+It generates a fresh private bridge token on startup. This is independent of
+`CODEXBAR_DASHBOARD_TOKEN`; neither token is written into the config file.
 
-`docker-entrypoint.sh` renders `config.json` (region substituted) into
-`$CODEXBAR_CONFIG`, validates it, and execs
-`codexbar serve --host 0.0.0.0 --port 8080 --allow-plain-http --identity redacted`.
-Plain HTTP is container-internal only; Traefik terminates TLS.
+`monthly-bridge.mjs` launches `bl usage token-plan` with the existing `.bailian`
+session and explicit international/Singapore flags. A process-local Node preload
+(`bailian-monthly.cjs`) observes only the successful, known console response before
+Bailian filters it. Only the two numeric monthly fields pass through a private FD;
+raw responses, credentials, and CLI stdout/stderr never enter bridge responses or
+logs. No installed Bailian files are patched. This hook is deliberately tied to the
+pinned CLI and response envelope: incompatible changes fail closed.
+
+Fetches are bounded to 20 seconds, coalesced, and cached for 60 seconds. Missing,
+invalid, expired, or out-of-range monthly values return 503, not fabricated zero
+usage. The quota percentage must be a fraction in [0,1] and the millisecond reset
+must be in the future, at most 62 days away. The real reset timestamp is preserved;
+no weekly mapping or made-up credit totals are used. CodexBar has its own cache and
+may display previously successful data as stale during failures.
+
+### Display limitations
+
+The stock card name is **LLM Proxy**, and the useful primary bar is **Quota**.
+The provider does not expose a custom card-title setting. The `alibaba` group name
+cannot rename that card. Its additional Requests/Sonnet/provider counters default
+to zero because this API does not supply those metrics; **those are not actual
+Alibaba request/token measurements**. Use the primary Quota bar and reset only.
+This bridge does not repair `bl usage token-plan` or the native Alibaba provider.
 
 ## Deploy
 
-1. Add `CODEXBAR_DASHBOARD_TOKEN` (`openssl rand -hex 32`) to the host `.env`.
-2. Append `docker-compose.snippet.yml` to the host compose file;
+1. Keep `CODEXBAR_DASHBOARD_TOKEN` in the host `.env` and the existing Codex,
+   Claude, Bailian and cache mounts in `docker-compose.snippet.yml`.
+2. Pull the published image and recreate: `docker compose pull codexbar` then
    `docker compose up -d codexbar`.
-3. Open `https://usage.tapiavala.com`, paste the token when prompted (stored in
-   browser localStorage). `/` and `/health` are unauthenticated; `/usage`,
-   `/cost` and `/dashboard/v1/snapshot` require `Authorization: Bearer`.
+3. Authenticate `bl` from a workspace if necessary. Its shared `.bailian` session
+   is reused; no browser cookie or additional host secret is required.
+4. Open the existing AI Usage app. Expect **LLM Proxy / Quota**, not the native
+   Alibaba card. `CODEXBAR_ALIBABA_REGION` is no longer used; remove it if present.
+
+Do not expose port 8081 or mount host credentials into another service. The image
+healthcheck probes both listeners, not Alibaba availability. SIGTERM/SIGINT close
+the bridge, terminate active Bailian requests, and stop the CodexBar process group;
+a forced shutdown follows after three seconds if necessary.
 
 ## Validation
 
-Local, in a workspace (`docker build -f host-services/codexbar/Dockerfile .`):
-image builds on arm64, `/health` returns 200, `/usage` returns 401 without the
-bearer, and with dummy credential files each provider reaches its auth-stage
-error (Codex "token expired", Claude scope check, Alibaba "sign in with bl"
-from a real `bl 2.0.0` spawn), proving the mounts are consumed. Not verified: amd64 build,
-live provider responses, Traefik routing on the host.
+`node --test host-services/codexbar/tests/bridge.test.mjs` runs offline regression
+tests for monthly normalization, auth, routing, cache/single-flight behavior,
+private errors, and response extraction. Existing agent-tools CI runs these on
+AMD64 and ARM64; the publishing workflow runs them before its build too.
+
+Local ARM64 checks: Docker build; synthetic 25%-used quota through the real stock
+CodexBar `/usage` and `/dashboard/v1/snapshot` (75% remaining, reset preserved);
+live workspace Bailian session yields valid monthly fields without logging values.
+Host deployment and a real browser render remain to be checked after rollout.

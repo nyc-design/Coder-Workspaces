@@ -5,7 +5,7 @@
 # https://usage.tapiavala.com and linked from every workspace's "AI Usage" app.
 #
 # The image holds the static CodexBar binary plus Node + the pinned `bl` CLI
-# (CodexBar's only non-cookie Alibaba path). It reads the same host-shared
+# plus a loopback monthly-usage bridge (shown as LLM Proxy / Quota). It reads the same host-shared
 # credential dirs the workspaces mount; logging in still happens in the
 # workspaces (`codex login`, `claude`, `bl auth login`). A stale token shows
 # as a per-provider error in the dashboard, never a crash.
@@ -15,10 +15,6 @@
 #                               snapshot. `openssl rand -hex 32`; the browser
 #                               UI prompts for it once and keeps it in
 #                               localStorage. `/` and `/health` stay open.
-# Optional env in the host .env:
-#   CODEXBAR_ALIBABA_REGION   — intl-personal (default). `bl` only reports
-#                               Personal/Solo usage; Team would need the
-#                               cookie path (ALIBABA_TOKEN_PLAN_COOKIE).
 
 services:
   codexbar:
@@ -27,9 +23,8 @@ services:
     restart: unless-stopped
     environment:
       CODEXBAR_DASHBOARD_TOKEN: ${CODEXBAR_DASHBOARD_TOKEN:?set in .env}
-      CODEXBAR_ALIBABA_REGION: ${CODEXBAR_ALIBABA_REGION:-intl-personal}
     volumes:
-      # Same host dirs the workspaces mount; read-only here. The image user is
+      # Same host dirs the workspaces mount; Codex/Claude are read-only. Image user is
       # UID 1000 (build arg CODEXBAR_UID) to match the secrets owner, and it
       # must stay a passwd user: CodexBar resolves $HOME via /etc/passwd.
       - /home/ubuntu/secrets/.codex:/home/codexbar/.codex:ro
