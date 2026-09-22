@@ -85,4 +85,31 @@ for scenario in fresh preserved legacy; do
   printf 'PASS: %s prompt/skills publishing and rerun\n' "$scenario"
 done
 
+# A noninteractive CLI may still drain stdin. It must not consume the next
+# manifest entry from the installer's read loop.
+mkdir -p "$fixture_root/bin" "$fixture_root/install-lists"
+printf '["likec4-dsl", "archify"]\n' > "$fixture_root/install-lists/10-base.json"
+cat > "$fixture_root/bin/skills" <<'MOCK'
+#!/usr/bin/env bash
+set -eu
+[[ "$1" == list ]] && exit 0
+[[ "$1" == add ]]
+cat >/dev/null
+mkdir -p "$HOME/.agents/skills/$2"
+printf 'Mock skill\n' > "$HOME/.agents/skills/$2/SKILL.md"
+MOCK
+chmod +x "$fixture_root/bin/skills"
+sed "s|$fixture_root/no-install-lists|$fixture_root/install-lists|g" \
+  "$fixture_root/skills.sh" > "$fixture_root/cli-skills.sh"
+env HOME="$fixture_root/cli-home" PATH="$fixture_root/bin:$PATH" BASH_ENV=/dev/null \
+  bash "$fixture_root/cli-skills.sh" > "$fixture_root/cli-skills.log" 2>&1
+for skill in likec4-dsl archify; do
+  [[ -f "$fixture_root/cli-home/.agents/skills/$skill/SKILL.md" ]] || {
+    printf 'FAIL: manifest entry %s skipped\n' "$skill"; exit 1;
+  }
+  for provider in .claude .codex .gemini .qwen .coder; do
+    [[ -f "$fixture_root/cli-home/$provider/skills/$skill/SKILL.md" ]]
+  done
+done
+printf 'PASS: CLI stdin cannot consume later manifest entries\n'
 printf 'All agent tools init tests passed.\n'
