@@ -416,7 +416,6 @@ models:
   # Use unsuffixed model IDs, not pinned snapshots. Gateway-advertised contexts.
   # Cost estimates follow LiteLLM: dashscope/Qwen, zai/GLM, OpenRouter/DeepSeek.
   # Not Token Plan billing rates. Unpublished cache-write prices stay unset.
-  # Cap effort at high conservatively; higher levels and native web search are unverified.
 
   - provider: alibaba-token-plan
     model: bcp/qwen3.8-max
@@ -427,8 +426,8 @@ models:
     compression_threshold: 30
     model_config:
       reasoning_effort:
-        default: high
-        max: high
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "2"
         output_price_per_million_tokens: "6"
@@ -436,7 +435,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
-          web_search_enabled: false
+          web_search_enabled: true
 
   - provider: alibaba-token-plan
     model: bcp/qwen3.8-flash
@@ -447,8 +446,8 @@ models:
     compression_threshold: 30
     model_config:
       reasoning_effort:
-        default: high
-        max: high
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.15"
         output_price_per_million_tokens: "0.47"
@@ -457,7 +456,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
-          web_search_enabled: false
+          web_search_enabled: true
 
   - provider: alibaba-token-plan
     model: bcp/glm-5.3
@@ -468,8 +467,8 @@ models:
     compression_threshold: 30
     model_config:
       reasoning_effort:
-        default: high
-        max: high
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "1.4"
         output_price_per_million_tokens: "4.4"
@@ -478,7 +477,7 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
-          web_search_enabled: false
+          web_search_enabled: true
 
   - provider: alibaba-token-plan
     model: bcp/deepseek-v4.1-flash
@@ -489,8 +488,8 @@ models:
     compression_threshold: 30
     model_config:
       reasoning_effort:
-        default: high
-        max: high
+        default: medium
+        max: max
       cost:
         input_price_per_million_tokens: "0.3"
         output_price_per_million_tokens: "1.2"
@@ -498,4 +497,4 @@ models:
       provider_options:
         anthropic:
           send_reasoning: true
-          web_search_enabled: false
+          web_search_enabled: true
