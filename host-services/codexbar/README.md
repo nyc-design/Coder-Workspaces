@@ -54,6 +54,21 @@ not rewritten. Invalid snapshots fail with a generic 502; buffers are bounded.
 The built-in provider itself has no custom title setting; this is a scoped web
 presentation override, not a rename of the native CLI provider.
 
+### Tapiavala branding
+
+The public homepage is branded **Tapiavala AI Usage** with a locally generated
+SVG T/spark mark and favicon, no third-party assets or fonts. A scoped stylesheet
+keeps the stock responsive grid and JavaScript behavior while adding charcoal
+surfaces, teal/neon-green accents, rounded cards, focus states and reduced-motion
+support. Light/dark themes follow the device preference. Codex bars are teal,
+Claude warm amber, and Alibaba lime; warning/error indicators remain semantic.
+The upstream version retains a small “Powered by CodexBar” attribution.
+
+HTML rewriting is limited to fixed branding strings and an appended stylesheet;
+upstream scripts, token storage, refresh, authentication forms and chart logic are
+unchanged. The public Host header is rewritten to the internal loopback authority
+before forwarding so CodexBar does not reject the deployment hostname.
+
 ## Deploy
 
 1. Keep `CODEXBAR_DASHBOARD_TOKEN` in the host `.env` and the existing Codex,
