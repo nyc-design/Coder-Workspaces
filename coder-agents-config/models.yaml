@@ -414,7 +414,9 @@ models:
 
   # Alibaba international Personal Token Plan via OmniRoute (bcp).
   # Use unsuffixed model IDs, not pinned snapshots. Gateway-advertised contexts.
-  # Subscription-backed: omit speculative per-token pricing and Claude-only options.
+  # Cost estimates follow LiteLLM: dashscope/Qwen, zai/GLM, OpenRouter/DeepSeek.
+  # Not Token Plan billing rates. Unpublished cache-write prices stay unset.
+  # Cap effort at high conservatively; higher levels and native web search are unverified.
 
   - provider: alibaba-token-plan
     model: bcp/qwen3.8-max
@@ -423,6 +425,18 @@ models:
     is_default: false
     context_limit: 1000000
     compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: high
+      cost:
+        input_price_per_million_tokens: "2"
+        output_price_per_million_tokens: "6"
+        cache_read_price_per_million_tokens: "0.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: false
 
   - provider: alibaba-token-plan
     model: bcp/qwen3.8-flash
@@ -431,6 +445,19 @@ models:
     is_default: false
     context_limit: 128000
     compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: high
+      cost:
+        input_price_per_million_tokens: "0.15"
+        output_price_per_million_tokens: "0.47"
+        cache_read_price_per_million_tokens: "0.016"
+        cache_write_price_per_million_tokens: "0.2"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: false
 
   - provider: alibaba-token-plan
     model: bcp/glm-5.3
@@ -439,6 +466,19 @@ models:
     is_default: false
     context_limit: 1000000
     compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: high
+      cost:
+        input_price_per_million_tokens: "1.4"
+        output_price_per_million_tokens: "4.4"
+        cache_read_price_per_million_tokens: "0.26"
+        cache_write_price_per_million_tokens: "0"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: false
 
   - provider: alibaba-token-plan
     model: bcp/deepseek-v4.1-flash
@@ -447,3 +487,15 @@ models:
     is_default: false
     context_limit: 128000
     compression_threshold: 30
+    model_config:
+      reasoning_effort:
+        default: high
+        max: high
+      cost:
+        input_price_per_million_tokens: "0.3"
+        output_price_per_million_tokens: "1.2"
+        cache_read_price_per_million_tokens: "0.006"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: false
