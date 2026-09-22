@@ -7,6 +7,7 @@ on:
     paths:
       - "host-services/codexbar/**"
       - "workspace-images/base-dev/scripts/install-codexbar.sh"
+      - "workspace-images/base-dev/scripts/install-bailian.sh"
       - ".github/workflows/build-codexbar.yaml"
   workflow_dispatch:
 

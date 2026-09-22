@@ -3,6 +3,6 @@
   "providers": [
     { "id": "codex", "enabled": true, "source": "oauth" },
     { "id": "claude", "enabled": true, "source": "oauth" },
-    { "id": "alibabatokenplan", "enabled": true, "source": "auto", "region": "__ALIBABA_REGION__" }
+    { "id": "alibabatokenplan", "enabled": true, "source": "cli", "region": "__ALIBABA_REGION__" }
   ]
 }

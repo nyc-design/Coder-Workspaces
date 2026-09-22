@@ -4,21 +4,21 @@
 # Claude and the Alibaba Token Plan, exposed via Traefik at
 # https://usage.tapiavala.com and linked from every workspace's "AI Usage" app.
 #
-# The image is a single static binary (no Node, no codex/claude CLIs). It reads
-# the host-shared native credential dirs read-only; logging in / refreshing
-# tokens still happens in the workspaces (`codex login`, `claude`). A stale
-# token shows as a per-provider error in the dashboard, never a crash.
+# The image holds the static CodexBar binary plus Node + the pinned `bl` CLI
+# (CodexBar's only non-cookie Alibaba path). It reads the same host-shared
+# credential dirs the workspaces mount; logging in still happens in the
+# workspaces (`codex login`, `claude`, `bl auth login`). A stale token shows
+# as a per-provider error in the dashboard, never a crash.
 #
 # Required env in the host .env:
 #   CODEXBAR_DASHBOARD_TOKEN  — bearer gating /usage, /cost and the dashboard
 #                               snapshot. `openssl rand -hex 32`; the browser
 #                               UI prompts for it once and keeps it in
 #                               localStorage. `/` and `/health` stay open.
-#   ALIBABA_TOKEN_PLAN_COOKIE — Model Studio console cookie header (see
-#                               upstream docs/alibaba-token-plan.md). This is
-#                               the only Linux path that works for Team plans.
 # Optional env in the host .env:
-#   CODEXBAR_ALIBABA_REGION   — intl-personal (default) | intl (Team).
+#   CODEXBAR_ALIBABA_REGION   — intl-personal (default). `bl` only reports
+#                               Personal/Solo usage; Team would need the
+#                               cookie path (ALIBABA_TOKEN_PLAN_COOKIE).
 
 services:
   codexbar:
@@ -27,7 +27,6 @@ services:
     restart: unless-stopped
     environment:
       CODEXBAR_DASHBOARD_TOKEN: ${CODEXBAR_DASHBOARD_TOKEN:?set in .env}
-      ALIBABA_TOKEN_PLAN_COOKIE: ${ALIBABA_TOKEN_PLAN_COOKIE:-}
       CODEXBAR_ALIBABA_REGION: ${CODEXBAR_ALIBABA_REGION:-intl-personal}
     volumes:
       # Same host dirs the workspaces mount; read-only here. The image user is
@@ -35,6 +34,8 @@ services:
       # must stay a passwd user: CodexBar resolves $HOME via /etc/passwd.
       - /home/ubuntu/secrets/.codex:/home/codexbar/.codex:ro
       - /home/ubuntu/secrets/.claude:/home/codexbar/.claude:ro
+      # rw like the workspaces: `bl` owns this dir and may refresh its session.
+      - /home/ubuntu/secrets/.bailian:/home/codexbar/.bailian
       - codexbar-cache:/home/codexbar/.cache
     labels:
       - "traefik.enable=true"
