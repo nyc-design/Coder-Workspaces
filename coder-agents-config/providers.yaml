@@ -70,3 +70,12 @@ providers:
     api_keys:
       - ${LLM_GATEWAY_API_KEY}
     enabled: false
+
+  # Separate Coder provider identity; Alibaba credentials remain in OmniRoute.
+  - name: alibaba-token-plan
+    type: anthropic
+    display_name: Alibaba Token Plan
+    base_url: https://llm.tapiavala.com
+    api_keys:
+      - ${LLM_GATEWAY_API_KEY}
+    enabled: true

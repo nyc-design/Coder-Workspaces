@@ -22,7 +22,8 @@
 # sync.sh, which only loads the exact filenames above).
 #
 # context_limit values are the live `context_length` reported by OmniRoute.
-# compression_threshold is a uniform 30 (compress at 30% of context).
+# compression_threshold is a percentage of context; Alibaba targets ~200k tokens,
+# capped at 90% for smaller windows. Other providers retain their existing settings.
 
 models:
   # ── Claude Code subscription paths (Anthropic Messages API) ────────────────
@@ -411,3 +412,90 @@ models:
       provider_options:
         openai-compat:
           reasoning_summary: auto
+
+  # Alibaba international Personal Token Plan via OmniRoute (bcp).
+  # Use unsuffixed model IDs, not pinned snapshots. Gateway-advertised contexts.
+  # Cost estimates follow LiteLLM: dashscope/Qwen, zai/GLM, OpenRouter/DeepSeek.
+  # Not Token Plan billing rates. Unpublished cache-write prices stay unset.
+
+  - provider: alibaba-token-plan
+    model: bcp/qwen3.8-max
+    display_name: Qwen 3.8 Max — Alibaba Token Plan
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      reasoning_effort:
+        default: medium
+        max: max
+      cost:
+        input_price_per_million_tokens: "2"
+        output_price_per_million_tokens: "6"
+        cache_read_price_per_million_tokens: "0.25"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: alibaba-token-plan
+    model: bcp/qwen3.8-flash
+    display_name: Qwen 3.8 Flash — Alibaba Token Plan
+    enabled: true
+    is_default: false
+    context_limit: 128000
+    compression_threshold: 90
+    model_config:
+      reasoning_effort:
+        default: medium
+        max: max
+      cost:
+        input_price_per_million_tokens: "0.15"
+        output_price_per_million_tokens: "0.47"
+        cache_read_price_per_million_tokens: "0.016"
+        cache_write_price_per_million_tokens: "0.2"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: alibaba-token-plan
+    model: bcp/glm-5.3
+    display_name: GLM 5.3 — Alibaba Token Plan
+    enabled: true
+    is_default: false
+    context_limit: 1000000
+    compression_threshold: 20
+    model_config:
+      reasoning_effort:
+        default: medium
+        max: max
+      cost:
+        input_price_per_million_tokens: "1.4"
+        output_price_per_million_tokens: "4.4"
+        cache_read_price_per_million_tokens: "0.26"
+        cache_write_price_per_million_tokens: "0"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
+
+  - provider: alibaba-token-plan
+    model: bcp/deepseek-v4.1-flash
+    display_name: DeepSeek V4.1 Flash — Alibaba Token Plan
+    enabled: true
+    is_default: false
+    context_limit: 128000
+    compression_threshold: 90
+    model_config:
+      reasoning_effort:
+        default: medium
+        max: max
+      cost:
+        input_price_per_million_tokens: "0.3"
+        output_price_per_million_tokens: "1.2"
+        cache_read_price_per_million_tokens: "0.006"
+      provider_options:
+        anthropic:
+          send_reasoning: true
+          web_search_enabled: true
