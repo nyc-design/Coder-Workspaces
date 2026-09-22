@@ -33,8 +33,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
  && apt-get update -y && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
 
-# Node.js 20 + pnpm
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# Node.js 22 + pnpm (Qwen Code requires Node >=22)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
  && apt-get update -y && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
@@ -44,8 +44,17 @@ ENV PATH=/usr/local/share/npm-global/bin:$PATH
 RUN install -d -m 0775 -o coder -g coder /usr/local/share/npm-global
 
 # AI coding CLIs + docs/tooling ecosystem
-RUN npm install -g pnpm @openai/codex @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli gitnexus @samuelfaj/distill ctx7 \
+RUN npm install -g pnpm @openai/codex @qwen-code/qwen-code@0.24.3 @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli gitnexus @samuelfaj/distill ctx7 \
  && chown -R coder:coder /usr/local/share/npm-global
+
+# Subscription tooling: no credentials or user state in image layers.
+COPY workspace-images/base-dev/scripts/install-bailian.sh /tmp/install-bailian.sh
+COPY workspace-images/base-dev/scripts/install-codexbar.sh /tmp/install-codexbar.sh
+RUN bash /tmp/install-bailian.sh && bash /tmp/install-codexbar.sh \
+ && qwen --version \
+ && chown -R coder:coder /usr/local/share/npm-global \
+ && rm /tmp/install-bailian.sh /tmp/install-codexbar.sh
+ENV ARCHIFY_UPDATE_CHECK_DISABLED=1
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction
 # Install to /usr/local/bin for system-wide availability across all agents
@@ -142,7 +151,7 @@ RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patc
 # the same shared path.
 #
 # base-dev currently ships the four agentmemory skills (recall, remember,
-# session-history, forget) as SKILL.md dirs and an empty CLI install list.
+# session-history, forget) as SKILL.md dirs; upstream LikeC4 DSL and Archify use the CLI install list.
 COPY workspace-images/base-dev/skills.d/          /usr/local/share/workspace-skills.d/
 COPY workspace-images/base-dev/skills-install.d/  /usr/local/share/workspace-skills-install.d/
 

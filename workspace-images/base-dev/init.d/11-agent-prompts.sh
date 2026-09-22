@@ -13,7 +13,7 @@
 #      auto-injects into chat context (default for chatd's workspace-agent
 #      lookup — see coder/coder agent/agentcontextconfig/api.go).
 #   3. Symlink each provider's expected path to ~/.coder/AGENTS.md so the
-#      same content is seen by Claude Code, Codex, and Gemini CLIs running
+#      same content is seen by Claude Code, Codex, Gemini, and Qwen CLIs running
 #      in-workspace. Symlinks are idempotent and preserve any user-edited
 #      regular files (we never overwrite a non-link).
 
@@ -58,5 +58,6 @@ maybe_link() {
 maybe_link "$CANONICAL" "$HOME/.claude/CLAUDE.md"     # Claude Code
 maybe_link "$CANONICAL" "$HOME/.codex/AGENTS.md"      # Codex CLI
 maybe_link "$CANONICAL" "$HOME/.gemini/GEMINI.md"     # Gemini CLI
+maybe_link "$CANONICAL" "$HOME/.qwen/QWEN.md"         # Qwen CLI
 
 printf "[agent-prompts] Done.\n"

@@ -345,6 +345,16 @@ For the same reason these land in every workspace's environment regardless of
 image: Terraform doesn't know which image a workspace resolves to, since that
 comes from the repo's `.devcontainer/devcontainer.json` at envbuilder time.
 
+### Base agent tools and diagram skills
+
+Base-dev now uses Node 22 and includes Qwen Code, Bailian (`bl`), and CodexBar CLI.
+Qwen/Bailian state is host-shared via `.qwen`/`.bailian` runtime mounts; credentials
+are user-provisioned, never baked in. Qwen receives the canonical prompt and skills.
+The base skill manifest adds upstream LikeC4 DSL and Archify (explanatory HTML,
+not a replacement for maintained LikeC4 models). See
+`workspace-images/base-dev/AGENT_TOOLS.md` for international Token Plan login,
+CodexBar usage-auth boundaries, host-directory prerequisites, validation and rollout.
+
 ### Design Tooling (vite-dev / fullstack-dev)
 - The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
 - Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
