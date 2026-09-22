@@ -70,6 +70,7 @@ resource "coder_app" "ai_usage" {
   icon         = "/icon/widgets.svg"
   url          = var.ai_usage_url
   external     = true
+  open_in      = "tab"
   order        = 1
 }
 
@@ -84,5 +85,6 @@ resource "coder_app" "github_repo" {
   icon         = "/icon/github.svg"
   url          = var.repo_html_url
   external     = true
+  open_in      = "tab"
   order        = 3
 }
