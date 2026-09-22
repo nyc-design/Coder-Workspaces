@@ -22,7 +22,8 @@
 # sync.sh, which only loads the exact filenames above).
 #
 # context_limit values are the live `context_length` reported by OmniRoute.
-# compression_threshold is a uniform 30 (compress at 30% of context).
+# compression_threshold is a percentage of context; Alibaba targets ~200k tokens,
+# capped at 90% for smaller windows. Other providers retain their existing settings.
 
 models:
   # ── Claude Code subscription paths (Anthropic Messages API) ────────────────
@@ -423,7 +424,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 1000000
-    compression_threshold: 30
+    compression_threshold: 20
     model_config:
       reasoning_effort:
         default: medium
@@ -443,7 +444,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 128000
-    compression_threshold: 30
+    compression_threshold: 90
     model_config:
       reasoning_effort:
         default: medium
@@ -464,7 +465,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 1000000
-    compression_threshold: 30
+    compression_threshold: 20
     model_config:
       reasoning_effort:
         default: medium
@@ -485,7 +486,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 128000
-    compression_threshold: 30
+    compression_threshold: 90
     model_config:
       reasoning_effort:
         default: medium
