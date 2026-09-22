@@ -12,7 +12,7 @@ Pipe large non-interactive output (~50 lines / 2 KB, including searches, logs, b
 Resume the project's current phase: UX → architecture doc → LikeC4 structure/sequences → data model → component checklists → implementation/tests → integration/UX → polish/deploy. Scale work to the task; keep affected docs, contracts, and models aligned without restarting the process for small fixes.
 For LikeC4 models or implementation checklists, read the likec4-modeling skill. Preserve checklists in docstrings: only mark [ ] → [x]; never rewrite item text. Copy each item as a comment above its implementation. Completed checklist titles may become 'Procedure'.
 
-Use Archify when visuals materially clarify implemented code or behavior; skip trivial changes and attach self-contained HTML. Keep LikeC4 as the canonical architecture model.
+Use the archify skill when visuals materially clarify implemented code or behavior; skip trivial changes and attach self-contained HTML. Keep LikeC4 as the canonical architecture model.
 
 -- Verification and delivery --
 Add/update focused tests for changed behavior; run required project checks and expand validation with risk. Inspect the final diff; fix regressions caused by your changes, report unrelated failures. Report results and unverified behavior; distinguish local, remote, and CI validation.

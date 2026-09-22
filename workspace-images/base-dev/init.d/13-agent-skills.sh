@@ -135,7 +135,8 @@ install_cli_skills() {
       # target succeeds). `universal` resolves to ~/.agents/skills, which is
       # exactly our canonical, and step 3 below publishes the per-skill
       # provider symlinks itself — so we never wanted the fan-out.
-      if ! skills add "$pkg" --global --skill '*' --agent universal --yes; then
+      # Keep the CLI from draining the manifest read loop's stdin.
+      if ! skills add "$pkg" --global --skill '*' --agent universal --yes </dev/null; then
         printf "[agent-skills] WARNING: skills add %s failed (continuing)\n" "$pkg"
       fi
     done < <(jq -r 'if type=="array" then .[] else empty end' "$list" 2>/dev/null)
