@@ -19,7 +19,7 @@ variable "enable_apps" {
 variable "enable_cursor" {
   description = "Whether to create the Cursor app"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_vscode_desktop" {
