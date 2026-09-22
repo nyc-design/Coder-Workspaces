@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {brandDashboard, colorProviders} from './theme.mjs';
 import {timingSafeEqual} from 'node:crypto';
 
 // Change presentation only. Keep the built-in ID for refresh and routing.
@@ -32,7 +33,9 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
       method: req.method, path: req.url, headers: {...req.headers, host: `127.0.0.1:${upstreamPort}`, 'accept-encoding': 'identity'}}, incoming => {
       const snapshot = req.method === 'GET' &&
         req.url.split('?')[0] === '/dashboard/v1/snapshot' && incoming.statusCode === 200;
-      if (!snapshot) {
+      const html = req.method === 'GET' && req.url.split('?')[0] === '/' &&
+        incoming.statusCode === 200 && incoming.headers['content-type']?.includes('text/html');
+      if (!snapshot && !html) {
         res.writeHead(incoming.statusCode, incoming.headers);
         incoming.pipe(res);
         incoming.on('error', () => res.destroy());
@@ -49,8 +52,10 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
       incoming.on('end', () => {
         if (res.destroyed || res.writableEnded) return;
         try {
-          const body = JSON.stringify(presentAlibaba(JSON.parse(Buffer.concat(chunks).toString('utf8'))));
-          const headers = {...incoming.headers, 'content-type': 'application/json',
+          const text = Buffer.concat(chunks).toString('utf8');
+          const body = html ? brandDashboard(text) :
+            JSON.stringify(colorProviders(presentAlibaba(JSON.parse(text))));
+          const headers = {...incoming.headers, 'content-type': html ? 'text/html; charset=utf-8' : 'application/json',
             'content-length': Buffer.byteLength(body), 'cache-control': 'no-store'};
           for (const key of ['transfer-encoding', 'content-encoding', 'etag', 'last-modified']) delete headers[key];
           res.writeHead(200, headers).end(body);
