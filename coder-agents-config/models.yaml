@@ -76,7 +76,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 1000000
-    compression_threshold: 20
+    compression_threshold: 30
     model_config:
       reasoning_effort:
         default: high
@@ -278,7 +278,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 400000
-    compression_threshold: 50
+    compression_threshold: 60
     model_config:
       openai_config:
         use_responses_api: true
@@ -302,7 +302,7 @@ models:
     enabled: true
     is_default: false
     context_limit: 400000
-    compression_threshold: 50
+    compression_threshold: 60
     model_config:
       openai_config:
         use_responses_api: true
