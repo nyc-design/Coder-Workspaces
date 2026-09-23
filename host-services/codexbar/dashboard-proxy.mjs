@@ -1,3 +1,4 @@
+import {createResetReader, addResetSummary} from './reset-credits.mjs';
 import http from 'node:http';
 import {brandDashboard, colorProviders} from './theme.mjs';
 import {timingSafeEqual} from 'node:crypto';
@@ -17,6 +18,7 @@ export function presentAlibaba(snapshot) {
 
 export function createDashboardProxy(upstreamPort = 8082, token = process.env.CODEXBAR_DASHBOARD_TOKEN) {
   if (!token) throw new Error('Dashboard token required');
+  const readResets = createResetReader(upstreamPort);
   const server = http.createServer((req, res) => {
     const path = req.url.split('?')[0];
     // Loopback CodexBar bypasses its bearer gate; enforce it at the public boundary.
@@ -49,12 +51,17 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
         else chunks.push(chunk);
       });
       incoming.on('error', fail);
-      incoming.on('end', () => {
+      incoming.on('end', async () => {
         if (res.destroyed || res.writableEnded) return;
         try {
           const text = Buffer.concat(chunks).toString('utf8');
-          const body = html ? brandDashboard(text) :
-            JSON.stringify(colorProviders(presentAlibaba(JSON.parse(text))));
+          let data;
+          if (!html) {
+            data = colorProviders(presentAlibaba(JSON.parse(text)));
+            if (data.providers.some(p => p.id === 'codex')) data = addResetSummary(data, await readResets());
+          }
+          if (res.destroyed || res.writableEnded) return;
+          const body = html ? brandDashboard(text) : JSON.stringify(data);
           const headers = {...incoming.headers, 'content-type': html ? 'text/html; charset=utf-8' : 'application/json',
             'content-length': Buffer.byteLength(body), 'cache-control': 'no-store'};
           for (const key of ['transfer-encoding', 'content-encoding', 'etag', 'last-modified']) delete headers[key];

@@ -71,6 +71,23 @@ upstream scripts, token storage, refresh, authentication forms and chart logic a
 unchanged. The public Host header is rewritten to the internal loopback authority
 before forwarding so CodexBar does not reject the deployment hostname.
 
+### Codex manual reset credits
+
+The Codex card now includes a display-only **Manual resets** section. Available
+credits can be expanded to show every expiration in local date/time order, with
+non-expiring credits last. Redeemed and expired credits are excluded. There are
+no redemption controls and no changes to the normal usage-window reset labels.
+
+The proxy reads stock CodexBar's `/usage?provider=codex` on loopback only when a
+snapshot includes Codex. Reads are coalesced and cached for 60 seconds, bounded
+to five seconds and 2 MiB, and reuse CodexBar's own provider machinery/cache.
+Only counts, expiration dates and an observation timestamp reach the browser;
+credit IDs and account details are not added. Missing, malformed or older-than-
+three-minute data displays **Unavailable**, never a fabricated zero. Multiple raw
+Codex accounts or grouped account cards are conservatively left unavailable rather
+than assigning credits to the wrong account. A genuine empty inventory displays
+**0 available**. Claude remains unchanged.
+
 ## Deploy
 
 1. Keep `CODEXBAR_DASHBOARD_TOKEN` in the host `.env` and the existing Codex,

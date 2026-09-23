@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import {addResetSummary} from '../reset-credits.mjs';
 import {colorProviders} from '../theme.mjs';
 import {presentAlibaba, createDashboardProxy} from '../dashboard-proxy.mjs';
 
@@ -57,6 +58,6 @@ test('proxy preserves bearer gate, assets and raw APIs, transforms only successf
   assert.equal(await (await fetch(base+'/usage', {headers})).text(), 'raw usage');
   const response = await fetch(base+'/dashboard/v1/snapshot?provider=llmproxy', {headers});
   assert.equal(response.headers.get('etag'), null);
-  assert.deepEqual(await response.json(), colorProviders(presentAlibaba(fixture)));
+  assert.deepEqual(await response.json(), addResetSummary(colorProviders(presentAlibaba(fixture)), {state:'unavailable'}));
   assert.equal((await fetch(base+'/dashboard/v1/snapshot?bad', {headers})).status, 502);
 });
