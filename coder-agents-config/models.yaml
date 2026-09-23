@@ -71,21 +71,21 @@ models:
           web_search_enabled: true
 
   - provider: anthropic
-    model: cliproxy-claude/claude-opus-4-8
-    display_name: Claude Opus 4.8 — CLIProxyAPI Claude Code
+    model: cliproxy-claude/claude-opus-5-5
+    display_name: Claude Opus 5.5 — CLIProxyAPI Claude Code
     enabled: true
     is_default: false
     context_limit: 1000000
-    compression_threshold: 30
+    compression_threshold: 20
     model_config:
       reasoning_effort:
         default: high
         max: max
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "25"
-        cache_read_price_per_million_tokens: "0.5"
-        cache_write_price_per_million_tokens: "6.25"
+        input_price_per_million_tokens: "4"
+        output_price_per_million_tokens: "20"
+        cache_read_price_per_million_tokens: "0.2"
+        cache_write_price_per_million_tokens: "5"
       provider_options:
         anthropic:
           send_reasoning: true
@@ -273,12 +273,12 @@ models:
           reasoning_summary: auto
 
   - provider: openai
-    model: cliproxy-codex/gpt-5.5
-    display_name: GPT-5.5 — CLIProxyAPI Codex
+    model: cliproxy-codex/gpt-6-sol
+    display_name: GPT-6 Sol — CLIProxyAPI Codex
     enabled: true
     is_default: false
-    context_limit: 256000
-    compression_threshold: 80
+    context_limit: 400000
+    compression_threshold: 50
     model_config:
       openai_config:
         use_responses_api: true
@@ -286,9 +286,10 @@ models:
         default: high
         max: max
       cost:
-        input_price_per_million_tokens: "5"
-        output_price_per_million_tokens: "30"
-        cache_read_price_per_million_tokens: "0.5"
+        input_price_per_million_tokens: "2"
+        output_price_per_million_tokens: "10"
+        cache_read_price_per_million_tokens: "0.2"
+        cache_write_price_per_million_tokens: "2.5"
       provider_options:
         openai:
           store: false
@@ -296,12 +297,12 @@ models:
           reasoning_summary: auto
 
   - provider: openai
-    model: cliproxy-codex/gpt-5.4-mini
-    display_name: GPT-5.4 Mini — CLIProxyAPI Codex
+    model: cliproxy-codex/gpt-6-luna
+    display_name: GPT-6 Luna — CLIProxyAPI Codex
     enabled: true
     is_default: false
-    context_limit: 256000
-    compression_threshold: 80
+    context_limit: 400000
+    compression_threshold: 50
     model_config:
       openai_config:
         use_responses_api: true
@@ -309,9 +310,10 @@ models:
         default: medium
         max: max
       cost:
-        input_price_per_million_tokens: "0.75"
-        output_price_per_million_tokens: "4.5"
-        cache_read_price_per_million_tokens: "0.075"
+        input_price_per_million_tokens: "0.1"
+        output_price_per_million_tokens: "0.5"
+        cache_read_price_per_million_tokens: "0.01"
+        cache_write_price_per_million_tokens: "0.125"
       provider_options:
         openai:
           store: false
