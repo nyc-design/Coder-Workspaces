@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# esp-remote — flash/monitor an ESP32 that is physically attached to a remote
+# machine (your local PC) from inside this Coder workspace.
+#
+# Why this exists
+# ---------------
+# Coder workspaces are sysbox containers on a shared host. Your board is on
+# your laptop. There is no local USB to pass through, and sysbox blocks the
+# host kernel modules that VirtualHere / usbip need. The portable answer is
+# *network serial*: esptool speaks pyserial's rfc2217:// URLs, which forward
+# the DTR/RTS lines ESP32 needs to enter its download bootloader.
+#
+# On the machine the board is plugged into (your PC), run:
+#
+#     # ESP-IDF ships this; or `pip install esptool` to get it standalone
+#     esp_rfc2217_server.py -v -p 4000 /dev/ttyUSB0      # Linux/macOS
+#     esp_rfc2217_server.py -v -p 4000 COM5              # Windows
+#
+# Then expose port 4000 to this workspace. Easiest options:
+#   * Tailscale between your PC and the Coder host, use the tailnet IP, or
+#   * `coder port-forward <ws> --tcp 4000:4000` from your PC (reverse), or
+#   * any SSH reverse tunnel: ssh -R 4000:localhost:4000 <host>.
+#
+# Usage
+# -----
+#   esp-remote flash   <host:port> [extra idf.py args...]
+#   esp-remote monitor <host:port> [extra idf.py args...]
+#   esp-remote run     <host:port>      # build + flash + monitor
+#   esp-remote esptool <host:port> -- <raw esptool args...>
+#
+# Examples
+#   esp-remote flash   100.92.1.5:4000
+#   esp-remote monitor 100.92.1.5:4000
+#   esp-remote esptool 100.92.1.5:4000 -- chip_id
+set -euo pipefail
+
+die() { echo "esp-remote: $*" >&2; exit 1; }
+
+[ "$#" -ge 2 ] || die "usage: esp-remote {flash|monitor|run|esptool} <host:port> [args...]"
+
+cmd="$1"; shift
+target="$1"; shift
+
+case "$target" in
+  *:*) ;;
+  *) die "expected <host:port>, got '$target'" ;;
+esac
+
+# pyserial URL. ign_set_control tolerates bridges that don't expose every
+# modem control line; esptool still drives EN/IO0 over the RFC2217 channel.
+PORT_URL="rfc2217://${target}?ign_set_control"
+
+# Make sure idf.py / esptool are on PATH even in a non-login shell.
+if ! command -v idf.py >/dev/null 2>&1; then
+  # shellcheck disable=SC1091
+  [ -f "${IDF_PATH:-/opt/esp-idf}/export.sh" ] && . "${IDF_PATH:-/opt/esp-idf}/export.sh" >/dev/null 2>&1 || true
+fi
+
+case "$cmd" in
+  flash)
+    exec idf.py -p "$PORT_URL" flash "$@"
+    ;;
+  monitor)
+    exec idf.py -p "$PORT_URL" monitor "$@"
+    ;;
+  run)
+    idf.py build
+    idf.py -p "$PORT_URL" flash
+    exec idf.py -p "$PORT_URL" monitor
+    ;;
+  esptool)
+    [ "${1:-}" = "--" ] && shift
+    exec esptool.py --port "$PORT_URL" "$@"
+    ;;
+  *)
+    die "unknown subcommand '$cmd' (flash|monitor|run|esptool)"
+    ;;
+esac
