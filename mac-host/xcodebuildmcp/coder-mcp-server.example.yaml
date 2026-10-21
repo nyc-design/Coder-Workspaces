@@ -1,0 +1,15 @@
+# Example entry for coder-agents-config/mcp-servers.yaml once the Mac endpoint is reachable.
+# Keep the real URL/key in your secret-management path rather than committing them.
+
+mcp_servers:
+  - slug: xcodebuildmcp
+    display_name: XcodeBuildMCP (Mac)
+    description: Native macOS Xcode build, test, simulator, logging, debugging, and UI tooling for iOS/macOS/visionOS work.
+    icon_url: /icon/code.svg
+    transport: streamable_http
+    url: ${XCODE_MCP_URL}
+    auth_type: custom_headers
+    custom_headers:
+      X-API-Key: ${XCODE_MCP_API_KEY}
+    enabled: true
+    availability: default_on
