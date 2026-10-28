@@ -1,7 +1,7 @@
 #!/bin/sh
 # agentmemory entrypoint.
 #
-# Three responsibilities:
+# Four responsibilities:
 #
 # 1) Install the right iii-engine config so the worker actually reads it.
 #
@@ -94,6 +94,62 @@ fi
 
 node /usr/local/bin/mcp-http-bridge.mjs &
 BRIDGE_PID=$!
-trap 'kill -TERM "$BRIDGE_PID" "$STUNNEL_PID" 2>/dev/null || true' EXIT TERM INT
 
-exec "$@"
+# Anything other than the default start command (status, doctor, demo, ...)
+# is a one-shot CLI invocation: run it and let the container exit with it.
+case "${1:-}:${2:-}" in
+  agentmemory:|agentmemory:-*) ;;
+  *)
+    trap 'kill -TERM "$BRIDGE_PID" "$STUNNEL_PID" 2>/dev/null || true' EXIT TERM INT
+    exec "$@"
+    ;;
+esac
+
+# 4) Supervise the Worker Compose daemon.
+#
+#    Since agentmemory 0.9.31 the default command spawns `iii compose --up`
+#    detached, waits for REST to come up, then process.exit(0)s
+#    (dist/cli.mjs, end of the start path). `exec`ing it made PID 1 exit 0
+#    seconds after boot, so the container restart-looped and Traefik served
+#    404 for the MCP endpoint. Instead we run the CLI to completion (tini, as
+#    PID 1, adopts the orphaned daemon), then stay in the foreground polling
+#    REST health; sustained failure exits non-zero so the restart policy
+#    recovers it. On SIGTERM we stop the compose project gracefully.
+HEALTH_URL="${AGENTMEMORY_HEALTH_URL:-http://127.0.0.1:3111/agentmemory/health}"
+HEALTH_INTERVAL="${AGENTMEMORY_HEALTH_INTERVAL:-10}"
+HEALTH_MAX_FAILURES="${AGENTMEMORY_HEALTH_MAX_FAILURES:-3}"
+
+cleanup() {
+  kill -TERM "$BRIDGE_PID" "$STUNNEL_PID" 2>/dev/null || true
+}
+shutdown() {
+  trap - TERM INT
+  echo "[agentmemory] stopping Worker Compose project"
+  timeout 8 agentmemory stop >/dev/null 2>&1 || true
+  exit 0
+}
+trap cleanup EXIT
+trap shutdown TERM INT
+
+"$@"
+echo "[agentmemory] supervising Worker Compose (health: ${HEALTH_URL})"
+
+failures=0
+while :; do
+  # Background sleep + wait so TERM interrupts immediately.
+  sleep "$HEALTH_INTERVAL" &
+  wait $! || true
+  # /agentmemory/health sits behind api-auth: use the configured secret, or
+  # the one the CLI generates into ~/.agentmemory/secret when none is set.
+  secret="${AGENTMEMORY_SECRET:-$(cat "$HOME/.agentmemory/secret" 2>/dev/null || true)}"
+  if curl -fsS -o /dev/null --max-time 5 -H "Authorization: Bearer ${secret}" "$HEALTH_URL"; then
+    failures=0
+  else
+    failures=$((failures + 1))
+    echo "[agentmemory] health check failed (${failures}/${HEALTH_MAX_FAILURES})" >&2
+    if [ "$failures" -ge "$HEALTH_MAX_FAILURES" ]; then
+      echo "[agentmemory] REST unhealthy; exiting so the container restarts" >&2
+      exit 1
+    fi
+  fi
+done
