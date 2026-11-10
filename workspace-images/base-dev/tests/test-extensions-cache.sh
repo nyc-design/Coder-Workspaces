@@ -38,6 +38,21 @@ ln -s "$S/charliermarsh.ruff-2026.80.0-linux-arm64" "$CS/charliermarsh.ruff-2026
 ln -s "$S/gone.ext-1.0.0-universal" "$CS/gone.ext-1.0.0-universal"
 mk "$CS/local.only-1.0.0-universal" "user-installed, not in manifest"
 
+# Editor registries that drifted from the symlinks. code-server still lists the
+# ruff version SYNC will unlink and a version that is gone from disk, and has
+# flagged the version SYNC will activate as obsolete.
+reg() { printf '{"identifier":{"id":"%s"},"version":"%s","location":{"$mid":1,"path":"%s/%s","scheme":"file"},"relativeLocation":"%s","metadata":{"size":1,"targetPlatform":"%s"}}' "$1" "$2" "$3" "$4" "$4" "$5"; }
+printf '[%s,%s,%s]' \
+  "$(reg charliermarsh.ruff 2026.80.0 "$CS" charliermarsh.ruff-2026.80.0-linux-arm64 linux-arm64)" \
+  "$(reg openai.chatgpt 26.5623.31443 "$CS" openai.chatgpt-26.5623.31443-linux-arm64 linux-arm64)" \
+  "$(reg local.only 1.0.0 "$CS" local.only-1.0.0-universal universal)" > "$CS/extensions.json"
+printf '{"openai.chatgpt-26.5908.31748-linux-arm64":true,"old.thing-0.1.0-universal":true}' > "$CS/.obsolete"
+# The install step's registry: its record for the active chatgpt is pinned.
+printf '[{"identifier":{"id":"openai.chatgpt","uuid":"u-1"},"version":"26.5908.31748","location":{"$mid":1,"path":"%s/x","scheme":"file"},"relativeLocation":"openai.chatgpt-26.5908.31748-linux-arm64","metadata":{"pinned":true,"source":"gallery","targetPlatform":"linux-arm64"}}]' "$S" > "$S/extensions.json"
+# vscode-web's registry is host-shared and must be left alone.
+printf '[%s]' "$(reg gone.web 1.0.0 "$W" gone.web-1.0.0 undefined)" > "$W/extensions.json"
+cp "$W/extensions.json" "$T/vscode-web-registry.before"
+
 # manifests: ruff pinned to the OLD version; chatgpt unpinned; claude unpinned
 cat > "$M/10-base.json" <<EOF
 {"shared":["Anthropic.claude-code","openai.chatgpt","charliermarsh.ruff@2026.60.0","abridge.file-explorer-tools","foo.bar"],"vscode_web_only":["Google.geminicodeassist"]}
@@ -78,6 +93,16 @@ chk "pinned ruff linked, not newest"  '[ -L "$CS/charliermarsh.ruff-2026.60.0-li
 chk "dangling symlink removed"        '[ ! -L "$CS/gone.ext-1.0.0-universal" ]'
 chk "user real dir untouched"         '[ -d "$CS/local.only-1.0.0-universal" ] && [ ! -L "$CS/local.only-1.0.0-universal" ]'
 chk "prefix collision: foo.bar ok"    '[ -L "$CS/foo.bar-1.0.0-universal" ] && [ ! -e "$CS/foo.bar-baz-9.0.0-universal" ]'
+R="$CS/extensions.json"
+chk "registry: every entry exists"    '[ "$(jq -r ".[].relativeLocation" "$R" | while read -r r; do [ -e "$CS/$r" ] || echo x; done | wc -l)" -eq 0 ]'
+chk "registry: every dir listed"      '[ "$(for e in "$CS"/*/; do jq -e --arg n "$(basename "$e")" "any(.[]; .relativeLocation==\$n)" "$R" >/dev/null || echo x; done | wc -l)" -eq 0 ]'
+chk "registry: one entry per id"      '[ "$(jq -r ".[].identifier.id" "$R" | sort | uniq -d | wc -l)" -eq 0 ]'
+chk "registry: repointed to pin"      'jq -e "any(.[]; .relativeLocation==\"charliermarsh.ruff-2026.60.0-linux-arm64\" and .version==\"2026.60.0\" and .metadata.targetPlatform==\"linux-arm64\" and (.metadata|has(\"size\")|not))" "$R" >/dev/null'
+chk "registry: install metadata, unpinned" 'jq -e "any(.[]; .relativeLocation==\"openai.chatgpt-26.5908.31748-linux-arm64\" and .identifier.uuid==\"u-1\" and .metadata.source==\"gallery\" and .metadata.pinned==false)" "$R" >/dev/null'
+chk "registry: user entry untouched"  'jq -e "any(.[]; .relativeLocation==\"local.only-1.0.0-universal\" and .metadata.size==1)" "$R" >/dev/null'
+chk "obsolete: active flag cleared"   'jq -e "(has(\"openai.chatgpt-26.5908.31748-linux-arm64\")|not) and has(\"old.thing-0.1.0-universal\")" "$CS/.obsolete" >/dev/null'
+chk "registry: none created if absent" '[ ! -e "$VS/extensions.json" ] && [ -L "$VS/foo.bar-1.0.0-universal" ]'
+chk "registry: vscode-web untouched"  'cmp -s "$W/extensions.json" "$T/vscode-web-registry.before"'
 chk "prune: old claude gone (no lease)" '[ ! -d "$S/anthropic.claude-code-2.1.193-linux-arm64" ] && [ ! -d "$S/anthropic.claude-code-2.1.227-linux-arm64" ]'
 chk "prune: newest claude kept"       '[ -d "$S/anthropic.claude-code-2.1.300-linux-arm64" ]'
 chk "prune: leased old chatgpt kept"  '[ -d "$S/openai.chatgpt-26.5623.31443-linux-arm64" ]'

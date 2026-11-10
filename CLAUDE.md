@@ -304,7 +304,7 @@ the shared cache. Three init scripts manage the lifecycle:
 | Script | Role |
 |---|---|
 | `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. |
-| `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir; write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
+| `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir; reconcile each per-workspace editor's `extensions.json` / `.obsolete` with those symlinks (the editors trust that registry and do not rescan, so a repointed id otherwise shows as an invalid extension); write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
 | `31-extensions-prune.sh` | Reap versions nobody needs. A versioned dir is deleted only if it is not the newest for its id, not pinned by an image manifest, and not listed in any fresh lease (any workspace's). Leases untouched for `EXTENSIONS_LEASE_STALE_DAYS` (45) are treated as abandoned and removed. |
 
 Leases live *inside* the host-bound cache, so every workspace's pruner sees

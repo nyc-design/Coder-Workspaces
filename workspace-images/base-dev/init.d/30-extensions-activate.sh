@@ -23,7 +23,14 @@
 #      gone) are pruned. Real (non-symlink, non-manifest) entries -- e.g.
 #      user-installed extensions -- are never touched.
 #
-#   3. LEASE: write shared/_leases/<owner>--<workspace> listing every versioned
+#   3. RECONCILE: bring each editor's own registry (`extensions.json` and
+#      `.obsolete` in its extensions dir) in line with the symlinks SYNC just
+#      made. The editors trust that registry and do not rescan the directory,
+#      so without this a repointed id keeps an entry for the version that is
+#      gone ("Invalid extensions detected") while the version now linked is
+#      unknown to the editor, which flags it obsolete and removes the link.
+#
+#   4. LEASE: write shared/_leases/<owner>--<workspace> listing every versioned
 #      dir this workspace activated (in shared/ and vscode-web/). Leases live
 #      inside the host-bound cache, so every workspace on the VM can read every
 #      other workspace's lease. 31-extensions-prune.sh only deletes versions
@@ -314,6 +321,118 @@ sync_editor_dir() {
   done
 
   log "$editor_name: synced (active ids: ${#active_name[@]}, linked/repointed: $linked, removed symlinks: $pruned)"
+
+  # Per-workspace editor dirs only. vscode-web's dir is one store shared by
+  # every workspace on the host (do_promote=0), so its registry is not ours
+  # to rewrite from a single workspace's manifest set.
+  [ "$do_promote" = "1" ] || return 0
+  local active_tsv=""
+  for id_lc in "${!active_name[@]}"; do
+    name="${active_name[$id_lc]}"
+    active_tsv+="$id_lc"$'\t'"$name"$'\t'"$(ext_version "$name")"$'\n'
+  done
+  reconcile_registry "$editor_name" "$target_dir" "$active_tsv"
+}
+
+# ---------------------------------------------------------------------------
+# RECONCILE
+# ---------------------------------------------------------------------------
+# reconcile_registry <editor_name> <target_dir> <active_tsv>
+#   active_tsv: one "<id_lc>\t<versioned name>\t<version>" line per active id.
+# Best-effort: a failure here is logged and never fails activation.
+reconcile_registry() {
+  local editor_name="$1" target_dir="$2" active_tsv="$3" out
+  command -v node >/dev/null 2>&1 || return 0
+  if out="$(DIR="$target_dir" ACTIVE="$active_tsv" SHARED_JSON="$SHARED_EXTENSIONS_DIR/extensions.json" node <<'NODE' 2>&1
+const fs = require('fs');
+const path = require('path');
+const dir = process.env.DIR;
+const active = (process.env.ACTIVE || '').split('\n').filter(Boolean).map((l) => {
+  const [id, name, ver] = l.split('\t');
+  return { id, name, ver };
+});
+
+const readJson = (file) => {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return undefined; }
+};
+const writeJson = (file, data) => {
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(data));
+  fs.renameSync(tmp, file);
+};
+const entryPath = (e) => (e && e.relativeLocation
+  ? path.join(dir, e.relativeLocation)
+  : (e && e.location && (e.location.path || e.location.fsPath)) || '');
+const entryId = (e) => String((e && e.identifier && e.identifier.id) || '').toLowerCase();
+
+// .obsolete: an active version must never be flagged for removal.
+const obsoleteFile = path.join(dir, '.obsolete');
+const obsolete = readJson(obsoleteFile);
+let unflagged = 0;
+if (obsolete && typeof obsolete === 'object' && !Array.isArray(obsolete)) {
+  const keep = new Set();
+  for (const a of active) { keep.add(a.name.toLowerCase()); keep.add(`${a.id}-${a.ver}`.toLowerCase()); }
+  for (const key of Object.keys(obsolete)) {
+    if (keep.has(key.toLowerCase())) { delete obsolete[key]; unflagged += 1; }
+  }
+  if (unflagged) writeJson(obsoleteFile, obsolete);
+}
+
+// extensions.json: absent means the editor has not built its registry yet and
+// will scan the directory itself; unparsable is left for the editor to handle.
+const registryFile = path.join(dir, 'extensions.json');
+let entries = fs.existsSync(registryFile) ? readJson(registryFile) : undefined;
+let added = 0, dropped = 0;
+if (Array.isArray(entries)) {
+  const shared = readJson(process.env.SHARED_JSON);
+  const sharedByName = new Map();
+  if (Array.isArray(shared)) {
+    for (const e of shared) if (e && e.relativeLocation) sharedByName.set(e.relativeLocation.toLowerCase(), e);
+  }
+
+  const missing = entries.filter((e) => !fs.existsSync(entryPath(e)));
+  entries = entries.filter((e) => fs.existsSync(entryPath(e)));
+  dropped = missing.length;
+
+  for (const a of active) {
+    const loc = path.join(dir, a.name);
+    if (!fs.existsSync(loc)) continue;
+    if (entries.some((e) => entryPath(e) === loc)) continue;
+    // Metadata: the install step's record for this exact version if there is
+    // one, else what this editor knew about the version it had before.
+    const exact = sharedByName.get(a.name.toLowerCase());
+    const template = exact || missing.find((e) => entryId(e) === a.id) || {};
+    const pkg = readJson(path.join(loc, 'package.json')) || {};
+    const platform = a.name.slice(`${a.id}-${a.ver}`.length).replace(/^-/, '');
+    // pinned:false -- the install step records `id@version` installs as
+    // pinned, which would switch off the editor's own updates for this id.
+    const metadata = { ...(template.metadata || {}), installedTimestamp: Date.now(), pinned: false };
+    delete metadata.size;
+    if (platform) metadata.targetPlatform = platform;
+    else if (!exact) metadata.targetPlatform = 'undefined';
+    entries.push({
+      identifier: template.identifier
+        || { id: pkg.publisher && pkg.name ? `${pkg.publisher}.${pkg.name}` : a.id },
+      version: typeof pkg.version === 'string' ? pkg.version : a.ver,
+      location: { $mid: 1, path: loc, scheme: 'file' },
+      relativeLocation: a.name,
+      metadata,
+    });
+    added += 1;
+  }
+  if (added || dropped) writeJson(registryFile, entries);
+}
+
+if (added || dropped || unflagged) {
+  console.log(`registry reconciled (entries added: ${added}, stale entries dropped: ${dropped}, obsolete flags cleared: ${unflagged})`);
+}
+NODE
+  )"; then
+    [ -n "$out" ] && log "$editor_name: $out"
+  else
+    log "$editor_name: WARN registry reconcile failed: $out"
+  fi
+  return 0
 }
 
 # vscode-web is its own host-bound store: Marketplace-only extensions
