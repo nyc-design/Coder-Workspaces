@@ -52,3 +52,15 @@ variable "extra_mounts" {
   }))
   default = []
 }
+
+variable "command" {
+  description = "Container command. Null keeps the image's own entrypoint/command (envbuilder). Set it when running a prebuilt image that must start the agent itself."
+  type        = list(string)
+  default     = null
+}
+
+variable "ssh_container_path" {
+  description = "Where the host's shared ssh directory is mounted. Override for workspaces that manage their own ~/.ssh and must not write to the shared one."
+  type        = string
+  default     = "/home/coder/.ssh"
+}

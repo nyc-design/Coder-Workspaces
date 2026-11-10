@@ -19,7 +19,7 @@ locals {
   )
 
   common_mounts = [
-    { container_path = "/home/coder/.ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = false },
+    { container_path = var.ssh_container_path, host_path = "/home/ubuntu/secrets/ssh", read_only = false },
     { container_path = "/home/coder/.config/gcloud", host_path = "/home/ubuntu/secrets/gcloud", read_only = false },
     { container_path = "/home/coder/.pencil", host_path = "/home/ubuntu/secrets/.pencil", read_only = false },
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
@@ -101,7 +101,8 @@ resource "docker_container" "workspace" {
   hostname = var.workspace_name
   runtime  = "sysbox-runc"
 
-  env = concat(var.docker_env, local.common_env, var.extra_env)
+  env     = concat(var.docker_env, local.common_env, var.extra_env)
+  command = var.command
 
   host {
     host = "host.docker.internal"

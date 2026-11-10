@@ -7,11 +7,21 @@ terraform {
     docker = {
       source = "kreuzwerker/docker"
     }
+    google = {
+      source  = "hashicorp/google"
+      version = "7.0.1"
+    }
   }
 }
 
 provider "coder" {}
 provider "docker" {}
+
+provider "google" {
+  project = "coder-nt"
+  region  = "us-central1"
+  zone    = "us-central1-c"
+}
 
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
@@ -91,6 +101,8 @@ locals {
   # in ~/.ssh/authorized_keys on every VM this template is pointed at.
   ssh_key_path = "/home/coder/secrets/ssh/id_ed25519"
 
+  git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+
   # Written by scripts/vm-gateway.sh; holds the VM's ssh:// folder.
   workspace_file = "/home/coder/vm.code-workspace"
 
@@ -130,6 +142,10 @@ data "coder_workspace_preset" "vms" {
   }
 }
 
+module "workspace_secrets" {
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
+}
+
 module "workspace_startup" {
   source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-startup?ref=main"
 }
@@ -156,6 +172,11 @@ resource "coder_agent" "main" {
     VM_REMOTE_DIR     = local.remote_dir
     VM_SSH_KEY_SOURCE = local.ssh_key_path
     VM_WORKSPACE_FILE = local.workspace_file
+
+    GIT_AUTHOR_NAME     = local.git_author_name
+    GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
+    GIT_COMMITTER_NAME  = local.git_author_name
+    GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
 
     CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
@@ -187,7 +208,7 @@ resource "coder_agent" "main" {
     for_each = module.workspace_apps_metadata.agent_metadata_items
     content {
       display_name = metadata.value.display_name
-      key          = "2_${metadata.value.key}"
+      key          = metadata.value.key
       script       = metadata.value.script
       interval     = metadata.value.interval
       timeout      = metadata.value.timeout
@@ -222,6 +243,7 @@ resource "coder_app" "vm_terminal" {
 }
 
 # ── Workspace container ──────────────────────────────────────────────────────
+# The shared runtime module, running base-dev directly instead of envbuilder.
 
 data "docker_registry_image" "workspace" {
   name = local.workspace_image
@@ -233,94 +255,28 @@ resource "docker_image" "workspace" {
   keep_locally  = true
 }
 
-# Holds editor state and ~/.ssh (config, known_hosts) for this one VM.
-resource "docker_volume" "home" {
-  name = "coder-${data.coder_workspace.me.id}-home"
+module "workspace_runtime" {
+  source                     = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-runtime?ref=main"
+  start_count                = data.coder_workspace.me.start_count
+  devcontainer_builder_image = docker_image.workspace.image_id
+  owner_name                 = data.coder_workspace_owner.me.name
+  owner_id                   = data.coder_workspace_owner.me.id
+  workspace_id               = data.coder_workspace.me.id
+  workspace_name             = data.coder_workspace.me.name
+  agent_id                   = coder_agent.main.id
+  github_pat                 = module.workspace_secrets.github_pat
+  command                    = ["sh", "-c", coder_agent.main.init_script]
 
-  lifecycle {
-    ignore_changes = all
-  }
-
-  labels {
-    label = "coder.owner"
-    value = data.coder_workspace_owner.me.name
-  }
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
-}
-
-locals {
-  # A subset of workspace-runtime's host mounts: the shared extension cache
-  # and the Claude Code login, so the editor and Claude behave as in any
-  # other workspace. The host's ssh directory is mounted read-only at a side
-  # path, NOT at ~/.ssh as workspace-runtime does: this template rewrites
-  # ~/.ssh/config, and that must never touch the directory other workspaces
-  # share.
-  host_mounts = [
-    { container_path = "/home/coder/secrets/ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = true },
-    { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
-    { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
-    { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },
-    { container_path = "/home/coder/.claude", host_path = "/home/ubuntu/secrets/.claude", read_only = false },
-    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false },
-  ]
-}
-
-resource "docker_container" "workspace" {
-  count = data.coder_workspace.me.start_count
-  image = docker_image.workspace.image_id
-  name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
-
-  hostname = data.coder_workspace.me.name
-  runtime  = "sysbox-runc"
-
-  env = [
+  docker_env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
     "CODER_AGENT_URL=${replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")}",
   ]
 
-  command = ["sh", "-c", coder_agent.main.init_script]
+  # This template rewrites ~/.ssh/config on every start, so the host's shared
+  # ssh directory is mounted at a side path and ~/.ssh stays in the home volume.
+  ssh_container_path = "/home/coder/secrets/ssh"
 
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
-  }
-
-  volumes {
-    container_path = "/home/coder"
-    volume_name    = docker_volume.home.name
-    read_only      = false
-  }
-
-  dynamic "volumes" {
-    for_each = local.host_mounts
-    content {
-      container_path = volumes.value.container_path
-      host_path      = volumes.value.host_path
-      read_only      = volumes.value.read_only
-    }
-  }
-
-  labels {
-    label = "coder.owner"
-    value = data.coder_workspace_owner.me.name
-  }
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
-  labels {
-    label = "coder.workspace_name"
-    value = data.coder_workspace.me.name
-  }
+  extra_mounts = [
+    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false }
+  ]
 }

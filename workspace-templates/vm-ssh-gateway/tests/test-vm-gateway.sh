@@ -99,6 +99,9 @@ check "SSH FS extension activated for code-server" ws 'ls ~/.vscode-extensions/c
 check "Machine settings carry the VM connection" ws '[ "$(jq -r ".[\"sshfs.configs\"][0].host" ~/.local/share/code-server/Machine/settings.json)" = "vm.test" ]'
 check "default terminal profile is the VM" ws '[ "$(jq -r ".[\"terminal.integrated.defaultProfile.linux\"]" ~/.local/share/code-server/Machine/settings.json)" = "VM" ]'
 check "agent prompt explains the VM" ws 'grep -q "ssh vm" ~/.coder/AGENTS.md'
+for f in .claude/CLAUDE.md .codex/AGENTS.md .gemini/GEMINI.md .qwen/QWEN.md; do
+  check "VM instructions reach ~/$f" ws "grep -q 'ssh vm' ~/$f"
+done
 
 echo "--- check"
 check "check succeeds against a reachable VM" ws 'bash /vm-gateway.sh check'
