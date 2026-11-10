@@ -6,15 +6,36 @@
 # stays in the workspaces.
 #
 # Multi-arch: linux/amd64 + linux/arm64. Build context is the repo root so the
-# pinned, checksum-verified installer shared with base-dev is reused.
+# pinned Bailian installer shared with base-dev is reused.
 
-# Stage 1: the installer needs dpkg/curl/sha256sum, which Alpine lacks.
+# Stage 1: pinned, checksum-verified CodexBar release.
+# Pinned separately from base-dev (0.84): CodexBar >= 0.72 reads Claude usage
+# with `?cedar_ember=1`, which Anthropic rate limits about half the time even at
+# one request per five minutes; the plain call 0.71.1 makes is not affected.
+# Re-test Claude polling before raising this. Checksums match upstream .sha256.
 FROM debian:bookworm-slim AS fetch
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
- && rm -rf /var/lib/apt/lists/*
-COPY workspace-images/base-dev/scripts/install-codexbar.sh /tmp/install-codexbar.sh
-RUN CODEXBAR_INSTALL_PREFIX=/opt/codexbar bash /tmp/install-codexbar.sh
+ARG TARGETARCH
+ARG CODEXBAR_VERSION=0.71.1
+ARG CODEXBAR_SHA256_AMD64=030d17d1b6b59937462067518106970778b02ab74d619e09980c03b9e4a44d9f
+ARG CODEXBAR_SHA256_ARM64=8562a028b9e304bc934b831d194bf84e528d9eb5ee59f700800a837ae5d7d9ed
+RUN set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl ca-certificates; \
+    rm -rf /var/lib/apt/lists/*; \
+    case "$TARGETARCH" in \
+      amd64) platform=x86_64; sha="$CODEXBAR_SHA256_AMD64" ;; \
+      arm64) platform=aarch64; sha="$CODEXBAR_SHA256_ARM64" ;; \
+      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    asset="CodexBarCLI-v${CODEXBAR_VERSION}-linux-musl-${platform}.tar.gz"; \
+    curl -fsSL --retry 3 --retry-delay 5 -o "/tmp/$asset" \
+      "https://github.com/steipete/CodexBar/releases/download/v${CODEXBAR_VERSION}/${asset}"; \
+    echo "$sha  /tmp/$asset" | sha256sum -c -; \
+    # Swift resolves resources beside the executable: keep the release together.
+    mkdir -p /opt/codexbar/lib/codexbar; \
+    tar -xzf "/tmp/$asset" -C /opt/codexbar/lib/codexbar; \
+    test "$(cat /opt/codexbar/lib/codexbar/VERSION)" = "$CODEXBAR_VERSION"; \
+    rm "/tmp/$asset"
 
 # Stage 2: pinned, checksum-verified Bailian CLI into a relocatable npm prefix
 # (Debian: the installer needs GNU sha256sum --check).
@@ -48,7 +69,7 @@ RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 
 USER codexbar
 # Create the cache dir as the service user before VOLUME, so new volumes (and
-# empty existing ones) are writable: CodexBar 0.84 keeps its URL cache here.
+# empty existing ones) are writable: newer CodexBar releases keep their URL cache here.
 RUN mkdir -p /home/codexbar/.cache
 # CodexBar launches `bl` with HOME so it reuses the mounted console session.
 ENV HOME=/home/codexbar \

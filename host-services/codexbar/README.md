@@ -1,6 +1,6 @@
 # CodexBar host dashboard
 
-Stock CodexBar 0.84.0 on Node 22 Alpine, with the pinned Bailian 2.0.0 CLI.
+Stock CodexBar 0.71.1 on Node 22 Alpine, with the pinned Bailian 2.0.0 CLI.
 The existing multi-arch GHCR workflow builds from the repository root. No new
 npm dependencies or Swift compilation are required.
 
@@ -13,7 +13,7 @@ configured in `config.json` as `alibabatokenplan` with `source: cli` and
 `bl console call --api zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/usage`
 with the shared `.bailian` console session. A monthly-only plan uses the primary
 usage bar with its real reset time. See upstream
-[alibaba-token-plan.md](https://github.com/steipete/CodexBar/blob/v0.84.0/docs/alibaba-token-plan.md).
+[alibaba-token-plan.md](https://github.com/steipete/CodexBar/blob/v0.71.1/docs/alibaba-token-plan.md).
 
 ```text
 Browser → Traefik → presentation proxy :8080 → CodexBar 127.0.0.1:8082
@@ -101,11 +101,17 @@ on AMD64 and ARM64; the publishing workflow runs them before its build too.
 
 ## Claude usage rate limits
 
-Anthropic rate limits the Claude OAuth usage endpoint per account, and that
-budget is shared with every Claude Code session on the same login. A burst of
-about ten requests in a minute returns 429 for a couple of minutes, and CodexBar
-then backs off for five. `claude-fallback.mjs` keeps the last good Claude card
-in memory and serves it during that window, with a `rate limited · showing Nm
+The image pins CodexBar 0.71.1 (base-dev's CLI stays on its own pin). CodexBar
+0.72+ reads Claude usage with the reset-credit inventory flag
+(`/api/oauth/usage?cedar_ember=1`), and Anthropic rate limits that variant far
+harder than the plain call: sent seconds apart once a minute, the flagged call
+got 429 on 3 of 7 while the plain call succeeded on all 7, and 0.84 was still
+rate limited every other fetch at a five-minute interval. CodexBar has no
+setting to drop the flag. Re-run that comparison before raising the pin in
+`Dockerfile`.
+
+As a second line, `claude-fallback.mjs` keeps the last good Claude card
+in memory and serves it while the rate-limit error is present, with a `rate limited · showing Nm
 old data` status chip. Readings older than 30 minutes, and every other error
 (expired login included), are passed through unchanged.
 
