@@ -82,18 +82,20 @@ patch_code_server_workbench_bundle_auth_trust() {
     return 0
   fi
 
+  # code-server has shipped the browser workbench under both of these paths;
+  # newer releases (4.145) only have the first. Patch whichever exist, and only
+  # report a problem when neither does.
   local bundles=(
     "$install_root/lib/vscode/out/vs/code/browser/workbench/workbench.js"
     "$install_root/lib/vscode/out/vs/workbench/workbench.web.main.internal.js"
   )
 
   local extra_ids='github.vscode-github-actions eamodio.gitlens'
+  local found=0
 
   for bundle in "${bundles[@]}"; do
-    if [ ! -f "$bundle" ]; then
-      log "workbench bundle not found, skipping: $bundle"
-      continue
-    fi
+    [ -f "$bundle" ] || continue
+    found=1
 
     BUNDLE_JS="$bundle" EXTRA_IDS="$extra_ids" node <<'NODE'
 const fs = require('fs');
@@ -145,6 +147,11 @@ fs.writeFileSync(file, patched);
 console.log('patched');
 NODE
   done
+
+  if [ "$found" = "0" ]; then
+    log "no workbench bundle found under $install_root/lib/vscode/out; auth trust patch not applied"
+    return 1
+  fi
 }
 
 patch_code_server_github_auth_extension || log "warning: failed to patch GitHub authentication extension"
