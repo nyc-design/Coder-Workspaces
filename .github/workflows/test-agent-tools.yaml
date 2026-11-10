@@ -29,6 +29,7 @@ jobs:
           bash workspace-images/base-dev/tests/test-agent-tools-init.sh
           bash workspace-images/base-dev/tests/test-bailian-install.sh
           bash workspace-images/base-dev/tests/test-codexbar-install.sh
+          bash workspace-images/base-dev/tests/test-code-server-auth-patch.sh
       - name: Smoke-test native CLI packages without credentials
         env:
           NPM_CONFIG_PREFIX: ${{ runner.temp }}/agent-tools
