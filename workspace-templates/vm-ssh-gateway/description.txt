@@ -1,1 +1,1 @@
-Browser VS Code (code-server) opened directly on an existing VM over SSH. Enter the VM's IP; no Coder agent needed on the VM.
+Browser VS Code (code-server) with an existing VM opened as an SSH folder. Enter the VM's IP; nothing is installed on the VM.

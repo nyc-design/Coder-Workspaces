@@ -30,7 +30,7 @@ workspace-images/          # Docker images for different development stacks
 
 workspace-templates/       # Coder workspace template definitions
 ├── windows-server-gcp/    # Windows VM on GCP with browser-based RDP access
-├── vm-ssh-gateway/        # Browser code-server running on an existing VM, reached over an SSH tunnel (no Coder agent on the VM)
+├── vm-ssh-gateway/        # Workspace code-server with an existing VM opened as an ssh:// folder (SSH FS); terminals and agents reach the VM over SSH, nothing installed on it
 └── project-workspace/     # Default GitHub-repo / new-project workspace (self mode + agent mode)
 
 workspace-modules/         # Reusable Terraform modules for workspace templates

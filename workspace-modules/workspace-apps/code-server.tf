@@ -35,7 +35,7 @@ resource "coder_app" "code_server" {
   agent_id     = var.agent_id
   slug         = "code-server"
   display_name = "code-server"
-  url          = "http://localhost:${local.code_server_port}/?folder=${urlencode("/workspaces/${var.project_name}")}"
+  url          = "http://localhost:${local.code_server_port}/?${coalesce(var.code_server_query, "folder=${urlencode("/workspaces/${var.project_name}")}")}"
   icon         = "/icon/code.svg"
   subdomain    = false
   share        = "owner"

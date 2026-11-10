@@ -19,7 +19,7 @@ data "coder_workspace_owner" "me" {}
 
 # ── Parameters ───────────────────────────────────────────────────────────────
 # Only the address is required. Every value below ends up in an SSH config and
-# on a remote command line, so each one is validated against a strict pattern.
+# on command lines, so each one is validated against a strict pattern.
 
 data "coder_parameter" "vm_host" {
   name         = "vm_host"
@@ -69,7 +69,7 @@ data "coder_parameter" "vm_port" {
 data "coder_parameter" "remote_dir" {
   name         = "remote_dir"
   display_name = "Folder to Open"
-  description  = "Absolute path on the VM to open. Leave empty for the SSH user's home directory."
+  description  = "Absolute path on the VM to open, e.g. /home/ubuntu or /home/neil/myproject. Leave empty for the SSH user's home directory."
   type         = "string"
   default      = ""
   form_type    = "input"
@@ -78,74 +78,93 @@ data "coder_parameter" "remote_dir" {
 
   validation {
     regex = "^$|^/[A-Za-z0-9._/-]*$"
-    error = "Enter an absolute path using letters, digits, '.', '_', '-' and '/', or leave empty."
+    error = "Enter an absolute path starting with '/' (letters, digits, '.', '_', '-' and '/' only), or leave empty."
   }
 }
 
 locals {
-  # base-dev supplies the editor setup that is pushed to the VM: the
-  # code-server version, settings manifests, extension manifest, and themes.
+  # base-dev supplies code-server, the extension/settings init pipeline, and
+  # the AI CLIs. Everything runs here; nothing is installed on the VM.
   workspace_image = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
-
-  vm_host    = data.coder_parameter.vm_host.value
-  vm_user    = data.coder_parameter.vm_user.value
-  vm_port    = data.coder_parameter.vm_port.value
-  remote_dir = data.coder_parameter.remote_dir.value
 
   # The one shared key, from the host's secrets mount. Its public half must be
   # in ~/.ssh/authorized_keys on every VM this template is pointed at.
   ssh_key_path = "/home/coder/secrets/ssh/id_ed25519"
 
-  # Local end of the SSH tunnel to code-server on the VM.
-  tunnel_port = 13337
+  # Written by scripts/vm-gateway.sh; holds the VM's ssh:// folder.
+  workspace_file = "/home/coder/vm.code-workspace"
 
-  # With no folder in the URL, code-server falls back to the last folder
-  # opened on that VM, then to the directory it was started in (the VM home).
-  folder_query = local.remote_dir != "" ? "?folder=${urlencode(local.remote_dir)}" : ""
+  # "/home/neil/" and "/home/neil" mean the same folder.
+  remote_dir = data.coder_parameter.remote_dir.value == "/" ? "/" : trimsuffix(data.coder_parameter.remote_dir.value, "/")
 
   vm_presets = {
-    watchparty-vm = { vm_host = "170.9.232.54", vm_user = "neil" }
-    neil-dev      = { vm_host = "163.192.217.205", vm_user = "ubuntu" }
+    watchparty-vm = { vm_host = "170.9.232.54", vm_user = "neil", remote_dir = "/home/neil" }
+    neil-dev      = { vm_host = "163.192.217.205", vm_user = "ubuntu", remote_dir = "/home/ubuntu" }
   }
+
+  # vm-gateway.sh feeds the image's init pipeline, so `configure` has to run
+  # before workspace-startup's run-workspace-inits. `check` runs last and may
+  # fail the startup script (VM unreachable, key rejected) without stopping
+  # the editor from coming up.
+  startup_script = join("\n", [
+    "cat > /tmp/vm-gateway.sh <<'VM_GATEWAY_SCRIPT_EOF'",
+    file("${path.module}/scripts/vm-gateway.sh"),
+    "VM_GATEWAY_SCRIPT_EOF",
+    "bash /tmp/vm-gateway.sh configure || true",
+    module.workspace_startup.startup_script,
+    "bash /tmp/vm-gateway.sh check",
+  ])
 }
 
 data "coder_workspace_preset" "vms" {
   for_each = local.vm_presets
 
   name        = each.key
-  description = "${each.value.vm_user}@${each.value.vm_host}"
+  description = "${each.value.vm_user}@${each.value.vm_host}:${each.value.remote_dir}"
   icon        = "/icon/terminal.svg"
 
   parameters = {
-    vm_host = each.value.vm_host
-    vm_user = each.value.vm_user
+    vm_host    = each.value.vm_host
+    vm_user    = each.value.vm_user
+    remote_dir = each.value.remote_dir
   }
 }
 
+module "workspace_startup" {
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-startup?ref=main"
+}
+
+module "workspace_apps_metadata" {
+  source      = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
+  enable_apps = false
+}
+
 # ── Agent ────────────────────────────────────────────────────────────────────
-# The agent runs in a thin gateway container, not on the VM. Parameters reach
-# the scripts as environment variables rather than being templated into them.
+# Parameters reach the scripts as environment variables rather than being
+# templated into them.
 
 resource "coder_agent" "main" {
-  os   = "linux"
-  arch = data.coder_provisioner.me.arch
-  dir  = "/home/coder"
+  os             = "linux"
+  arch           = data.coder_provisioner.me.arch
+  dir            = "/home/coder"
+  startup_script = local.startup_script
 
   env = {
-    VM_HOST           = local.vm_host
-    VM_USER           = local.vm_user
-    VM_PORT           = tostring(local.vm_port)
+    VM_HOST           = data.coder_parameter.vm_host.value
+    VM_USER           = data.coder_parameter.vm_user.value
+    VM_PORT           = tostring(data.coder_parameter.vm_port.value)
     VM_REMOTE_DIR     = local.remote_dir
     VM_SSH_KEY_SOURCE = local.ssh_key_path
-    VM_TUNNEL_PORT    = tostring(local.tunnel_port)
+    VM_WORKSPACE_FILE = local.workspace_file
+
+    CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
 
   display_apps {
-    web_terminal           = true
-    vscode                 = false
-    vscode_insiders        = false
-    ssh_helper             = false
-    port_forwarding_helper = false
+    web_terminal    = true
+    vscode          = false
+    vscode_insiders = false
+    ssh_helper      = false
   }
 
   metadata {
@@ -159,51 +178,38 @@ resource "coder_agent" "main" {
   metadata {
     display_name = "VM Link"
     key          = "1_vm_link"
-    script       = "curl -fsS -m 2 -o /dev/null \"http://127.0.0.1:$VM_TUNNEL_PORT/healthz\" && echo connected || echo disconnected"
-    interval     = 15
-    timeout      = 3
+    script       = "ssh -o ConnectTimeout=3 vm true < /dev/null > /dev/null 2>&1 && echo connected || echo unreachable"
+    interval     = 30
+    timeout      = 5
   }
-}
 
-# Installs code-server on the VM over SSH, pushes the editor setup, starts it,
-# and keeps the tunnel open. Progress and errors show in the workspace's
-# startup logs.
-resource "coder_script" "vm_connect" {
-  agent_id     = coder_agent.main.id
-  display_name = "Connect to VM"
-  icon         = "/icon/terminal.svg"
-  run_on_start = true
-  script       = file("${path.module}/scripts/vm-connect.sh")
-}
-
-# Stopping the workspace stops code-server on the VM so nothing is left
-# running there. The install, settings, and extensions stay for the next start.
-resource "coder_script" "vm_disconnect" {
-  agent_id     = coder_agent.main.id
-  display_name = "Stop code-server on VM"
-  icon         = "/icon/terminal.svg"
-  run_on_stop  = true
-  script       = "ssh -o ConnectTimeout=5 vm 'bash .coder-vm-gateway/remote.sh stop' < /dev/null || true"
+  dynamic "metadata" {
+    for_each = module.workspace_apps_metadata.agent_metadata_items
+    content {
+      display_name = metadata.value.display_name
+      key          = "2_${metadata.value.key}"
+      script       = metadata.value.script
+      interval     = metadata.value.interval
+      timeout      = metadata.value.timeout
+    }
+  }
 }
 
 # ── Apps ─────────────────────────────────────────────────────────────────────
+# The shared code-server launcher and app, pointed at the VM's ssh:// folder
+# instead of a /workspaces project. The other editors are off: only
+# code-server has been set up and tested against an ssh:// folder.
 
-resource "coder_app" "code_server" {
-  agent_id     = coder_agent.main.id
-  slug         = "code-server"
-  display_name = "code-server"
-  url          = "http://localhost:${local.tunnel_port}/${local.folder_query}"
-  icon         = "/icon/code.svg"
-  subdomain    = false
-  share        = "owner"
-  order        = 0
-  open_in      = "tab"
-
-  healthcheck {
-    url       = "http://localhost:${local.tunnel_port}/healthz"
-    interval  = 5
-    threshold = 6
-  }
+module "workspace_apps" {
+  count                 = data.coder_workspace.me.start_count
+  source                = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
+  agent_id              = coder_agent.main.id
+  enable_apps           = true
+  code_server_query     = "workspace=${urlencode(local.workspace_file)}"
+  enable_vscode_web     = false
+  enable_vscode_desktop = false
+  enable_filebrowser    = false
+  enable_neovim         = false
 }
 
 resource "coder_app" "vm_terminal" {
@@ -212,10 +218,10 @@ resource "coder_app" "vm_terminal" {
   display_name = "VM Terminal"
   icon         = "/icon/terminal.svg"
   command      = "ssh vm"
-  order        = 1
+  order        = 2
 }
 
-# ── Gateway container ────────────────────────────────────────────────────────
+# ── Workspace container ──────────────────────────────────────────────────────
 
 data "docker_registry_image" "workspace" {
   name = local.workspace_image
@@ -227,7 +233,7 @@ resource "docker_image" "workspace" {
   keep_locally  = true
 }
 
-# Persists known_hosts, so a VM whose host key changes is noticed.
+# Holds editor state and ~/.ssh (config, known_hosts) for this one VM.
 resource "docker_volume" "home" {
   name = "coder-${data.coder_workspace.me.id}-home"
 
@@ -247,6 +253,23 @@ resource "docker_volume" "home" {
     label = "coder.workspace_id"
     value = data.coder_workspace.me.id
   }
+}
+
+locals {
+  # A subset of workspace-runtime's host mounts: the shared extension cache
+  # and the Claude Code login, so the editor and Claude behave as in any
+  # other workspace. The host's ssh directory is mounted read-only at a side
+  # path, NOT at ~/.ssh as workspace-runtime does: this template rewrites
+  # ~/.ssh/config, and that must never touch the directory other workspaces
+  # share.
+  host_mounts = [
+    { container_path = "/home/coder/secrets/ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = true },
+    { container_path = "/home/coder/.vscode-extensions/shared", host_path = "/home/ubuntu/secrets/extensions/shared", read_only = false },
+    { container_path = "/home/coder/.vscode-extensions/vscode-web", host_path = "/home/ubuntu/secrets/extensions/vscode-web", read_only = false },
+    { container_path = "/home/coder/.local/share/code-server/User/globalStorage", host_path = "/home/ubuntu/secrets/code-server-globalstorage", read_only = false },
+    { container_path = "/home/coder/.claude", host_path = "/home/ubuntu/secrets/.claude", read_only = false },
+    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false },
+  ]
 }
 
 resource "docker_container" "workspace" {
@@ -275,10 +298,13 @@ resource "docker_container" "workspace" {
     read_only      = false
   }
 
-  volumes {
-    container_path = "/home/coder/secrets/ssh"
-    host_path      = "/home/ubuntu/secrets/ssh"
-    read_only      = true
+  dynamic "volumes" {
+    for_each = local.host_mounts
+    content {
+      container_path = volumes.value.container_path
+      host_path      = volumes.value.host_path
+      read_only      = volumes.value.read_only
+    }
   }
 
   labels {
