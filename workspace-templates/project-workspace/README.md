@@ -3,7 +3,7 @@
 ## Modeling workspaces
 
 `modeling-dev` extends `python-dev`. Existing repositories select it through
-`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+`.devcontainer/devcontainer.json`; the template runs whatever image that file names.
 No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
 `scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
 
@@ -21,6 +21,66 @@ default-scene USDZ export and archive integrity, and CPU rendering with denoisin
 disabled. Denoising enabled fails with `SIGILL`. Apple Vision Pro / RealityKit
 device compatibility and the full modeling image build remain untested.
 See [MODELING_WORKSPACE.md](../../MODELING_WORKSPACE.md) for validation limits and integration prerequisites.
+
+## How the workspace container is built
+
+The workspace container runs the project's devcontainer image directly. There is
+no envbuilder step: nothing is built or unpacked at start, and the image is pulled
+once per host and reused until its tag moves.
+
+On every start, in this order:
+
+1. **Image.** Terraform reads `.devcontainer/devcontainer.json` from GitHub and
+   uses its `image`. No file, or a file without an `image`, means
+   `base-dev`. Any other answer from GitHub fails the build rather than starting
+   on the wrong image.
+2. **Container.** Docker runs that image. Its entrypoint fixes ownership of
+   `/home/coder` and `/workspaces` as root, then starts the Coder agent.
+3. **Clone.** The registry [`git-clone`](https://registry.coder.com/modules/coder/git-clone)
+   module clones the repository into `/workspaces/<project>` if that folder is
+   empty, authenticating through your linked GitHub account.
+4. **Lifecycle commands.** `onCreateCommand`, `updateContentCommand`,
+   `postCreateCommand` and `postStartCommand` run from the project folder. A
+   failing command is reported and skips the rest; the workspace still starts.
+5. **Init pipeline.** The image's `workspace-init.d` scripts.
+
+Steps 3 to 5 appear as the **Git Clone** script in the workspace's startup logs.
+
+### What is read from `devcontainer.json`
+
+| Setting | Support |
+|---|---|
+| `image` | Yes. Must be pullable without credentials. |
+| `containerEnv`, `remoteEnv` | Yes, as container environment. `${containerWorkspaceFolder}`, `${localWorkspaceFolder}` and their `Basename` forms are resolved; a value using `${containerEnv:...}` or `${localEnv:...}` is skipped and reported. |
+| `onCreateCommand`, `updateContentCommand`, `postCreateCommand`, `postStartCommand` | Yes: string, array and object forms. Object entries run one after another in name order. All four run on every start, because the container is new each time. |
+| `customizations.vscode` | Yes, by the init pipeline, from the checkout. |
+| `build` / `dockerFile`, `features`, `dockerComposeFile` | No. Publish an image and reference it. |
+| `mounts`, `runArgs`, `forwardPorts`, `postAttachCommand`, `initializeCommand` | No. |
+
+Comments on their own line and trailing commas are fine. A file that still does
+not parse keeps its `image` but loses the other settings, with a notice in the
+startup log.
+
+### Where the file is read from
+
+The image has to be known before the container exists, so everything in the table
+except `customizations.vscode` comes from GitHub, not from the checkout:
+
+- **Existing repository:** the default branch. A change to `devcontainer.json`
+  takes effect on the next start after it reaches the default branch.
+- **New project:** the `scaffold/<type>` branch of `nyc-design/Project-Scaffolds`,
+  for the life of the workspace. Once the project has its own repository, create
+  a workspace for that repository to have its own `devcontainer.json` apply.
+
+### If the clone fails
+
+The Git Clone script fails, the workspace shows a startup error with git's
+message, and the lifecycle commands and init pipeline do not run. Fix the cause
+(repository name, GitHub access) and restart; the clone is retried while the
+project folder is empty.
+
+The pieces live in [`workspace-modules/workspace-devcontainer`](../../workspace-modules/workspace-devcontainer),
+with tests under its `tests/` directory.
 
 ## Features
 

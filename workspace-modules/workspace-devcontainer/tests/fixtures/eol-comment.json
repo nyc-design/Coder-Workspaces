@@ -1,0 +1,5 @@
+{
+  "name": "End-of-line comments are not tolerated by the parser",
+  "image": "example/rust-dev:latest", // pinned by the team
+  "postCreateCommand": "cargo fetch" // would be skipped
+}

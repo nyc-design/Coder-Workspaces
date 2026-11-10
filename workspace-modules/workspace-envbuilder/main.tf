@@ -1,3 +1,8 @@
+# LEGACY: project-workspace no longer uses this module; see
+# workspace-devcontainer. Template versions from before that change still
+# reference it, and Coder fetches modules from main on every workspace build,
+# so a workspace that has not been updated yet needs it to keep starting.
+# Remove it once no workspace is on an envbuilder template version.
 
 terraform {
   required_providers {

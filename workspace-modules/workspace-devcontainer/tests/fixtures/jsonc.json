@@ -1,0 +1,23 @@
+// Comments on their own line and trailing commas are what editors leave
+// behind in devcontainer.json, so both have to survive.
+{
+  "name": "JSONC",
+  // The image comes after a comment.
+  "image": "example/fullstack-dev:latest",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "files.exclude": { "**/*.pyc": true, "**/__pycache__": true, },
+        "search.exclude": { "**/node_modules/*": true },
+        "docs.url": "https://example.com/a//b",
+      },
+    },
+  },
+  "onCreateCommand": ["echo", "it's created", "a b"],
+  "updateContentCommand": "git submodule update --init",
+  "postCreateCommand": {
+    "b-frontend": "cd frontend && pnpm install",
+    "a-backend": ["uv", "sync"],
+  },
+  "postStartCommand": "/usr/local/bin/start-gateway",
+}

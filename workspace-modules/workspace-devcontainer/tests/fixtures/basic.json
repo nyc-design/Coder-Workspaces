@@ -1,0 +1,19 @@
+{
+  "name": "Basic",
+  "image": "example/python-dev:latest",
+  "features": {},
+  "containerEnv": {
+    "STATE_DIR": "/home/coder/.local/share/app",
+    "PROJECT_ROOT": "${containerWorkspaceFolder}/src",
+    "PROJECT_NAME": "${localWorkspaceFolderBasename}",
+    "PATH": "${containerEnv:PATH}:/opt/tool/bin",
+    "SHARED": "from-container-env"
+  },
+  "remoteEnv": {
+    "SHARED": "from-remote-env",
+    "EDITOR_HOME": "${localEnv:HOME}",
+    "UNSET_ME": null
+  },
+  "postCreateCommand": "cd services/frontend && npm install",
+  "postStartCommand": ""
+}

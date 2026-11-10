@@ -3,7 +3,7 @@
 ## Modeling workspaces
 
 `modeling-dev` extends `python-dev`. Existing repositories select it through
-`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+`.devcontainer/devcontainer.json`; the template runs whatever image that file names.
 No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
 `scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
 

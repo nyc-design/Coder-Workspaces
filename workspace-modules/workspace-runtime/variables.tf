@@ -3,7 +3,8 @@ variable "start_count" {
 }
 
 variable "devcontainer_builder_image" {
-  type = string
+  description = "Image the workspace container runs. The name dates from envbuilder; it is kept because template versions still on envbuilder read this module from main."
+  type        = string
 }
 
 variable "owner_name" {
@@ -54,7 +55,13 @@ variable "extra_mounts" {
 }
 
 variable "command" {
-  description = "Container command. Null keeps the image's own entrypoint/command (envbuilder). Set it when running a prebuilt image that must start the agent itself."
+  description = "Container command. Null keeps the image's own command (envbuilder). Set it when running a prebuilt image that must start the agent itself."
+  type        = list(string)
+  default     = null
+}
+
+variable "entrypoint" {
+  description = "Container entrypoint. Null keeps the image's own. Unlike command, it also replaces an image ENTRYPOINT, so it works for images this repo does not build."
   type        = list(string)
   default     = null
 }

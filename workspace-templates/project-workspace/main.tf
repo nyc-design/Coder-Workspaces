@@ -7,8 +7,8 @@ terraform {
     docker = {
       source = "kreuzwerker/docker"
     }
-    envbuilder = {
-      source = "coder/envbuilder"
+    http = {
+      source = "hashicorp/http"
     }
     google = {
       source = "hashicorp/google"
@@ -25,8 +25,6 @@ data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
 provider "docker" {}
-
-provider "envbuilder" {}
 
 provider "google" {
   project = "coder-nt"
@@ -166,10 +164,9 @@ locals {
   # GCP project (optional)
   gcp_project = local.is_new_project == false && data.coder_parameter.gcp_project_name[0].value != "" ? data.coder_parameter.gcp_project_name[0].value : ""
 
-  # Container and builder configuration
-  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  git_author_email           = data.coder_workspace_owner.me.email
-  startup_script             = module.workspace_startup.startup_script
+  # Container configuration
+  git_author_name  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  git_author_email = data.coder_workspace_owner.me.email
 }
 
 
@@ -183,21 +180,33 @@ locals {
   # Browser URL for the GitHub Repository app. Empty for new projects: those
   # clone Project-Scaffolds, so there is no repo of the workspace's own yet.
   repo_html_url = local.is_new_project ? "" : trimsuffix(local.existing_repo_url, ".git")
+
+  # What gets cloned into /workspaces/<project> and searched for
+  # .devcontainer/devcontainer.json: the repository itself, or the scaffold
+  # branch a new project starts from. Empty while the template is imported,
+  # when Coder plans with empty parameters.
+  devcontainer_repo = local.is_new_project ? "nyc-design/Project-Scaffolds" : (local.project_name != "" ? "${local.github_username}/${local.project_name}" : "")
+  devcontainer_ref  = local.is_new_project ? "scaffold/${local.project_type}" : ""
 }
 
-module "workspace_envbuilder" {
-  source                     = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-envbuilder?ref=main"
-  agent_token                = coder_agent.main.token
-  access_url                 = data.coder_workspace.me.access_url
-  init_script                = coder_agent.main.init_script
-  docker_config_base64       = module.workspace_secrets.docker_config
-  git_username               = data.coder_external_auth.github.access_token
-  repo_url                   = local.repo_url
-  project_name               = local.project_name
-  is_new_project             = local.is_new_project
-  fallback_image             = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
-  devcontainer_builder_image = "ghcr.io/coder/envbuilder:latest"
-  agent_env                  = coder_agent.main.env
+# Resolves the project's devcontainer image, runs it directly, clones the
+# repository and runs the devcontainer lifecycle commands, then the workspace
+# init pipeline. The agent has no startup_script of its own: the init pipeline
+# reads the project tree, so it has to run after the clone, not beside it.
+module "workspace_devcontainer" {
+  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-devcontainer?ref=main"
+  start_count      = data.coder_workspace.me.start_count
+  agent_id         = coder_agent.main.id
+  agent_token      = coder_agent.main.token
+  access_url       = data.coder_workspace.me.access_url
+  init_script      = coder_agent.main.init_script
+  agent_env        = coder_agent.main.env
+  repo             = local.devcontainer_repo
+  repo_ref         = local.devcontainer_ref
+  github_token     = data.coder_external_auth.github.access_token != "" ? data.coder_external_auth.github.access_token : module.workspace_secrets.github_pat
+  workspace_folder = "/workspaces/${local.project_name}"
+  fallback_image   = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
+  startup_script   = module.workspace_startup.startup_script
 }
 
 module "workspace_apps_metadata" {
@@ -206,9 +215,8 @@ module "workspace_apps_metadata" {
 }
 
 resource "coder_agent" "main" {
-  arch           = data.coder_provisioner.me.arch
-  os             = "linux"
-  startup_script = local.startup_script
+  arch = data.coder_provisioner.me.arch
+  os   = "linux"
 
   dir = "/workspaces/${local.project_name}"
 
@@ -243,13 +251,14 @@ resource "coder_agent" "main" {
 module "workspace_runtime" {
   source                     = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-runtime?ref=main"
   start_count                = data.coder_workspace.me.start_count
-  devcontainer_builder_image = module.workspace_envbuilder.devcontainer_builder_image
+  devcontainer_builder_image = module.workspace_devcontainer.image_id
+  entrypoint                 = module.workspace_devcontainer.entrypoint
   owner_name                 = data.coder_workspace_owner.me.name
   owner_id                   = data.coder_workspace_owner.me.id
   workspace_id               = data.coder_workspace.me.id
   workspace_name             = data.coder_workspace.me.name
   agent_id                   = coder_agent.main.id
-  docker_env                 = module.workspace_envbuilder.docker_env
+  docker_env                 = module.workspace_devcontainer.docker_env
   github_pat                 = module.workspace_secrets.github_pat
 
   extra_env = concat(
