@@ -67,19 +67,51 @@ locals {
   image = coalesce(try(trimspace(tostring(local.devcontainer.image)), ""), local.devcontainer_image_guess, var.fallback_image)
 }
 
-# The registry lookup makes a moved tag (":latest") pull again on the next
-# start. keep_locally: other workspaces run containers from the same image.
+# The image runs by digest. The registry lookup resolves the tag to its current
+# digest on every start, and "<repo>@<digest>" is the name pulled: a digest the
+# host already has is reused, a new one is pulled. Pulling by tag does not work
+# for a moving tag: the provider only pulls when no local image has that name,
+# so the first ":latest" ever pulled would be served forever.
+#
+# keep_locally: other workspaces run containers from the same image, so the
+# provider must not remove it when this workspace stops. Superseded digests are
+# removed by the prune step below instead.
 
 data "docker_registry_image" "workspace" {
   count = var.start_count
   name  = local.image
 }
 
+locals {
+  # Repository without tag or digest: "ghcr.io/org/base-dev:latest" -> "ghcr.io/org/base-dev".
+  image_repo   = regex("^(.+?)(?::[^/:@]+)?(?:@.+)?$", local.image)[0]
+  image_pinned = one([for r in data.docker_registry_image.workspace : "${local.image_repo}@${r.sha256_digest}"])
+}
+
 resource "docker_image" "workspace" {
-  count         = var.start_count
-  name          = data.docker_registry_image.workspace[0].name
-  pull_triggers = [data.docker_registry_image.workspace[0].sha256_digest]
-  keep_locally  = true
+  count        = var.start_count
+  name         = local.image_pinned
+  keep_locally = true
+}
+
+# Remove the versions of this image that the new digest supersedes. Docker
+# refuses to delete an image a container still uses, so workspaces on an older
+# version keep it until they restart; a later start of any workspace on this
+# image then removes it. Never fails the build (see the script).
+resource "terraform_data" "prune_images" {
+  count            = var.start_count
+  triggers_replace = [docker_image.workspace[0].image_id]
+
+  provisioner "local-exec" {
+    on_failure  = continue
+    quiet       = true
+    interpreter = ["sh", "-c"]
+    command     = file("${path.module}/scripts/prune-images.sh")
+    environment = {
+      IMAGE_REPO = local.image_repo
+      IMAGE_KEEP = local.image_pinned
+    }
+  }
 }
 
 # ── Container ────────────────────────────────────────────────────────────────

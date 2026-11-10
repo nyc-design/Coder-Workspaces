@@ -303,6 +303,13 @@ order envbuilder had). The agent's `startup_script` comes from the module:
 lifecycle commands from the checked-out file, then the init pipeline. A failed
 clone or an unreadable file is logged and does not stop the workspace.
 
+The image runs by digest: each start resolves the tag (`:latest`) against the
+registry and pulls `<repo>@<digest>` if the host does not have it. Pulling by
+tag is not enough, because the Docker provider only pulls when no local image
+has that name. `scripts/prune-images.sh` (a `local-exec` on the provisioner,
+which shares the host's Docker socket) then removes the other versions of that
+repository; Docker keeps any that a running workspace still uses.
+
 Only prebuilt images are supported (no Dockerfile builds or devcontainer
 features). Details, the supported `devcontainer.json` settings and failure
 behaviour: [`workspace-templates/project-workspace/README.md`](workspace-templates/project-workspace/README.md).

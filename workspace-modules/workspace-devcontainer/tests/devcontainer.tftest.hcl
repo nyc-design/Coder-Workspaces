@@ -50,6 +50,14 @@ run "strict_json" {
     error_message = "the container should run the pulled image id"
   }
   assert {
+    condition     = docker_image.workspace[0].name == "example/python-dev@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    error_message = "the image is pulled by the registry's current digest, not by tag (a tag already on the host is never pulled again): ${docker_image.workspace[0].name}"
+  }
+  assert {
+    condition     = length(terraform_data.prune_images) == 1
+    error_message = "superseded versions of the image are pruned on start"
+  }
+  assert {
     condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/octo/app/contents/.devcontainer/devcontainer.json"
     error_message = "default-branch lookups carry no ref: ${data.http.devcontainer[0].url}"
   }
@@ -174,7 +182,7 @@ run "stopped_workspace_touches_nothing" {
   }
 
   assert {
-    condition     = length(data.http.devcontainer) == 0 && length(data.docker_registry_image.workspace) == 0 && length(docker_image.workspace) == 0
+    condition     = length(data.http.devcontainer) == 0 && length(data.docker_registry_image.workspace) == 0 && length(docker_image.workspace) == 0 && length(terraform_data.prune_images) == 0
     error_message = "stopping a workspace must not depend on GitHub or the registry"
   }
   assert {
