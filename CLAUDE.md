@@ -212,10 +212,10 @@ applies four resources idempotently:
 
 | File | Synced to | Stable identity |
 |---|---|---|
-| `providers.yaml` | `/api/experimental/chats/providers` | `provider` |
-| `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` |
-| `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` |
-| `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton) |
+| `providers.yaml` | `/api/v2/ai/providers` | `name` |
+| `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` |
+| `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` |
+| `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton) |
 
 `${VAR}` placeholders in YAML are substituted from the workflow's env at sync
 time — secrets live in GitHub Actions secrets (`CODER_URL`,

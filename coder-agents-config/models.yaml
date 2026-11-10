@@ -1,5 +1,5 @@
 # Chat model configs for Coder Agents (chatd).
-# Synced to /api/experimental/chats/model-configs by update-coder-agents-config.yaml.
+# Synced to /api/v2/organizations/{org}/chats/models by update-coder-agents-config.yaml.
 #
 # Stable identity: `(provider, model)` tuple. This file is declarative: models
 # missing from this YAML are deleted from Coder on sync.

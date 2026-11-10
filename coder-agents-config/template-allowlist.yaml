@@ -1,5 +1,5 @@
 # Templates the Coder Agents central loop is allowed to create workspaces from.
-# Synced to PUT /api/experimental/chats/config/template-allowlist by sync.sh.
+# Synced by sync.sh as PATCH /api/v2/templates/{id} {agents_allowed} on each template.
 #
 # Stored slugs are resolved to template UUIDs at sync time via the templates
 # list endpoint (slugs match the `name` field on coder_template).
