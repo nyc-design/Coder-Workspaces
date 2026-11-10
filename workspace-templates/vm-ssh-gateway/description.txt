@@ -1,1 +1,1 @@
-Browser code-server with SSH/SSHFS gateway to a bare VM. Use for thin browser IDE access to existing remote machines.
+Browser VS Code (code-server) opened directly on an existing VM over SSH. Enter the VM's IP; no Coder agent needed on the VM.
