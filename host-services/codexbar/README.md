@@ -95,9 +95,19 @@ CodexBar process group; a forced shutdown follows after three seconds if necessa
 ## Validation
 
 `node --test host-services/codexbar/tests/*.test.mjs` runs offline regression
-tests for auth, routing, branding, colours, reset credits and the Claude
-keepalive. Existing agent-tools CI runs these on AMD64 and ARM64; the publishing
-workflow runs them before its build too.
+tests for auth, routing, branding, colours, reset credits, the Claude
+rate-limit fallback and the Claude keepalive. Existing agent-tools CI runs these
+on AMD64 and ARM64; the publishing workflow runs them before its build too.
+
+## Claude usage rate limits
+
+Anthropic rate limits the Claude OAuth usage endpoint per account, and that
+budget is shared with every Claude Code session on the same login. A burst of
+about ten requests in a minute returns 429 for a couple of minutes, and CodexBar
+then backs off for five. `claude-fallback.mjs` keeps the last good Claude card
+in memory and serves it during that window, with a `rate limited · showing Nm
+old data` status chip. Readings older than 30 minutes, and every other error
+(expired login included), are passed through unchanged.
 
 ## Claude token keepalive
 

@@ -1,4 +1,5 @@
 import {createResetReader, addResetSummary} from './reset-credits.mjs';
+import {createClaudeFallback} from './claude-fallback.mjs';
 import http from 'node:http';
 import {brandDashboard, colorProviders} from './theme.mjs';
 import {timingSafeEqual} from 'node:crypto';
@@ -6,6 +7,7 @@ import {timingSafeEqual} from 'node:crypto';
 export function createDashboardProxy(upstreamPort = 8082, token = process.env.CODEXBAR_DASHBOARD_TOKEN) {
   if (!token) throw new Error('Dashboard token required');
   const readResets = createResetReader(upstreamPort);
+  const claudeFallback = createClaudeFallback();
   const server = http.createServer((req, res) => {
     const path = req.url.split('?')[0];
     // Loopback CodexBar bypasses its bearer gate; enforce it at the public boundary.
@@ -44,7 +46,7 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
           const text = Buffer.concat(chunks).toString('utf8');
           let data;
           if (!html) {
-            data = colorProviders(JSON.parse(text));
+            data = claudeFallback(colorProviders(JSON.parse(text)));
             if (data.providers.some(p => p.id === 'codex')) data = addResetSummary(data, await readResets());
           }
           if (res.destroyed || res.writableEnded) return;
