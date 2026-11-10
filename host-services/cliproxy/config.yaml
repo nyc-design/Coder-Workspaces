@@ -36,9 +36,11 @@ api-keys:
 # for Claude Code.
 enable-gemini-cli-endpoint: true
 
-# Surface request errors as 4xx/5xx instead of silently retrying so callers
-# can react to upstream issues.
-disable-cooling: false
+# Never bench a credential after a quota/429 response: every request is
+# forwarded upstream so a usage-limit reset or plan upgrade takes effect
+# immediately instead of waiting out CLIProxy's own cooldown window. Upstream
+# errors still reach the caller once the retry rounds below are exhausted.
+disable-cooling: true
 request-retry: 2
 max-retry-interval: 15
 
