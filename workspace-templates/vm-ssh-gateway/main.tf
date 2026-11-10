@@ -272,10 +272,6 @@ module "workspace_runtime" {
     "CODER_AGENT_URL=${replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")}",
   ]
 
-  # This template rewrites ~/.ssh/config on every start, so the host's shared
-  # ssh directory is mounted at a side path and ~/.ssh stays in the home volume.
-  ssh_container_path = "/home/coder/secrets/ssh"
-
   extra_mounts = [
     { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false }
   ]

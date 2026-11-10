@@ -59,16 +59,15 @@ Coder host, mounted read-only into the workspace. Its public half must be in
 key, the startup log prints the public key to add.
 
 The workspace keeps its own `~/.ssh` (config and `known_hosts`) in its home
-volume. It does not mount the host's shared `~/.ssh` directory there, because
-it rewrites `~/.ssh/config` on every start.
+volume and rewrites `~/.ssh/config` on every start. The shared key directory
+is mounted beside it at `~/secrets/ssh`, as in every workspace.
 
 To authorise the key on a VM, print the public half from any workspace
-(`cat ~/.ssh/id_ed25519.pub` in a normal workspace, or
-`cat ~/secrets/ssh/id_ed25519.pub` in this one) and append that line to
+(`cat ~/secrets/ssh/id_ed25519.pub`) and append that line to
 `~/.ssh/authorized_keys` for the SSH user on the VM. On Oracle Cloud you can
 also paste it into the instance's SSH keys at creation. Check it from a
 normal workspace with
-`ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 <user>@<ip> true`.
+`ssh -o IdentitiesOnly=yes -i ~/secrets/ssh/id_ed25519 <user>@<ip> true`.
 
 ## Apps
 

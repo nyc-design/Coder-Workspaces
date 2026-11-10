@@ -58,9 +58,3 @@ variable "command" {
   type        = list(string)
   default     = null
 }
-
-variable "ssh_container_path" {
-  description = "Where the host's shared ssh directory is mounted. Override for workspaces that manage their own ~/.ssh and must not write to the shared one."
-  type        = string
-  default     = "/home/coder/.ssh"
-}

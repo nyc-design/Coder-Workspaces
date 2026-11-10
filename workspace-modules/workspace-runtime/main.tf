@@ -19,7 +19,9 @@ locals {
   )
 
   common_mounts = [
-    { container_path = var.ssh_container_path, host_path = "/home/ubuntu/secrets/ssh", read_only = false },
+    # Mounted beside ~/.ssh, not on it, so a workspace's own ssh config and
+    # known_hosts stay in its home volume and cannot alter the shared keys' dir.
+    { container_path = "/home/coder/secrets/ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = false },
     { container_path = "/home/coder/.config/gcloud", host_path = "/home/ubuntu/secrets/gcloud", read_only = false },
     { container_path = "/home/coder/.pencil", host_path = "/home/ubuntu/secrets/.pencil", read_only = false },
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
