@@ -3,7 +3,7 @@
 ## Modeling workspaces
 
 `modeling-dev` extends `python-dev`. Existing repositories select it through
-`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+`.devcontainer/devcontainer.json`; the template runs whatever image that file names.
 No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
 `scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
 
@@ -21,6 +21,72 @@ default-scene USDZ export and archive integrity, and CPU rendering with denoisin
 disabled. Denoising enabled fails with `SIGILL`. Apple Vision Pro / RealityKit
 device compatibility and the full modeling image build remain untested.
 See [MODELING_WORKSPACE.md](../../MODELING_WORKSPACE.md) for validation limits and integration prerequisites.
+
+## How the workspace container is built
+
+The workspace container runs the project's devcontainer image directly. There is
+no envbuilder step: nothing is built or unpacked at start, and the image is pulled
+once per host and reused until its tag moves.
+
+On every start, in this order:
+
+1. **Image.** Terraform reads `.devcontainer/devcontainer.json` from GitHub,
+   for its `image` only. No file, or a file without an `image`, means
+   `base-dev`. Any other answer from GitHub fails the build rather than starting
+   on the wrong image.
+2. **Container.** Docker runs that image. Its entrypoint fixes ownership of
+   `/home/coder` and `/workspaces` as root.
+3. **Clone.** Still in the entrypoint, the repository is cloned into
+   `/workspaces/<project>` if that folder is empty, using your linked GitHub
+   account's token (or the shared PAT). The token is not saved to disk. The
+   checked-out `devcontainer.json` is then read for its environment variables
+   and lifecycle commands.
+4. **Agent.** The Coder agent starts and connects, with the project in place.
+5. **Lifecycle commands.** `onCreateCommand`, `updateContentCommand`,
+   `postCreateCommand` and `postStartCommand` run from the project folder. A
+   failing command is reported and skips the rest; the workspace still starts.
+6. **Init pipeline.** The image's `workspace-init.d` scripts.
+
+Steps 5 and 6 are the agent's startup script. Its log begins with the clone's
+output, which is otherwise only in the container log.
+
+### What is read from `devcontainer.json`
+
+| Setting | Support |
+|---|---|
+| `image` | Yes. Must be pullable without credentials. |
+| `containerEnv`, `remoteEnv` | Yes, exported before the agent starts. `${containerWorkspaceFolder}`, `${localWorkspaceFolder}`, their `Basename` forms, `${containerEnv:NAME}` and `${localEnv:NAME}` are resolved (both from the container). A value using any other variable, or a `CODER_*` name, is skipped and reported. |
+| `onCreateCommand`, `updateContentCommand`, `postCreateCommand`, `postStartCommand` | Yes: string, array and object forms. Object entries run one after another in name order. All four run on every start, because the container is new each time. |
+| `customizations.vscode` | Yes, by the init pipeline, from the checkout. |
+| `build` / `dockerFile`, `features`, `dockerComposeFile` | No. Publish an image and reference it. |
+| `mounts`, `runArgs`, `forwardPorts`, `postAttachCommand`, `initializeCommand` | No. |
+
+Comments and trailing commas are fine. Problems with the file are reported at
+the top of the startup log and never stop the workspace.
+
+### Where the file is read from
+
+The image has to be known before the container exists, so `image` alone comes
+from GitHub:
+
+- **Existing repository:** the default branch. A changed `image` takes effect
+  on the next start after it reaches the default branch.
+- **New project:** the `scaffold/<type>` branch of `nyc-design/Project-Scaffolds`,
+  for the life of the workspace. Once the project has its own repository, create
+  a workspace for that repository to have its own `image` apply.
+
+Everything else comes from the checkout in the workspace, so an edit applies on
+the next start without being pushed.
+
+### If the clone fails
+
+The workspace still starts: the agent connects, and the lifecycle commands and
+init pipeline run in an empty project folder. Git's message is at the top of the
+startup script log. Fix the cause (repository name, GitHub access) and restart;
+the clone is retried while the project folder is empty.
+
+The pieces live in [`workspace-modules/workspace-devcontainer`](../../workspace-modules/workspace-devcontainer),
+with tests under its `tests/` directory.
 
 ## Features
 

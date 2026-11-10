@@ -103,8 +103,9 @@ resource "docker_container" "workspace" {
   hostname = var.workspace_name
   runtime  = "sysbox-runc"
 
-  env     = concat(var.docker_env, local.common_env, var.extra_env)
-  command = var.command
+  env        = concat(var.docker_env, local.common_env, var.extra_env)
+  entrypoint = var.entrypoint
+  command    = var.command
 
   host {
     host = "host.docker.internal"

@@ -1,0 +1,8 @@
+{
+  "name": "Dockerfile build, which is not supported",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": { "image": "example/should-not-be-picked:latest" }
+  },
+  "postCreateCommand": "make setup"
+}

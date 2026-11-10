@@ -1,0 +1,26 @@
+// Comments and trailing commas are what editors leave behind in
+// devcontainer.json, so all of these have to survive.
+{
+  "name": "JSONC",
+  /* A block comment,
+     over two lines. */
+  "image": "example/fullstack-dev:latest", // and one at the end of a line
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "files.exclude": { "**/*.pyc": true, "**/__pycache__": true, },
+        "search.exclude": { "**/node_modules/*": true },
+      },
+    },
+  },
+  "containerEnv": {
+    "DOCS_URL": "https://example.com/a//b /* not a comment */",
+  },
+  "onCreateCommand": ["echo", "it's created", "a b"],
+  "updateContentCommand": "pwd > /tmp/lifecycle-pwd",
+  "postCreateCommand": {
+    "b-second": "echo second",
+    "a-first": ["echo", "first"],
+  },
+  "postStartCommand": "cd sub && pwd > /tmp/lifecycle-subdir",
+}

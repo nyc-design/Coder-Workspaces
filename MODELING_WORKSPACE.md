@@ -6,12 +6,14 @@
 and adding Blender. It is separate from the Vite/fullstack image lineage.
 
 Existing repositories select the published `modeling-dev` image in their own
-`.devcontainer/devcontainer.json`, or use a Dockerfile based on that image, then
-create/rebuild the workspace through the normal existing-project flow. Use the
+`.devcontainer/devcontainer.json`, then create or restart the workspace through
+the normal existing-project flow. The file is read from the repository's default
+branch, and the image must be named directly: the template runs prebuilt images
+and does not build Dockerfiles. Use the
 registry and tag published by the modeling image workflow; this document does
 not assert that the new image is already available.
 
-The shared envbuilder module is image-agnostic; no new module-level image enum
+The shared `workspace-devcontainer` module is image-agnostic; no new module-level image enum
 or mapping is required. The template's `base-dev` fallback is not a modeling
 image override. Reusing a Python devcontainer without changing its image does
 not select `modeling-dev`.

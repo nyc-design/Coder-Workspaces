@@ -35,7 +35,8 @@ workspace-templates/       # Coder workspace template definitions
 
 workspace-modules/         # Reusable Terraform modules for workspace templates
 ├── workspace-apps/        # coder_app metadata
-├── workspace-envbuilder/  # envbuilder + container provisioning
+├── workspace-devcontainer/ # devcontainer.json image, clone, env, lifecycle commands (replaces envbuilder)
+├── workspace-envbuilder/  # legacy; only read by template versions still on envbuilder
 ├── workspace-runtime/     # runtime container/env wiring
 ├── workspace-secrets/     # GCP Secret Manager fetches
 └── workspace-startup/     # startup script aggregation
@@ -269,7 +270,7 @@ cache persistence, test commands, and deployment validation limits.
 ### Modeling Image Integration
 
 `modeling-dev` extends `python-dev`. Existing repositories select it through
-`.devcontainer/devcontainer.json`; the shared envbuilder remains image-agnostic.
+`.devcontainer/devcontainer.json`; the template runs whatever image that file names.
 No modeling new-project scaffold exists (`nyc-design/Project-Scaffolds` has no
 `scaffold/modeling` branch), so `new_project_type=modeling` is not offered.
 
@@ -287,6 +288,29 @@ default-scene USDZ export and archive integrity, and CPU rendering with denoisin
 disabled. Denoising enabled fails with `SIGILL`. Apple Vision Pro / RealityKit
 device compatibility and the full modeling image build remain untested.
 See [MODELING_WORKSPACE.md](MODELING_WORKSPACE.md) for validation limits and integration prerequisites.
+
+### Workspace container (project-workspace)
+
+`project-workspace` runs the project's devcontainer image directly; envbuilder is
+no longer involved. `workspace-modules/workspace-devcontainer` reads only the
+`image` from `.devcontainer/devcontainer.json` on GitHub at plan time (default
+branch, or the `scaffold/<type>` branch for new projects), falling back to
+`base-dev`. The container entrypoint then fixes ownership as root, clones the
+repo if the project folder is empty, exports `containerEnv`/`remoteEnv` from the
+checked-out file (`scripts/devcontainer.sh`, needs `python3` in the image), and
+only then starts the agent, so the repo exists before the agent connects (the
+order envbuilder had). The agent's `startup_script` comes from the module:
+lifecycle commands from the checked-out file, then the init pipeline. A failed
+clone or an unreadable file is logged and does not stop the workspace.
+
+Only prebuilt images are supported (no Dockerfile builds or devcontainer
+features). Details, the supported `devcontainer.json` settings and failure
+behaviour: [`workspace-templates/project-workspace/README.md`](workspace-templates/project-workspace/README.md).
+
+Shared modules are fetched from `main` on every workspace build, including by
+workspaces still on an older template version. Change them compatibly, and do
+not remove `workspace-envbuilder` or rename `workspace-runtime` inputs until no
+workspace is on an envbuilder template version.
 
 ### Shared Install Scripts
 - `workspace-images/python-shared/scripts/install-python.sh` — Python apt + pip packages used by both python-dev and fullstack-dev (build-time, root install)
@@ -343,8 +367,7 @@ All three secrets must exist in `coder-nt` before the template is pushed. The
 `google_secret_manager_secret_version` data sources are unconditional, so a
 missing secret fails the plan for *every* workspace, not just swift-dev ones.
 For the same reason these land in every workspace's environment regardless of
-image: Terraform doesn't know which image a workspace resolves to, since that
-comes from the repo's `.devcontainer/devcontainer.json` at envbuilder time.
+image: nothing ties the secrets to the image a workspace resolves to.
 
 ### Base agent tools and diagram skills
 
