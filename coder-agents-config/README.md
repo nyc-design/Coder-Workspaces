@@ -10,10 +10,10 @@ GitHub Actions workflow on every commit that touches this directory.
 | File | Synced to | Stable identity (matched on POST/PATCH) |
 |---|---|---|
 | `providers.yaml` | `/api/v2/ai/providers` | `name` field |
-| `models.yaml` | `/api/experimental/chats/model-configs` | `(provider, model)` tuple |
-| `mcp-servers.yaml` | `/api/experimental/mcp/servers` | `slug` field |
-| `system-prompt.txt` | `/api/experimental/chats/config/system-prompt` | (singleton, PUT) |
-| `plan-mode-instructions.txt` | `/api/experimental/chats/config/plan-mode-instructions` | (singleton, PUT) |
+| `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` tuple |
+| `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` field |
+| `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
+| `plan-mode-instructions.txt` | `/api/v2/chats/config/plan-mode-instructions` | (singleton, PUT) |
 | `template-allowlist.yaml` | `/api/experimental/chats/config/template-allowlist` | (singleton, PUT) — slugs resolved to template UUIDs at sync time |
 | `sync.sh` | — (the script the workflow runs) | — |
 

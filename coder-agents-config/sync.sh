@@ -169,7 +169,7 @@ resolve_models_url() {
 }
 
 resolve_mcp_servers_url() {
-  printf '/api/experimental/organizations/%s/mcp-servers' "$(resolve_organization_id)"
+  printf '/api/v2/organizations/%s/mcp-servers' "$(resolve_organization_id)"
 }
 
 # ───────── MODELS (declarative) ─────────────────────────────────────────────
@@ -318,7 +318,7 @@ push_system_prompt() {
   curl -sS --fail-with-body -X PUT \
     -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
     -d "$req_body" \
-    "${CODER_URL}/api/experimental/chats/config/system-prompt" >/dev/null
+    "${CODER_URL}/api/v2/chats/config/system-prompt" >/dev/null
   echo "    PUT system prompt ($(printf '%s' "$body" | wc -c) bytes, include_default_system_prompt=$include_default)"
 }
 
@@ -333,7 +333,7 @@ push_plan_mode_instructions() {
   curl -sS --fail-with-body -X PUT \
     -H "$AUTH_HEADER" -H 'Content-Type: application/json' \
     -d "$body" \
-    "${CODER_URL}/api/experimental/chats/config/plan-mode-instructions" >/dev/null
+    "${CODER_URL}/api/v2/chats/config/plan-mode-instructions" >/dev/null
   echo "    PUT plan-mode-instructions ($(wc -c < "$file") bytes)"
 }
 
@@ -432,11 +432,11 @@ pull_all() {
   prettify_yaml "$CONFIG_DIR/mcp-servers.yaml.new"
 
   echo "  system-prompt.txt"
-  coder_get '/api/experimental/chats/config/system-prompt' | \
+  coder_get '/api/v2/chats/config/system-prompt' | \
     jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
 
   echo "  plan-mode-instructions.txt"
-  coder_get '/api/experimental/chats/config/plan-mode-instructions' | \
+  coder_get '/api/v2/chats/config/plan-mode-instructions' | \
     jq -r '.plan_mode_instructions' > "$CONFIG_DIR/plan-mode-instructions.txt.new"
 
   # Template access is stored directly on each template.
