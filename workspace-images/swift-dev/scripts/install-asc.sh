@@ -14,11 +14,11 @@
 # one directly and check its SHA-256 instead.
 set -euo pipefail
 
-ASC_VERSION="${ASC_VERSION:-5.3.0}"
+ASC_VERSION="${ASC_VERSION:-6.6.0}"
 
-# Pinned SHA-256 of the official release assets (verified by download on 2026-09-13).
-ASC_SHA256_AMD64="213c4c822a6a411a525dd14ac2a4c15e33ac9e32bada8128baf0397bb02c4b05"
-ASC_SHA256_ARM64="72ab72a9c2651c2ae030b23dc49504ebca8414ae9e8af797be096c0142e17507"
+# Pinned SHA-256 of the official release assets (verified by download on 2026-11-10).
+ASC_SHA256_AMD64="68fddb0e02be25f9ac5c0f53d07533ceb31ddda2265575090b8eb6a133605785"
+ASC_SHA256_ARM64="d2619fd94102ba67b1a9dcf7e760e0ad81bc57292ae4a07bd39c790aa6d5a8c7"
 
 log() { echo "[install-asc] $*"; }
 die() { echo "[install-asc] ERROR: $*" >&2; exit 1; }

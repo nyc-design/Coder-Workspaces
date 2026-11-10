@@ -50,7 +50,7 @@ RUN chmod +x /tmp/install-swiftlint.sh \
 # Linux CLI of its own. Pinned + SHA-256 verified rather than curl|bash.
 COPY workspace-images/swift-dev/scripts/install-asc.sh /tmp/install-asc.sh
 RUN chmod +x /tmp/install-asc.sh \
- && ASC_VERSION=5.3.0 /tmp/install-asc.sh \
+ && ASC_VERSION=6.6.0 /tmp/install-asc.sh \
  && rm -f /tmp/install-asc.sh
 
 # asc phones home with pseudonymous command-usage telemetry by default. Off for

@@ -484,6 +484,9 @@ base-dev → swift-dev
 - **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/python-shared/**`, or workflow files
 - **Cascade**: Parent image builds trigger child image rebuilds via `workflow_run`
 - **Manual**: `workflow_dispatch` for on-demand builds
+- **Stale rebuild**: `rebuild-stale-base-dev.yaml` checks daily and dispatches `build-base-dev.yaml` once the last successful base-dev build is 7 days old; the cascade then rebuilds the child images
+- **Weekly cache epoch**: `build-base-dev.yaml` passes `CACHE_EPOCH` (ISO year-week) as a build arg, so the first base-dev build of each week re-runs every `RUN` layer and picks up current apt packages, code-server, VS Code Web and unpinned CLIs. Without it an unchanged Dockerfile is replayed from the GHA cache and those never update
+- **Base OS**: `base-dev` is pinned to a dated `codercom/enterprise-base:ubuntu-noble-*` tag (Ubuntu 24.04). The plain `ubuntu-<date>` tags now track 26.04; moving to them is a deliberate migration, not a routine bump
 - **Authentication**: Uses workload identity with `GCP_SA_KEY` secret
 
 ### Image Tagging Strategy
