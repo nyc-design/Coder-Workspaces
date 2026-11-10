@@ -3,11 +3,18 @@
 # time). A failing command is reported and the remaining ones are skipped, but
 # workspace startup carries on.
 #
-# Prepended to the git-clone module's post_clone_script, which has already
-# changed into the project folder. The calls are appended by main.tf with
-# base64 arguments, so no command text is ever re-quoted by Terraform.
+# Head of the agent startup script. The calls are appended by main.tf with
+# base64 arguments, so no command text is ever re-quoted by Terraform. Kept to
+# what dash accepts: the agent runs it with the image user's shell.
 
 devcontainer_lifecycle_failed=""
+
+# Shows what the entrypoint's clone did (its output is otherwise only in the
+# container log), then moves into the project folder.
+devcontainer_enter() {
+  [ ! -s /tmp/workspace-clone.log ] || cat /tmp/workspace-clone.log
+  cd "$(printf '%s' "$1" | base64 -d)" 2> /dev/null || true
+}
 
 devcontainer_notice() {
   printf '=== %s\n' "$(printf '%s' "$1" | base64 -d)"

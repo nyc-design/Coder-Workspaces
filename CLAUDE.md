@@ -296,11 +296,11 @@ no longer involved. `workspace-modules/workspace-devcontainer` reads
 `.devcontainer/devcontainer.json` from GitHub at plan time (default branch, or
 the `scaffold/<type>` branch for new projects) to get the image, container env
 and lifecycle commands, and falls back to `base-dev` when there is no file or no
-`image`. The container entrypoint fixes ownership as root and starts the agent.
-The registry `coder/git-clone` module then clones the repo, and its
-`post_clone_script` runs the lifecycle commands followed by the init pipeline.
-That is why the agent has no `startup_script`: the init pipeline needs the repo,
-and a `startup_script` would run beside the clone, not after it.
+`image`. The container entrypoint fixes ownership as root, clones the repo if
+the project folder is empty, and only then starts the agent, so the repo exists
+before the agent connects (the order envbuilder had). The agent's
+`startup_script` comes from the module: lifecycle commands, then the init
+pipeline. A failed clone is logged and does not stop the workspace.
 
 Only prebuilt images are supported (no Dockerfile builds or devcontainer
 features). Details, the supported `devcontainer.json` settings and failure

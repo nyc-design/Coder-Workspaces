@@ -3,10 +3,6 @@ variable "start_count" {
   type        = number
 }
 
-variable "agent_id" {
-  type = string
-}
-
 variable "agent_token" {
   type = string
 }
@@ -42,7 +38,7 @@ variable "repo_ref" {
 }
 
 variable "github_token" {
-  description = "Token for reading devcontainer.json through the GitHub API. Empty sends the request anonymously (public repositories only). The clone itself authenticates through the agent's external auth."
+  description = "Token for reading devcontainer.json through the GitHub API and for the clone. Empty means anonymous access (public repositories only). It is not written to disk by the clone."
   type        = string
   sensitive   = true
   default     = ""
@@ -59,7 +55,7 @@ variable "fallback_image" {
 }
 
 variable "startup_script" {
-  description = "Workspace init script, run after the clone and the devcontainer lifecycle commands. The init pipeline reads the project tree, so it cannot run in the agent's own startup script: that runs in parallel with the clone."
+  description = "Workspace init script. Returned in output startup_script after the devcontainer lifecycle commands."
   type        = string
   default     = ""
 }

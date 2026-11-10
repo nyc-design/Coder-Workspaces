@@ -5,7 +5,6 @@
 # devcontainer.json turns into an image, container env and lifecycle commands.
 
 mock_provider "http" {}
-mock_provider "coder" {}
 mock_provider "docker" {
   mock_data "docker_registry_image" {
     defaults = {
@@ -21,7 +20,6 @@ mock_provider "docker" {
 
 variables {
   start_count      = 1
-  agent_id         = "agent-id"
   agent_token      = "agent-token"
   access_url       = "http://localhost:3000"
   init_script      = "curl http://127.0.0.1:3000/bin/coder && exec ./coder agent"
@@ -45,11 +43,6 @@ run "strict_json" {
   assert {
     condition     = output.image == "example/python-dev:latest"
     error_message = "image should come from devcontainer.json, got ${output.image}"
-  }
-
-  assert {
-    condition     = length(coder_script.without_repo) == 0
-    error_message = "with a repo, git-clone's post_clone_script runs the init pipeline; it must not run twice"
   }
 
   assert {
@@ -82,16 +75,20 @@ run "strict_json" {
     error_message = "skipped variables should be reported: ${jsonencode(output.notices)}"
   }
   assert {
-    condition     = output.entrypoint[0] == "sh" && output.entrypoint[1] == "-c" && strcontains(output.entrypoint[2], "chown coder:coder") && strcontains(output.entrypoint[2], "curl http://host.docker.internal:3000/bin/coder && exec ./coder agent")
-    error_message = "the entrypoint fixes ownership, then runs the init script with localhost rewritten"
+    condition     = output.entrypoint[0] == "sh" && output.entrypoint[1] == "-c" && strcontains(output.entrypoint[2], "chown coder:coder") && strcontains(output.entrypoint[2], "WORKSPACE_CLONE_URL") && strcontains(output.entrypoint[2], "curl http://host.docker.internal:3000/bin/coder && exec ./coder agent")
+    error_message = "the entrypoint fixes ownership, clones, then runs the init script with localhost rewritten"
   }
   assert {
-    condition     = endswith(local.post_clone_script, "run_lifecycle_command postCreateCommand ${base64encode("cd services/frontend && npm install")}\necho init-pipeline")
-    error_message = "post_clone_script must end with the lifecycle commands followed by the init pipeline"
+    condition     = endswith(output.startup_script, "run_lifecycle_command postCreateCommand ${base64encode("cd services/frontend && npm install")}\necho init-pipeline")
+    error_message = "startup_script must end with the lifecycle commands followed by the init pipeline"
   }
   assert {
-    condition     = module.git_clone[0].clone_url == "https://github.com/octo/app.git" && module.git_clone[0].repo_dir == "/workspaces/app" && module.git_clone[0].branch_name == ""
-    error_message = "clone target is wrong: ${module.git_clone[0].clone_url} -> ${module.git_clone[0].repo_dir}"
+    condition     = local.clone_env["WORKSPACE_CLONE_URL"] == "https://github.com/octo/app.git" && local.clone_env["WORKSPACE_CLONE_REF"] == "" && local.clone_env["WORKSPACE_CLONE_DIR"] == "/workspaces/app" && nonsensitive(local.clone_env["WORKSPACE_CLONE_TOKEN"]) == "gh-token"
+    error_message = "clone settings are wrong"
+  }
+  assert {
+    condition     = strcontains(output.startup_script, "devcontainer_enter ${base64encode("/workspaces/app")}\n")
+    error_message = "lifecycle commands must run from the project folder"
   }
   assert {
     condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/octo/app/contents/.devcontainer/devcontainer.json"
@@ -146,7 +143,7 @@ run "scaffold_branch" {
     error_message = "the ref must be URL-encoded: ${data.http.devcontainer[0].url}"
   }
   assert {
-    condition     = module.git_clone[0].branch_name == "scaffold/python" && module.git_clone[0].clone_url == "https://github.com/nyc-design/Project-Scaffolds.git"
+    condition     = local.clone_env["WORKSPACE_CLONE_REF"] == "scaffold/python" && local.clone_env["WORKSPACE_CLONE_URL"] == "https://github.com/nyc-design/Project-Scaffolds.git"
     error_message = "the scaffold branch must be what gets cloned"
   }
 }
@@ -211,7 +208,7 @@ run "missing_file_falls_back" {
     error_message = "the fallback must be reported: ${jsonencode(output.notices)}"
   }
   assert {
-    condition     = endswith(local.post_clone_script, "\necho init-pipeline")
+    condition     = endswith(output.startup_script, "\necho init-pipeline")
     error_message = "the init pipeline runs whether or not there is a devcontainer.json"
   }
 }
@@ -236,7 +233,7 @@ run "stopped_workspace_touches_nothing" {
   }
 
   assert {
-    condition     = length(data.http.devcontainer) == 0 && length(data.docker_registry_image.workspace) == 0 && length(docker_image.workspace) == 0 && length(module.git_clone) == 0
+    condition     = length(data.http.devcontainer) == 0 && length(data.docker_registry_image.workspace) == 0 && length(docker_image.workspace) == 0
     error_message = "stopping a workspace must not depend on GitHub or the registry"
   }
   assert {
@@ -259,7 +256,7 @@ run "template_import_with_empty_parameters" {
   }
 
   assert {
-    condition     = length(coder_script.without_repo) == 1 && endswith(coder_script.without_repo[0].script, var.startup_script)
-    error_message = "with no repo to clone, the init pipeline must still run"
+    condition     = length(local.clone_env) == 0 && endswith(output.startup_script, var.startup_script)
+    error_message = "with no repo there is nothing to clone, and the init pipeline must still run"
   }
 }

@@ -35,16 +35,18 @@ On every start, in this order:
    `base-dev`. Any other answer from GitHub fails the build rather than starting
    on the wrong image.
 2. **Container.** Docker runs that image. Its entrypoint fixes ownership of
-   `/home/coder` and `/workspaces` as root, then starts the Coder agent.
-3. **Clone.** The registry [`git-clone`](https://registry.coder.com/modules/coder/git-clone)
-   module clones the repository into `/workspaces/<project>` if that folder is
-   empty, authenticating through your linked GitHub account.
-4. **Lifecycle commands.** `onCreateCommand`, `updateContentCommand`,
+   `/home/coder` and `/workspaces` as root.
+3. **Clone.** Still in the entrypoint, the repository is cloned into
+   `/workspaces/<project>` if that folder is empty, using your linked GitHub
+   account's token (or the shared PAT). The token is not saved to disk.
+4. **Agent.** The Coder agent starts and connects, with the project in place.
+5. **Lifecycle commands.** `onCreateCommand`, `updateContentCommand`,
    `postCreateCommand` and `postStartCommand` run from the project folder. A
    failing command is reported and skips the rest; the workspace still starts.
-5. **Init pipeline.** The image's `workspace-init.d` scripts.
+6. **Init pipeline.** The image's `workspace-init.d` scripts.
 
-Steps 3 to 5 appear as the **Git Clone** script in the workspace's startup logs.
+Steps 5 and 6 are the agent's startup script. Its log begins with the clone's
+output, which is otherwise only in the container log.
 
 ### What is read from `devcontainer.json`
 
@@ -74,10 +76,10 @@ except `customizations.vscode` comes from GitHub, not from the checkout:
 
 ### If the clone fails
 
-The Git Clone script fails, the workspace shows a startup error with git's
-message, and the lifecycle commands and init pipeline do not run. Fix the cause
-(repository name, GitHub access) and restart; the clone is retried while the
-project folder is empty.
+The workspace still starts: the agent connects, and the lifecycle commands and
+init pipeline run in an empty project folder. Git's message is at the top of the
+startup script log. Fix the cause (repository name, GitHub access) and restart;
+the clone is retried while the project folder is empty.
 
 The pieces live in [`workspace-modules/workspace-devcontainer`](../../workspace-modules/workspace-devcontainer),
 with tests under its `tests/` directory.

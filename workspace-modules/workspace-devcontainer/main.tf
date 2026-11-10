@@ -4,18 +4,14 @@
 # plan time and run directly:
 #
 #   1. read devcontainer.json from GitHub            -> image, env, lifecycle commands
-#   2. container entrypoint: root ownership fix      -> then the agent init script
-#   3. registry git-clone module                     -> clone if the folder is empty
-#   4. its post_clone_script                         -> lifecycle commands, then var.startup_script
+#   2. container entrypoint: ownership fix, clone    -> then the agent init script
+#   3. output startup_script (for coder_agent)       -> lifecycle commands, then var.startup_script
 #
 # Dockerfile builds and devcontainer features are not supported; a
 # devcontainer.json without an "image" falls back to var.fallback_image.
 
 terraform {
   required_providers {
-    coder = {
-      source = "coder/coder"
-    }
     docker = {
       source = "kreuzwerker/docker"
     }
@@ -142,60 +138,46 @@ resource "docker_image" "workspace" {
 }
 
 # ── Container ────────────────────────────────────────────────────────────────
+# The entrypoint does what has to be finished before the agent exists, in the
+# order envbuilder did it: ownership, clone, then the agent init script.
 
 locals {
   entrypoint_script = join("\n", [
     file("${path.module}/scripts/fix-ownership.sh"),
+    file("${path.module}/scripts/clone.sh"),
     replace(var.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
   ])
 
+  # Read by clone.sh, which unsets them before the agent starts. Passed as env
+  # rather than written into the entrypoint so the token is not in the
+  # container's command line.
+  clone_env = var.repo == "" ? {} : {
+    "WORKSPACE_CLONE_URL"   = "https://github.com/${var.repo}.git"
+    "WORKSPACE_CLONE_REF"   = var.repo_ref
+    "WORKSPACE_CLONE_DIR"   = var.workspace_folder
+    "WORKSPACE_CLONE_TOKEN" = var.github_token
+  }
+
   # The devcontainer's own variables first, so the template's agent env and
   # the agent credentials win on conflict.
-  container_env = merge(local.devcontainer_env, var.agent_env, {
+  container_env = merge(local.devcontainer_env, var.agent_env, local.clone_env, {
     "CODER_AGENT_TOKEN" = var.agent_token
     "CODER_AGENT_URL"   = replace(var.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")
   })
 }
 
-# ── Clone, lifecycle commands, init ──────────────────────────────────────────
-# git-clone runs as its own coder_script, in parallel with the agent's
-# startup_script. Everything that needs the repository therefore hangs off its
-# post_clone_script, which runs on every start, cloned or not: the lifecycle
-# commands first (as under envbuilder), then var.startup_script.
+# ── Agent startup script ─────────────────────────────────────────────────────
+# The repository is in place before the agent connects, so this is an ordinary
+# coder_agent.startup_script: the lifecycle commands, then var.startup_script.
+# It must not depend on anything derived from the agent, or the template's
+# agent and this module would form a cycle.
 
 locals {
-  post_clone_script = join("\n", concat(
-    ["#!/usr/bin/env bash", file("${path.module}/scripts/lifecycle.sh")],
+  startup_script = join("\n", concat(
+    [file("${path.module}/scripts/lifecycle.sh")],
+    ["devcontainer_enter ${base64encode(var.workspace_folder)}"],
     [for notice in local.notices : "devcontainer_notice ${base64encode(notice)}"],
     [for c in local.lifecycle_commands : "run_lifecycle_command ${c.hook} ${base64encode(c.command)}"],
     [var.startup_script],
   ))
-}
-
-module "git_clone" {
-  count   = var.start_count
-  source  = "registry.coder.com/coder/git-clone/coder"
-  version = "2.0.5"
-
-  agent_id    = var.agent_id
-  url         = var.repo != "" ? "https://github.com/${var.repo}.git" : ""
-  branch_name = var.repo_ref
-  base_dir    = dirname(var.workspace_folder)
-  folder_name = basename(var.workspace_folder)
-
-  pre_clone_script  = file("${path.module}/scripts/pre-clone.sh")
-  post_clone_script = local.post_clone_script
-}
-
-# git-clone creates no script at all when it has no URL. Run the same script
-# directly in that case, so a workspace never starts without its init pipeline
-# (the app launchers wait on the sentinel that pipeline writes).
-resource "coder_script" "without_repo" {
-  count              = var.start_count > 0 && var.repo == "" ? 1 : 0
-  agent_id           = var.agent_id
-  display_name       = "Workspace Init"
-  icon               = "/icon/widgets.svg"
-  script             = local.post_clone_script
-  run_on_start       = true
-  start_blocks_login = true
 }

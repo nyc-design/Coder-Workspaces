@@ -189,14 +189,13 @@ locals {
   devcontainer_ref  = local.is_new_project ? "scaffold/${local.project_type}" : ""
 }
 
-# Resolves the project's devcontainer image, runs it directly, clones the
-# repository and runs the devcontainer lifecycle commands, then the workspace
-# init pipeline. The agent has no startup_script of its own: the init pipeline
-# reads the project tree, so it has to run after the clone, not beside it.
+# Resolves the project's devcontainer image and runs it directly. The container
+# entrypoint clones the repository before the agent starts; the agent's
+# startup script then runs the devcontainer lifecycle commands and the
+# workspace init pipeline.
 module "workspace_devcontainer" {
   source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-devcontainer?ref=main"
   start_count      = data.coder_workspace.me.start_count
-  agent_id         = coder_agent.main.id
   agent_token      = coder_agent.main.token
   access_url       = data.coder_workspace.me.access_url
   init_script      = coder_agent.main.init_script
@@ -215,8 +214,9 @@ module "workspace_apps_metadata" {
 }
 
 resource "coder_agent" "main" {
-  arch = data.coder_provisioner.me.arch
-  os   = "linux"
+  arch           = data.coder_provisioner.me.arch
+  os             = "linux"
+  startup_script = module.workspace_devcontainer.startup_script
 
   dir = "/workspaces/${local.project_name}"
 
