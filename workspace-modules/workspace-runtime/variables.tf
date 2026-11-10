@@ -52,3 +52,9 @@ variable "extra_mounts" {
   }))
   default = []
 }
+
+variable "command" {
+  description = "Container command. Null keeps the image's own entrypoint/command (envbuilder). Set it when running a prebuilt image that must start the agent itself."
+  type        = list(string)
+  default     = null
+}

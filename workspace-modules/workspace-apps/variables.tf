@@ -34,6 +34,12 @@ variable "enable_code_server" {
   default     = true
 }
 
+variable "code_server_query" {
+  description = "URL query string for the code-server app, without the leading '?'. Null opens /workspaces/<project_name>. Set it to open something else, e.g. 'workspace=<path to a .code-workspace file>'."
+  type        = string
+  default     = null
+}
+
 variable "enable_vscode_web" {
   description = "Whether to create the VS Code Web app"
   type        = bool

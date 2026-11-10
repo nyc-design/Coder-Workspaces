@@ -19,7 +19,9 @@ locals {
   )
 
   common_mounts = [
-    { container_path = "/home/coder/.ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = false },
+    # Mounted beside ~/.ssh, not on it, so a workspace's own ssh config and
+    # known_hosts stay in its home volume and cannot alter the shared keys' dir.
+    { container_path = "/home/coder/secrets/ssh", host_path = "/home/ubuntu/secrets/ssh", read_only = false },
     { container_path = "/home/coder/.config/gcloud", host_path = "/home/ubuntu/secrets/gcloud", read_only = false },
     { container_path = "/home/coder/.pencil", host_path = "/home/ubuntu/secrets/.pencil", read_only = false },
     { container_path = "/home/coder/.gemini", host_path = "/home/ubuntu/secrets/.gemini", read_only = false },
@@ -101,7 +103,8 @@ resource "docker_container" "workspace" {
   hostname = var.workspace_name
   runtime  = "sysbox-runc"
 
-  env = concat(var.docker_env, local.common_env, var.extra_env)
+  env     = concat(var.docker_env, local.common_env, var.extra_env)
+  command = var.command
 
   host {
     host = "host.docker.internal"

@@ -7,269 +7,203 @@ terraform {
     docker = {
       source = "kreuzwerker/docker"
     }
+    google = {
+      source  = "hashicorp/google"
+      version = "7.0.1"
+    }
   }
 }
 
 provider "coder" {}
 provider "docker" {}
 
+provider "google" {
+  project = "coder-nt"
+  region  = "us-central1"
+  zone    = "us-central1-c"
+}
+
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_parameter" "workspace_image" {
-  name         = "workspace_image"
-  display_name = "Workspace Image"
-  description  = "Container image where code-server runs."
-  type         = "string"
-  default      = "codercom/enterprise-base:ubuntu-20250929"
-  form_type    = "input"
-  order        = 1
-}
-
-data "coder_parameter" "workspace_dir" {
-  name         = "workspace_dir"
-  display_name = "Workspace Directory"
-  description  = "Folder opened by code-server."
-  type         = "string"
-  default      = "/workspaces/vm-gateway"
-  form_type    = "input"
-  order        = 2
-}
+# ── Parameters ───────────────────────────────────────────────────────────────
+# Only the address is required. Every value below ends up in an SSH config and
+# on command lines, so each one is validated against a strict pattern.
 
 data "coder_parameter" "vm_host" {
   name         = "vm_host"
-  display_name = "Bare VM Host"
-  description  = "IP or DNS name of your bare VM."
+  display_name = "VM IP Address"
+  description  = "IP address or DNS name of the VM to open in code-server."
   type         = "string"
-  default      = ""
   form_type    = "input"
-  order        = 3
+  mutable      = true
+  order        = 1
+
+  validation {
+    regex = "^[A-Za-z0-9:][A-Za-z0-9.:-]*$"
+    error = "Enter an IP address or hostname (letters, digits, '.', ':' and '-' only)."
+  }
 }
 
 data "coder_parameter" "vm_user" {
   name         = "vm_user"
-  display_name = "Bare VM User"
-  description  = "SSH username for your bare VM."
+  display_name = "SSH User"
+  description  = "Login user on the VM. Oracle's Ubuntu images use 'ubuntu'; Oracle Linux uses 'opc'."
   type         = "string"
   default      = "ubuntu"
   form_type    = "input"
-  order        = 4
+  mutable      = true
+  order        = 2
+
+  validation {
+    regex = "^[a-z_][a-z0-9_.-]*$"
+    error = "Enter a valid Linux username."
+  }
 }
 
 data "coder_parameter" "vm_port" {
   name         = "vm_port"
-  display_name = "Bare VM SSH Port"
-  description  = "SSH port on your bare VM."
-  type         = "string"
-  default      = "22"
-  form_type    = "input"
-  order        = 5
+  display_name = "SSH Port"
+  type         = "number"
+  default      = 22
+  mutable      = true
+  order        = 3
+
+  validation {
+    min = 1
+    max = 65535
+  }
 }
 
-data "coder_parameter" "remote_path" {
-  name         = "remote_path"
-  display_name = "Remote Path"
-  description  = "Path on bare VM to mount into this workspace via SSHFS."
+data "coder_parameter" "remote_dir" {
+  name         = "remote_dir"
+  display_name = "Folder to Open"
+  description  = "Absolute path on the VM to open, e.g. /home/ubuntu or /home/neil/myproject. Leave empty for the SSH user's home directory."
   type         = "string"
-  default      = "/home/ubuntu"
+  default      = ""
   form_type    = "input"
-  order        = 6
-}
+  mutable      = true
+  order        = 4
 
-data "coder_parameter" "auto_mount_remote" {
-  name         = "auto_mount_remote"
-  display_name = "Auto-mount Remote Files"
-  description  = "Mount /workspaces/remote-vm to the bare VM path at startup using SSHFS."
-  type         = "bool"
-  default      = true
-  order        = 7
-}
-
-data "coder_parameter" "ssh_key_filename" {
-  name         = "ssh_key_filename"
-  display_name = "SSH Key Filename"
-  description  = "Private key filename under /home/coder/secrets/ssh (e.g., id_ed25519)."
-  type         = "string"
-  default      = "id_ed25519"
-  form_type    = "input"
-  order        = 8
+  validation {
+    regex = "^$|^/[A-Za-z0-9._/-]*$"
+    error = "Enter an absolute path starting with '/' (letters, digits, '.', '_', '-' and '/' only), or leave empty."
+  }
 }
 
 locals {
-  workspace_image     = data.coder_parameter.workspace_image.value
-  workspace_dir       = data.coder_parameter.workspace_dir.value
-  project_name        = trimprefix(data.coder_parameter.workspace_dir.value, "/workspaces/")
-  vm_host             = data.coder_parameter.vm_host.value
-  vm_user             = data.coder_parameter.vm_user.value
-  vm_port             = data.coder_parameter.vm_port.value
-  remote_path         = data.coder_parameter.remote_path.value
-  auto_mount_remote   = data.coder_parameter.auto_mount_remote.value
-  ssh_key_filename    = data.coder_parameter.ssh_key_filename.value
+  # base-dev supplies code-server, the extension/settings init pipeline, and
+  # the AI CLIs. Everything runs here; nothing is installed on the VM.
+  workspace_image = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
+
+  # The one shared key, from the host's secrets mount. Its public half must be
+  # in ~/.ssh/authorized_keys on every VM this template is pointed at.
+  ssh_key_path = "/home/coder/secrets/ssh/id_ed25519"
+
+  git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+
+  # Written by scripts/vm-gateway.sh; holds the VM's ssh:// folder.
+  workspace_file = "/home/coder/vm.code-workspace"
+
+  # "/home/neil/" and "/home/neil" mean the same folder.
+  remote_dir = data.coder_parameter.remote_dir.value == "/" ? "/" : trimsuffix(data.coder_parameter.remote_dir.value, "/")
 
   vm_presets = {
-    vm1 = {
-      name          = "watchparty-vm"
-      description   = "Preset for watchparty-vm (170.9.232.54)"
-      icon          = "/icon/terminal.svg"
-      workspace_dir = "/workspaces/vm1-gateway"
-      vm_host       = "170.9.232.54"
-      vm_user       = "neil"
-      vm_port       = "22"
-      remote_path   = "/home/neil"
-      ssh_key       = "id_ed25519"
-    }
-    vm2 = {
-      name          = "neil-dev"
-      description   = "Preset for neil-dev (163.192.217.205)"
-      icon          = "/icon/terminal.svg"
-      workspace_dir = "/workspaces/vm2-gateway"
-      vm_host       = "163.192.217.205"
-      vm_user       = "ubuntu"
-      vm_port       = "22"
-      remote_path   = "/home/ubuntu"
-      ssh_key       = "id_ed25519"
-    }
+    watchparty-vm = { vm_host = "170.9.232.54", vm_user = "neil", remote_dir = "/home/neil" }
+    neil-dev      = { vm_host = "163.192.217.205", vm_user = "ubuntu", remote_dir = "/home/ubuntu" }
   }
+
+  # vm-gateway.sh feeds the image's init pipeline, so `configure` has to run
+  # before workspace-startup's run-workspace-inits. `check` runs last and may
+  # fail the startup script (VM unreachable, key rejected) without stopping
+  # the editor from coming up.
+  startup_script = join("\n", [
+    "cat > /tmp/vm-gateway.sh <<'VM_GATEWAY_SCRIPT_EOF'",
+    file("${path.module}/scripts/vm-gateway.sh"),
+    "VM_GATEWAY_SCRIPT_EOF",
+    "bash /tmp/vm-gateway.sh configure || true",
+    module.workspace_startup.startup_script,
+    "bash /tmp/vm-gateway.sh check",
+  ])
 }
 
-data "coder_workspace_preset" "bare_vms" {
+data "coder_workspace_preset" "vms" {
   for_each = local.vm_presets
 
-  name        = each.value.name
-  description = each.value.description
-  icon        = each.value.icon
+  name        = each.key
+  description = "${each.value.vm_user}@${each.value.vm_host}:${each.value.remote_dir}"
+  icon        = "/icon/terminal.svg"
 
   parameters = {
-    workspace_image   = local.workspace_image
-    workspace_dir     = each.value.workspace_dir
-    vm_host           = each.value.vm_host
-    vm_user           = each.value.vm_user
-    vm_port           = each.value.vm_port
-    remote_path       = each.value.remote_path
-    auto_mount_remote = "true"
-    ssh_key_filename  = each.value.ssh_key
+    vm_host    = each.value.vm_host
+    vm_user    = each.value.vm_user
+    remote_dir = each.value.remote_dir
   }
 }
 
-resource "docker_image" "workspace" {
-  name         = local.workspace_image
-  keep_locally = true
+module "workspace_secrets" {
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-secrets?ref=main"
 }
 
-resource "docker_volume" "home" {
-  name = "coder-${data.coder_workspace.me.id}-home"
-
-  lifecycle {
-    ignore_changes = all
-  }
-
-  labels {
-    label = "coder.owner"
-    value = data.coder_workspace_owner.me.name
-  }
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
+module "workspace_startup" {
+  source = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-startup?ref=main"
 }
 
-resource "docker_volume" "workspaces" {
-  name = "coder-${data.coder_workspace.me.id}-workspaces"
-
-  lifecycle {
-    ignore_changes = all
-  }
-
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
-}
-
-# ── Workspace Apps (phase 1: metadata only, for coder_agent) ────────────────
 module "workspace_apps_metadata" {
   source      = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
   enable_apps = false
 }
 
+# ── Agent ────────────────────────────────────────────────────────────────────
+# Parameters reach the scripts as environment variables rather than being
+# templated into them.
+
 resource "coder_agent" "main" {
-  os   = "linux"
-  arch = data.coder_provisioner.me.arch
-  dir  = local.workspace_dir
+  os             = "linux"
+  arch           = data.coder_provisioner.me.arch
+  dir            = "/home/coder"
+  startup_script = local.startup_script
 
-  startup_script_behavior = "blocking"
-  startup_script = <<-EOT
-    set -eu
+  env = {
+    VM_HOST           = data.coder_parameter.vm_host.value
+    VM_USER           = data.coder_parameter.vm_user.value
+    VM_PORT           = tostring(data.coder_parameter.vm_port.value)
+    VM_REMOTE_DIR     = local.remote_dir
+    VM_SSH_KEY_SOURCE = local.ssh_key_path
+    VM_WORKSPACE_FILE = local.workspace_file
 
-    sudo mkdir -p "${local.workspace_dir}" /workspaces/remote-vm ~/.ssh ~/.ssh/config.d
-    sudo chown -R coder:coder /workspaces ~/.ssh
-    chmod 700 ~/.ssh ~/.ssh/config.d
+    GIT_AUTHOR_NAME     = local.git_author_name
+    GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
+    GIT_COMMITTER_NAME  = local.git_author_name
+    GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
 
-    if [ -n "${local.vm_host}" ]; then
-      SECRETS_KEY="/home/coder/secrets/ssh/${local.ssh_key_filename}"
-      LOCAL_KEY="$HOME/.ssh/${local.ssh_key_filename}"
-      if [ -f "$SECRETS_KEY" ]; then
-        cp "$SECRETS_KEY" "$LOCAL_KEY"
-        chmod 600 "$LOCAL_KEY"
-        KEY_FILE="$LOCAL_KEY"
-      else
-        KEY_FILE="$HOME/.ssh/id_ed25519"
-      fi
-
-      cat > ~/.ssh/config.d/vm-gateway <<CFG
-Host barevm
-  HostName ${local.vm_host}
-  User ${local.vm_user}
-  Port ${local.vm_port}
-  IdentityFile $KEY_FILE
-  IdentitiesOnly yes
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 3
-CFG
-
-      touch ~/.ssh/config
-      if ! grep -q "config.d/vm-gateway" ~/.ssh/config; then
-        printf '\nInclude ~/.ssh/config.d/vm-gateway\n' >> ~/.ssh/config
-      fi
-      chmod 600 ~/.ssh/config ~/.ssh/config.d/vm-gateway
-    else
-      echo "[vm-gateway] vm_host is empty; skipping SSH config + auto mount."
-    fi
-
-    # Install sshfs if not present
-    if ! command -v sshfs >/dev/null 2>&1; then
-      if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update
-        sudo apt-get install -y sshfs
-      fi
-    fi
-
-    # Auto-mount remote VM filesystem via SSHFS
-    if [ "${local.auto_mount_remote}" = "true" ] && [ -n "${local.vm_host}" ] && command -v sshfs >/dev/null 2>&1; then
-      mkdir -p /workspaces/remote-vm
-      if mountpoint -q /workspaces/remote-vm; then
-        fusermount -u /workspaces/remote-vm || true
-      fi
-      sshfs barevm:${local.remote_path} /workspaces/remote-vm \
-        -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,follow_symlinks || true
-    fi
-  EOT
-
-  display_apps {
-    web_terminal           = true
-    vscode                 = false
-    vscode_insiders        = false
-    ssh_helper             = false
-    port_forwarding_helper = true
+    CODER_AGENT_EXP_SKILLS_DIRS = "~/.agents/skills,.agents/skills"
   }
 
-  # Standard workspace metrics (CPU, RAM, disk, etc.)
+  display_apps {
+    web_terminal    = true
+    vscode          = false
+    vscode_insiders = false
+    ssh_helper      = false
+  }
+
+  metadata {
+    display_name = "VM"
+    key          = "0_vm_target"
+    script       = "echo \"$VM_USER@$VM_HOST:$VM_PORT\""
+    interval     = 600
+    timeout      = 1
+  }
+
+  metadata {
+    display_name = "VM Link"
+    key          = "1_vm_link"
+    script       = "ssh -o ConnectTimeout=3 vm true < /dev/null > /dev/null 2>&1 && echo connected || echo unreachable"
+    interval     = 30
+    timeout      = 5
+  }
+
   dynamic "metadata" {
     for_each = module.workspace_apps_metadata.agent_metadata_items
     content {
@@ -280,111 +214,65 @@ CFG
       timeout      = metadata.value.timeout
     }
   }
-
-  # VM-gateway-specific metadata
-  metadata {
-    display_name = "Gateway Target"
-    key          = "gateway_target"
-    script       = "echo '${local.vm_user}@${local.vm_host}:${local.vm_port}'"
-    interval     = 60
-    timeout      = 1
-  }
-
-  metadata {
-    display_name = "Remote Mount"
-    key          = "remote_mount"
-    script       = "mountpoint -q /workspaces/remote-vm && echo mounted || echo not-mounted"
-    interval     = 30
-    timeout      = 1
-  }
 }
 
-resource "docker_container" "workspace" {
-  count = data.coder_workspace.me.start_count
-  image = docker_image.workspace.name
-  name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+# ── Apps ─────────────────────────────────────────────────────────────────────
+# The shared code-server launcher and app, pointed at the VM's ssh:// folder
+# instead of a /workspaces project. The other editors are off: only
+# code-server has been set up and tested against an ssh:// folder.
 
-  hostname = data.coder_workspace.me.name
-  runtime  = "sysbox-runc"
+module "workspace_apps" {
+  count                 = data.coder_workspace.me.start_count
+  source                = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
+  agent_id              = coder_agent.main.id
+  enable_apps           = true
+  code_server_query     = "workspace=${urlencode(local.workspace_file)}"
+  enable_vscode_web     = false
+  enable_vscode_desktop = false
+  enable_filebrowser    = false
+  enable_neovim         = false
+}
 
-  env = [
+resource "coder_app" "vm_terminal" {
+  agent_id     = coder_agent.main.id
+  slug         = "vm-terminal"
+  display_name = "VM Terminal"
+  icon         = "/icon/terminal.svg"
+  command      = "ssh vm"
+  order        = 2
+}
+
+# ── Workspace container ──────────────────────────────────────────────────────
+# The shared runtime module, running base-dev directly instead of envbuilder.
+
+data "docker_registry_image" "workspace" {
+  name = local.workspace_image
+}
+
+resource "docker_image" "workspace" {
+  name          = data.docker_registry_image.workspace.name
+  pull_triggers = [data.docker_registry_image.workspace.sha256_digest]
+  keep_locally  = true
+}
+
+module "workspace_runtime" {
+  source                     = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-runtime?ref=main"
+  start_count                = data.coder_workspace.me.start_count
+  devcontainer_builder_image = docker_image.workspace.image_id
+  owner_name                 = data.coder_workspace_owner.me.name
+  owner_id                   = data.coder_workspace_owner.me.id
+  workspace_id               = data.coder_workspace.me.id
+  workspace_name             = data.coder_workspace.me.name
+  agent_id                   = coder_agent.main.id
+  github_pat                 = module.workspace_secrets.github_pat
+  command                    = ["sh", "-c", coder_agent.main.init_script]
+
+  docker_env = [
     "CODER_AGENT_TOKEN=${coder_agent.main.token}",
     "CODER_AGENT_URL=${replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal")}",
   ]
 
-  command = ["sh", "-c", coder_agent.main.init_script]
-
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
-  }
-
-  volumes {
-    container_path = "/home/coder"
-    volume_name    = docker_volume.home.name
-    read_only      = false
-  }
-
-  volumes {
-    container_path = "/workspaces"
-    volume_name    = docker_volume.workspaces.name
-    read_only      = false
-  }
-
-  volumes {
-    container_path = "/home/coder/secrets/ssh"
-    host_path      = "/home/ubuntu/secrets/ssh"
-    read_only      = true
-  }
-
-  labels {
-    label = "coder.owner"
-    value = data.coder_workspace_owner.me.name
-  }
-  labels {
-    label = "coder.owner_id"
-    value = data.coder_workspace_owner.me.id
-  }
-  labels {
-    label = "coder.workspace_id"
-    value = data.coder_workspace.me.id
-  }
-  labels {
-    label = "coder.workspace_name"
-    value = data.coder_workspace.me.name
-  }
-}
-
-# ── Workspace Apps (phase 2: actual apps — code-server, cursor, vscode-web, etc.) ──
-module "workspace_apps" {
-  count        = data.coder_workspace.me.start_count
-  source       = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-apps?ref=main"
-  agent_id     = coder_agent.main.id
-  project_name = local.project_name
-  enable_apps  = true
-}
-
-# ── VM-gateway-specific apps ───────────────────────────────────────────────────
-resource "coder_app" "ssh_vm" {
-  agent_id     = coder_agent.main.id
-  slug         = "ssh-vm"
-  display_name = "SSH to VM"
-  icon         = "${data.coder_workspace.me.access_url}/icon/terminal.svg"
-  command      = "ssh barevm"
-}
-
-resource "coder_app" "remote_files_shell" {
-  agent_id     = coder_agent.main.id
-  slug         = "remote-files-shell"
-  display_name = "Remote Files Shell"
-  icon         = "${data.coder_workspace.me.access_url}/icon/folder.svg"
-  command      = "bash -lc 'cd /workspaces/remote-vm 2>/dev/null || true; exec bash'"
-}
-
-resource "coder_app" "remount_remote_files" {
-  agent_id     = coder_agent.main.id
-  slug         = "remount-remote-files"
-  display_name = "Remount Remote Files"
-  icon         = "${data.coder_workspace.me.access_url}/icon/folder.svg"
-  command      = "bash -lc 'mkdir -p /workspaces/remote-vm; (mountpoint -q /workspaces/remote-vm && (fusermount -u /workspaces/remote-vm || umount /workspaces/remote-vm || true) || true); sshfs barevm:${local.remote_path} /workspaces/remote-vm -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,follow_symlinks; echo mounted /workspaces/remote-vm'"
+  extra_mounts = [
+    { container_path = "/home/coder/.claude.json", host_path = "/home/ubuntu/secrets/.claude.json", read_only = false }
+  ]
 }
