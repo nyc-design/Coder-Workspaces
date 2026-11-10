@@ -29,7 +29,7 @@ die() {
 : "${VM_USER:?VM_USER is required}"
 VM_PORT="${VM_PORT:-22}"
 VM_REMOTE_DIR="${VM_REMOTE_DIR:-}"
-VM_SSH_KEY_SOURCE="${VM_SSH_KEY_SOURCE:-/home/coder/secrets/ssh/id_ed25519}"
+VM_SSH_KEY_SOURCE="${VM_SSH_KEY_SOURCE:-/home/coder/secrets/ssh/coder_workspace_ssh}"
 
 SSH_ALIAS="vm"
 SSH_KEY="$HOME/.ssh/vm_gateway_key"

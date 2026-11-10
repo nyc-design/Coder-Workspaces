@@ -100,9 +100,10 @@ locals {
   # the AI CLIs. Everything runs here; nothing is installed on the VM.
   workspace_image = "ghcr.io/nyc-design/workspace-images/base-dev:latest"
 
-  # The one shared key, from the host's secrets mount. Its public half must be
-  # in ~/.ssh/authorized_keys on every VM this template is pointed at.
-  ssh_key_path = "/home/coder/secrets/ssh/id_ed25519"
+  # This template's own key ("Coder Workspace SSH"), from the host's secrets
+  # mount. Its public half must be in ~/.ssh/authorized_keys on every VM this
+  # template is pointed at.
+  ssh_key_path = "/home/coder/secrets/ssh/coder_workspace_ssh"
 
   git_author_name = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
 
