@@ -28,6 +28,12 @@ The workspace container runs the project's devcontainer image directly. There is
 no envbuilder step: nothing is built or unpacked at start, and the image is pulled
 once per host and reused until its tag moves.
 
+Each start asks the registry for the tag's current digest and runs the image by
+that digest: a digest the host already has is reused, a new one is pulled. The
+same start then removes the other versions of that image from the host, except
+those a running workspace still uses; they go on a later start, once that
+workspace has restarted. Nothing needs to be run on the host.
+
 On every start, in this order:
 
 1. **Image.** Terraform reads `.devcontainer/devcontainer.json` from GitHub,
