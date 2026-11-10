@@ -15,7 +15,7 @@ trap cleanup EXIT
 
 mk() { mkdir -p "$1"; echo "$2" > "$1/package.json"; }
 
-S="$T/shared"; W="$T/vscode-web"; CS="$T/code-server"; VS="$T/vscode-server"; CU="$T/cursor-server"
+S="$T/shared"; W="$T/vscode-web"; WE="$T/vscode-web-editor"; CS="$T/code-server"; VS="$T/vscode-server"; CU="$T/cursor-server"
 M="$T/manifests"; P="$T/workspaces/proj/.devcontainer"
 mkdir -p "$S" "$W" "$CS" "$VS" "$CU" "$M" "$P"
 
@@ -28,6 +28,12 @@ mk "$S/user.installed-1.0.0-universal" x
 mk "$S/user.installed-1.1.0-universal" x
 mk "$S/foo.bar-1.0.0-universal" x
 mk "$S/foo.bar-baz-9.0.0-universal" x   # prefix collision guard
+# two releases of one id, the newer needing a newer VS Code than code-server has
+mk "$S/gh.pr-0.166.1-universal" '{"version":"0.166.1","engines":{"vscode":"^1.137.0"}}'
+mk "$S/gh.pr-0.174.0-universal" '{"version":"0.174.0","engines":{"vscode":"^1.144.0"}}'
+# every release too new for code-server: fall back to the newest
+mk "$S/too.new-1.0.0-universal" '{"version":"1.0.0","engines":{"vscode":"^1.150.0"}}'
+mk "$S/too.new-2.0.0-universal" '{"version":"2.0.0","engines":{"vscode":"^1.160.0"}}'
 # vscode-web real dirs
 for v in 2.98.0 2.100.0; do mk "$W/google.geminicodeassist-$v" "$v"; done
 # code-server: a UI-installed real dir (not in shared) + one dup of shared + old symlinks
@@ -55,7 +61,7 @@ cp "$W/extensions.json" "$T/vscode-web-registry.before"
 
 # manifests: ruff pinned to the OLD version; chatgpt unpinned; claude unpinned
 cat > "$M/10-base.json" <<EOF
-{"shared":["Anthropic.claude-code","openai.chatgpt","charliermarsh.ruff@2026.60.0","abridge.file-explorer-tools","foo.bar"],"vscode_web_only":["Google.geminicodeassist"]}
+{"shared":["Anthropic.claude-code","openai.chatgpt","charliermarsh.ruff@2026.60.0","abridge.file-explorer-tools","foo.bar","gh.pr","too.new"],"vscode_web_only":["Google.geminicodeassist"]}
 EOF
 cat > "$P/devcontainer.json" <<EOF
 { // jsonc
@@ -71,6 +77,9 @@ touch -d '60 days ago' "$L/nyc-design--DeadWs"
 
 export MANIFEST_DIR="$M" WORKSPACES_ROOT="$T/workspaces" \
   SHARED_EXTENSIONS_DIR="$S" CODE_SERVER_EXTENSIONS_DIR="$CS" VSCODE_WEB_EXTENSIONS_DIR="$W" \
+  VSCODE_WEB_EDITOR_EXTENSIONS_DIR="$WE" \
+  EXTENSIONS_CODE_SERVER_VSCODE_VERSION=1.138.0 EXTENSIONS_VSCODE_WEB_VSCODE_VERSION=1.138.0 \
+  EXTENSIONS_VSCODE_SERVER_VSCODE_VERSION=1.145.2 EXTENSIONS_CURSOR_SERVER_VSCODE_VERSION= \
   VSCODE_SERVER_EXTENSIONS_DIR="$VS" CURSOR_SERVER_EXTENSIONS_DIR="$CU" \
   CODER_WORKSPACE_OWNER_NAME=nyc-design CODER_WORKSPACE_NAME=ThisWs \
   EXTENSIONS_LEASE_REFRESH_PIDFILE="$T/refresh.pid" EXTENSIONS_LEASE_REFRESH_INTERVAL=2s \
@@ -102,7 +111,16 @@ chk "registry: install metadata, unpinned" 'jq -e "any(.[]; .relativeLocation==\
 chk "registry: user entry untouched"  'jq -e "any(.[]; .relativeLocation==\"local.only-1.0.0-universal\" and .metadata.size==1)" "$R" >/dev/null'
 chk "obsolete: active flag cleared"   'jq -e "(has(\"openai.chatgpt-26.5908.31748-linux-arm64\")|not) and has(\"old.thing-0.1.0-universal\")" "$CS/.obsolete" >/dev/null'
 chk "registry: none created if absent" '[ ! -e "$VS/extensions.json" ] && [ -L "$VS/foo.bar-1.0.0-universal" ]'
-chk "registry: vscode-web untouched"  'cmp -s "$W/extensions.json" "$T/vscode-web-registry.before"'
+chk "registry: vscode-web store untouched" 'cmp -s "$W/extensions.json" "$T/vscode-web-registry.before"'
+chk "engines: code-server gets runnable" '[ -L "$CS/gh.pr-0.166.1-universal" ] && [ ! -e "$CS/gh.pr-0.174.0-universal" ]'
+chk "engines: newer editor gets newest"  '[ -L "$VS/gh.pr-0.174.0-universal" ] && [ ! -e "$VS/gh.pr-0.166.1-universal" ]'
+chk "engines: unknown editor gets newest" '[ -L "$CU/gh.pr-0.174.0-universal" ]'
+chk "engines: none runnable -> newest"   '[ -L "$CS/too.new-2.0.0-universal" ]'
+chk "engines: both versions leased"      'grep -q "shared/gh.pr-0.166.1-universal" "$L/nyc-design--ThisWs" && grep -q "shared/gh.pr-0.174.0-universal" "$L/nyc-design--ThisWs"'
+chk "engines: prune keeps both"          '[ -d "$S/gh.pr-0.166.1-universal" ] && [ -d "$S/gh.pr-0.174.0-universal" ]'
+chk "vscode-web: own dir links shared"   '[ "$(readlink "$WE/gh.pr-0.166.1-universal")" = "$S/gh.pr-0.166.1-universal" ]'
+chk "vscode-web: own dir links store"    '[ "$(readlink "$WE/google.geminicodeassist-2.100.0")" = "$W/google.geminicodeassist-2.100.0" ] && [ ! -e "$WE/google.geminicodeassist-2.98.0" ]'
+chk "vscode-web: store gets no symlinks" '[ -z "$(find "$W" -maxdepth 1 -type l)" ]'
 chk "prune: old claude gone (no lease)" '[ ! -d "$S/anthropic.claude-code-2.1.193-linux-arm64" ] && [ ! -d "$S/anthropic.claude-code-2.1.227-linux-arm64" ]'
 chk "prune: newest claude kept"       '[ -d "$S/anthropic.claude-code-2.1.300-linux-arm64" ]'
 chk "prune: leased old chatgpt kept"  '[ -d "$S/openai.chatgpt-26.5623.31443-linux-arm64" ]'
@@ -134,7 +152,7 @@ printf '{"shared":["eamodio.gitlens"]}\n' > "$M2/10-base.json"
 
 set +e
 nopin_out="$(MANIFEST_DIR="$M2" WORKSPACES_ROOT="$T2/workspaces" SHARED_EXTENSIONS_DIR="$S2" \
-  CODE_SERVER_EXTENSIONS_DIR="$CS2" VSCODE_WEB_EXTENSIONS_DIR="$W2" \
+  CODE_SERVER_EXTENSIONS_DIR="$CS2" VSCODE_WEB_EXTENSIONS_DIR="$W2" VSCODE_WEB_EDITOR_EXTENSIONS_DIR="$T2/vscode-web-editor" \
   VSCODE_SERVER_EXTENSIONS_DIR="$T2/vscode-server" CURSOR_SERVER_EXTENSIONS_DIR="$T2/cursor-server" \
   CODER_WORKSPACE_OWNER_NAME=nyc-design CODER_WORKSPACE_NAME=NoPinWs \
   EXTENSIONS_LEASE_REFRESH_PIDFILE="$T2/refresh.pid" EXTENSIONS_LEASE_REFRESH_INTERVAL=1h \

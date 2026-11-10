@@ -2,13 +2,15 @@
 # Binary is installed at /opt/vscode-web/bin/code-server by the image build.
 # workspace-init.d installs each manifest extension into a host-bound shared
 # cache, then symlinks the active manifest set (OpenVSX from shared/, plus
-# Marketplace-only extensions from vscode-web/) into vscode-web's own
-# extensions dir at workspace start.
+# Marketplace-only extensions from the host-bound vscode-web/ store) into
+# vscode-web's own per-workspace extensions dir (vscode-web-editor/) at
+# workspace start. Images that predate that dir run on the store itself.
 
 locals {
   vscode_web_port              = 13338
   vscode_web_install_prefix    = "/opt/vscode-web"
   vscode_web_extensions_dir    = "/home/coder/.vscode-extensions/vscode-web"
+  vscode_web_editor_ext_dir    = "/home/coder/.vscode-extensions/vscode-web-editor"
   vscode_web_log_path          = "/tmp/vscode-web.log"
   vscode_web_telemetry_level   = "error"
   vscode_web_subdomain         = true
@@ -29,6 +31,7 @@ resource "coder_script" "vscode_web" {
   script = templatefile("${path.module}/scripts/vscode-web-launch.sh", {
     INSTALL_PREFIX        = local.vscode_web_install_prefix
     EXTENSIONS_DIR        = local.vscode_web_extensions_dir
+    EDITOR_EXTENSIONS_DIR = local.vscode_web_editor_ext_dir
     LOG_PATH              = local.vscode_web_log_path
     PORT                  = local.vscode_web_port
     TELEMETRY_LEVEL       = local.vscode_web_telemetry_level

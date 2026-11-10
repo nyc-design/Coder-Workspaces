@@ -15,9 +15,13 @@
 #
 #   2. SYNC: for each id in the active manifest set, resolve exactly ONE
 #      active version from the shared cache -- the manifest-pinned version if
-#      a pin exists and is present, otherwise the highest version number -- and
+#      a pin exists and is present, otherwise the highest version number
+#      that the editor's VS Code version can run (`engines.vscode`) -- and
 #      symlink only that version into each per-editor dir (code-server,
-#      vscode-web, vscode-server, cursor-server). Any other symlinks for the
+#      vscode-web, vscode-server, cursor-server). Editors differ in VS Code
+#      version, so they can resolve different versions of one id. vscode-web's
+#      dir also links the Marketplace-only extensions from its host-bound
+#      store (~/.vscode-extensions/vscode-web). Any other symlinks for the
 #      same id are removed so the editor has a single candidate and the active
 #      version is deterministic. Stale symlinks (manifest dropped, or target
 #      gone) are pruned. Real (non-symlink, non-manifest) entries -- e.g.
@@ -44,7 +48,12 @@ MANIFEST_DIR="${MANIFEST_DIR:-/usr/local/share/workspace-extensions.d}"
 WORKSPACES_ROOT="${WORKSPACES_ROOT:-/workspaces}"
 SHARED_EXTENSIONS_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
 CODE_SERVER_EXTENSIONS_DIR="${CODE_SERVER_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/code-server}"
+# Host-bound store of Marketplace-only extensions, shared by every workspace.
 VSCODE_WEB_EXTENSIONS_DIR="${VSCODE_WEB_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web}"
+# The dir vscode-web actually runs on: per-workspace, symlinks only. It used to
+# run on the store itself, where every workspace rewrote the same symlinks and
+# the same extensions.json.
+VSCODE_WEB_EDITOR_EXTENSIONS_DIR="${VSCODE_WEB_EDITOR_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web-editor}"
 VSCODE_SERVER_EXTENSIONS_DIR="${VSCODE_SERVER_EXTENSIONS_DIR:-/home/coder/.vscode-server/extensions}"
 CURSOR_SERVER_EXTENSIONS_DIR="${CURSOR_SERVER_EXTENSIONS_DIR:-/home/coder/.cursor-server/extensions}"
 LEASES_DIR="${EXTENSIONS_LEASES_DIR:-$SHARED_EXTENSIONS_DIR/_leases}"
@@ -173,12 +182,51 @@ NODE
 }
 
 # ---------------------------------------------------------------------------
+# Editor VS Code versions, for `engines.vscode` checks. Empty means unknown,
+# which disables the check for that editor. Each can be overridden (including
+# to empty) with EXTENSIONS_<EDITOR>_VSCODE_VERSION.
+# ---------------------------------------------------------------------------
+highest_package_version() {
+  local f v best=""
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    v="$(jq -r '.version // empty' "$f" 2>/dev/null || true)"
+    [ -n "$v" ] || continue
+    if [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -V | tail -n1)" = "$v" ]; then best="$v"; fi
+  done
+  printf '%s' "$best"
+}
+
+shopt -s nullglob
+CODE_SERVER_VSCODE_VERSION="${EXTENSIONS_CODE_SERVER_VSCODE_VERSION-$(highest_package_version /opt/code-server/lib/code-server-*/lib/vscode/package.json /opt/code-server/lib/vscode/package.json)}"
+VSCODE_WEB_VSCODE_VERSION="${EXTENSIONS_VSCODE_WEB_VSCODE_VERSION-$(highest_package_version /opt/vscode-web/package.json)}"
+# VS Code Desktop downloads one server per client version; the newest is the
+# client in use. Unknown until the first connection.
+vscode_server_root="$(dirname "$VSCODE_SERVER_EXTENSIONS_DIR")"
+VSCODE_SERVER_VSCODE_VERSION="${EXTENSIONS_VSCODE_SERVER_VSCODE_VERSION-$(highest_package_version "$vscode_server_root"/cli/servers/*/server/package.json "$vscode_server_root"/bin/*/package.json)}"
+CURSOR_SERVER_VSCODE_VERSION="${EXTENSIONS_CURSOR_SERVER_VSCODE_VERSION-}"
+
+# engine_ok <editor version> <engines.vscode range>: can the editor run it?
+# Mirrors VS Code's rule for the ranges extensions use (`^1.2.3`, `>=1.2.3`,
+# `1.2.x`, `*`): the editor must be at least the stated version. Unknown
+# editor version or an unparsable range counts as compatible.
+engine_ok() {
+  local have="${1%%-*}" want
+  [ -n "$have" ] || return 0
+  want="$(printf '%s' "$2" | sed -nE 's/^[^0-9]*([0-9]+)\.([0-9]+|x)(\.([0-9]+|x))?.*$/\1.\2.\4/p' | sed -E 's/x/0/g; s/\.$/.0/')"
+  [ -n "$want" ] || return 0
+  [ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | tail -n1)" = "$have" ]
+}
+
+# ---------------------------------------------------------------------------
 # Version resolution. For a given id, pick the single dir in <store> that
-# should be active: the pinned version if present, else the highest version.
+# should be active: the pinned version if present, else the highest version
+# the editor can run, else (none compatible) the highest version.
 # Prints the basename, or nothing if the id has no dirs in <store>.
 # ---------------------------------------------------------------------------
 resolve_active() {
-  local store="$1" id_lc="$2" pin="${manifest_pin[$id_lc]:-}"
+  local store="$1" id_lc="$2" editor_ver="${3:-}" pin="${manifest_pin[$id_lc]:-}"
+  local ok="" ok_ver=""
   shopt -s nullglob nocaseglob
   local candidates=("$store"/"${id_lc}"-[0-9]*/)
   shopt -u nocaseglob
@@ -203,7 +251,15 @@ resolve_active() {
     elif [ "$ver" != "$best_ver" ] && [ "$(printf '%s\n%s\n' "$best_ver" "$ver" | sort -V | tail -n1)" = "$ver" ]; then
       best="$name"; best_ver="$ver"
     fi
+    [ -n "$editor_ver" ] || continue
+    engine_ok "$editor_ver" "$(jq -r '.engines.vscode // empty' "$c/package.json" 2>/dev/null || true)" || continue
+    if [ -z "$ok" ]; then
+      ok="$name"; ok_ver="$ver"
+    elif [ "$ver" != "$ok_ver" ] && [ "$(printf '%s\n%s\n' "$ok_ver" "$ver" | sort -V | tail -n1)" = "$ver" ]; then
+      ok="$name"; ok_ver="$ver"
+    fi
   done
+  [ -n "$ok" ] && best="$ok"
   [ -n "$best" ] && printf '%s' "$best"
   return 0
 }
@@ -252,14 +308,19 @@ promote_real_to_shared() {
 # ---------------------------------------------------------------------------
 declare -a lease_lines=()
 
-# sync_editor_dir <editor_name> <target_dir> <do_promote>
-#   do_promote: "1" to promote real dirs back into the shared cache. Pass "0"
-#               for vscode-web because its target_dir IS its own host-bound
-#               extension store -- there is nowhere to promote to.
+# sync_editor_dir <editor_name> <target_dir> <do_promote> <vscode_version> [extra_store]
+#   do_promote:     "1" to promote real dirs back into the shared cache. "0"
+#                   for vscode-web: it installs from the Marketplace, and those
+#                   builds are not put in the OpenVSX cache behind its back.
+#   vscode_version: the editor's VS Code version, or empty if unknown.
+#   extra_store:    a second store whose every id is linked as well, taking
+#                   precedence over the shared cache (vscode-web's own store).
 sync_editor_dir() {
   local editor_name="$1"
   local target_dir="$2"
   local do_promote="$3"
+  local editor_ver="${4:-}"
+  local extra_store="${5:-}"
   mkdir -p "$target_dir" "$SHARED_EXTENSIONS_DIR"
 
   if [ "$do_promote" = "1" ]; then
@@ -287,11 +348,30 @@ sync_editor_dir() {
 
   # Which versioned name is active per id in this editor dir.
   declare -A active_name=()
+  declare -A active_store=()
   local id_lc active
   for id_lc in "${!want_ids[@]}"; do
-    active="$(resolve_active "$SHARED_EXTENSIONS_DIR" "$id_lc")"
+    active="$(resolve_active "$SHARED_EXTENSIONS_DIR" "$id_lc" "$editor_ver")"
     [ -n "$active" ] && active_name["$id_lc"]="$active"
   done
+  if [ -n "$extra_store" ] && [ -d "$extra_store" ]; then
+    local xsrc xname xid
+    for xsrc in "$extra_store"/*/; do
+      xsrc="${xsrc%/}"
+      [ -L "$xsrc" ] && continue
+      xname="$(basename "$xsrc")"
+      case "$xname" in _*|.*) continue ;; esac
+      xid="$(ext_id "$xname")"
+      if [ -z "$xid" ] || [ "$xid" = "$xname" ]; then continue; fi
+      id_lc="${xid,,}"
+      [ -n "${active_store[$id_lc]:-}" ] && continue
+      active="$(resolve_active "$extra_store" "$id_lc" "$editor_ver")"
+      [ -n "$active" ] || continue
+      want_ids["$id_lc"]=1
+      active_name["$id_lc"]="$active"
+      active_store["$id_lc"]="$extra_store"
+    done
+  fi
 
   # Pass 1: drop symlinks that are stale (manifest dropped, target gone) or
   # point at a non-active version of a wanted id.
@@ -311,21 +391,21 @@ sync_editor_dir() {
   local linked=0 link src
   for id_lc in "${!active_name[@]}"; do
     name="${active_name[$id_lc]}"
-    src="$SHARED_EXTENSIONS_DIR/$name"
+    src="${active_store[$id_lc]:-$SHARED_EXTENSIONS_DIR}/$name"
     link="$target_dir/$name"
     if [ -L "$link" ] || [ ! -e "$link" ]; then
       ln -snf "$src" "$link"
       linked=$((linked + 1))
     fi
-    lease_lines+=("shared/$name")
+    if [ -n "${active_store[$id_lc]:-}" ]; then
+      lease_lines+=("vscode-web/$name")
+    else
+      lease_lines+=("shared/$name")
+    fi
   done
 
   log "$editor_name: synced (active ids: ${#active_name[@]}, linked/repointed: $linked, removed symlinks: $pruned)"
 
-  # Per-workspace editor dirs only. vscode-web's dir is one store shared by
-  # every workspace on the host (do_promote=0), so its registry is not ours
-  # to rewrite from a single workspace's manifest set.
-  [ "$do_promote" = "1" ] || return 0
   local active_tsv=""
   for id_lc in "${!active_name[@]}"; do
     name="${active_name[$id_lc]}"
@@ -343,7 +423,7 @@ sync_editor_dir() {
 reconcile_registry() {
   local editor_name="$1" target_dir="$2" active_tsv="$3" out
   command -v node >/dev/null 2>&1 || return 0
-  if out="$(DIR="$target_dir" ACTIVE="$active_tsv" SHARED_JSON="$SHARED_EXTENSIONS_DIR/extensions.json" node <<'NODE' 2>&1
+  if out="$(DIR="$target_dir" ACTIVE="$active_tsv" INSTALL_REGISTRIES="$SHARED_EXTENSIONS_DIR/extensions.json:$VSCODE_WEB_EXTENSIONS_DIR/extensions.json" node <<'NODE' 2>&1
 const fs = require('fs');
 const path = require('path');
 const dir = process.env.DIR;
@@ -384,10 +464,12 @@ const registryFile = path.join(dir, 'extensions.json');
 let entries = fs.existsSync(registryFile) ? readJson(registryFile) : undefined;
 let added = 0, dropped = 0;
 if (Array.isArray(entries)) {
-  const shared = readJson(process.env.SHARED_JSON);
+  // The install step's own registries (shared cache, vscode-web store).
   const sharedByName = new Map();
-  if (Array.isArray(shared)) {
-    for (const e of shared) if (e && e.relativeLocation) sharedByName.set(e.relativeLocation.toLowerCase(), e);
+  for (const file of (process.env.INSTALL_REGISTRIES || '').split(':').filter(Boolean)) {
+    const installed = readJson(file);
+    if (!Array.isArray(installed)) continue;
+    for (const e of installed) if (e && e.relativeLocation) sharedByName.set(e.relativeLocation.toLowerCase(), e);
   }
 
   const missing = entries.filter((e) => !fs.existsSync(entryPath(e)));
@@ -532,10 +614,12 @@ fi
 
 log "manifest extension IDs: ${#manifest_set[@]} (pinned: ${#manifest_pin[@]})"
 
-sync_editor_dir "code-server"    "$CODE_SERVER_EXTENSIONS_DIR"    1
-sync_editor_dir "vscode-web"     "$VSCODE_WEB_EXTENSIONS_DIR"     0
-sync_editor_dir "vscode-server"  "$VSCODE_SERVER_EXTENSIONS_DIR"  1
-sync_editor_dir "cursor-server"  "$CURSOR_SERVER_EXTENSIONS_DIR"  1
+log "editor VS Code versions: code-server=${CODE_SERVER_VSCODE_VERSION:-unknown} vscode-web=${VSCODE_WEB_VSCODE_VERSION:-unknown} vscode-server=${VSCODE_SERVER_VSCODE_VERSION:-unknown} cursor-server=${CURSOR_SERVER_VSCODE_VERSION:-unknown}"
+
+sync_editor_dir "code-server"    "$CODE_SERVER_EXTENSIONS_DIR"       1 "$CODE_SERVER_VSCODE_VERSION"
+sync_editor_dir "vscode-web"     "$VSCODE_WEB_EDITOR_EXTENSIONS_DIR" 0 "$VSCODE_WEB_VSCODE_VERSION" "$VSCODE_WEB_EXTENSIONS_DIR"
+sync_editor_dir "vscode-server"  "$VSCODE_SERVER_EXTENSIONS_DIR"     1 "$VSCODE_SERVER_VSCODE_VERSION"
+sync_editor_dir "cursor-server"  "$CURSOR_SERVER_EXTENSIONS_DIR"     1 "$CURSOR_SERVER_VSCODE_VERSION"
 lease_vscode_web_real_dirs
 
 LEASE_PATH=""

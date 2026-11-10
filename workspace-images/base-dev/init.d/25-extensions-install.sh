@@ -34,6 +34,9 @@ SHARED_DIR="${SHARED_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/shared}"
 VSCODE_WEB_DIR="${VSCODE_WEB_EXTENSIONS_DIR:-/home/coder/.vscode-extensions/vscode-web}"
 CODE_SERVER="${CODE_SERVER_BIN:-/opt/code-server/bin/code-server}"
 VSCODE_WEB="${VSCODE_WEB_BIN:-/opt/vscode-web/bin/code-server}"
+# code-server's VS Code version, for `engines.vscode` checks. Empty disables them.
+CODE_SERVER_VSCODE_VERSION="${EXTENSIONS_CODE_SERVER_VSCODE_VERSION-$(jq -r '.version // empty' "$(dirname "$(dirname "$CODE_SERVER")")"/lib/code-server-*/lib/vscode/package.json 2>/dev/null | sort -V | tail -n1)}"
+CODE_SERVER_VSCODE_VERSION="${CODE_SERVER_VSCODE_VERSION%%-*}"
 
 if [ ! -d "$MANIFEST_DIR" ]; then
   log "no manifest dir at $MANIFEST_DIR; nothing to install"
@@ -79,13 +82,26 @@ has_version() {
 # on OpenVSX, so curl prints a raw `curl: (22) ... 404` that looks like a
 # failure. The caller already logs a clear "could not resolve latest version"
 # line and falls back to installing unpinned.
+#
+# A release is also skipped when its `engines.vscode` asks for a newer VS Code
+# than this image's code-server: the newest release of an extension can be
+# ahead of code-server (github.vscode-pull-request-github 0.174.0 needs 1.144),
+# and code-server installs an explicitly versioned extension anyway and then
+# disables it as incompatible.
 latest_openvsx() {
   local id="$1" pub name ver
   pub="${id%%.*}"; name="${id#*.}"
 
   ver="$(curl -sSfL --max-time 10 \
     "https://open-vsx.org/api/v2/-/query?namespaceName=${pub}&extensionName=${name}&includeAllVersions=true&size=100&sortBy=timestamp" 2>/dev/null \
-    | jq -r 'first(.extensions[]? | select(.preRelease == false) | .version) // empty' 2>/dev/null)"
+    | jq -r --arg have "$CODE_SERVER_VSCODE_VERSION" '
+        def nums: [scan("[0-9]+|x")] | .[0:3] | map(if . == "x" then 0 else tonumber end);
+        def runs_here:
+          if $have == "" then true
+          else ((.engines.vscode // "") | nums) as $want
+            | ($want | length) < 2 or $want <= ($have | nums)
+          end;
+        first(.extensions[]? | select(.preRelease == false) | select(runs_here) | .version) // empty' 2>/dev/null)"
 
   if [ -z "$ver" ]; then
     ver="$(curl -sSfL --max-time 10 "https://open-vsx.org/api/${pub}/${name}" 2>/dev/null \
