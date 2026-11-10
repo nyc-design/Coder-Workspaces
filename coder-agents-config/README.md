@@ -14,7 +14,7 @@ GitHub Actions workflow on every commit that touches this directory.
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` field |
 | `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
 | `plan-mode-instructions.txt` | `/api/v2/chats/config/plan-mode-instructions` | (singleton, PUT) |
-| `template-allowlist.yaml` | `/api/experimental/chats/config/template-allowlist` | (singleton, PUT) — slugs resolved to template UUIDs at sync time |
+| `template-allowlist.yaml` | `/api/v2/templates/{id}` (`agents_allowed`) | template slug (`name`); every template not listed is set to `false` |
 | `sync.sh` | — (the script the workflow runs) | — |
 
 ## Sync semantics

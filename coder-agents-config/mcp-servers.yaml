@@ -1,5 +1,5 @@
 # MCP server configs for Coder Agents (chatd).
-# Synced to /api/experimental/mcp/servers by update-coder-agents-config.yaml.
+# Synced to /api/v2/organizations/{org}/mcp-servers by update-coder-agents-config.yaml.
 #
 # Stable identity: `slug` (must be unique within the deployment).
 # Additive: manually-added MCP servers in admin UI are not deleted by sync.
