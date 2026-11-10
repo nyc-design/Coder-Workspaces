@@ -2,6 +2,7 @@ import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {createBridge} from './monthly-bridge.mjs';
 import {createDashboardProxy} from './dashboard-proxy.mjs';
+import {startClaudeKeepalive} from './claude-keepalive.mjs';
 
 const token = randomBytes(32).toString('hex');
 const bridge = createBridge(token);
@@ -32,6 +33,7 @@ bridge.listen(8081, '127.0.0.1', () => {
   });
   child.on('error', () => shutdown(1));
   child.on('exit', code => { shutdown(code || 1); });
+  if (process.env.CLAUDE_KEEPALIVE !== '0') startClaudeKeepalive();
 });
 process.on('SIGTERM', () => shutdown(0));
 process.on('SIGINT', () => shutdown(0));

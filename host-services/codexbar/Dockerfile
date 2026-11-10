@@ -34,7 +34,9 @@ ARG CODEXBAR_UID=1000
 # owner (replaces the image's default `node` user at the same UID).
 RUN deluser --remove-home node \
  && adduser -D -u "${CODEXBAR_UID}" -h /home/codexbar codexbar \
- && apk add --no-cache tzdata
+ && apk add --no-cache tzdata libgcc libstdc++ \
+ && npm install -g @anthropic-ai/claude-code \
+ && npm cache clean --force
 COPY --from=fetch /opt/codexbar/lib/codexbar /usr/local/lib/codexbar
 COPY --from=bl /opt/bl /usr/local/share/bl
 RUN ln -s /usr/local/lib/codexbar/codexbar /usr/local/bin/codexbar \
