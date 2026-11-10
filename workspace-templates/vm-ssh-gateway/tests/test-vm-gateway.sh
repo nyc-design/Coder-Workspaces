@@ -49,8 +49,8 @@ ws() { docker exec "$WS" bash -c "$1"; }
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 mkdir -p "$TMP/key"
-ssh-keygen -q -t ed25519 -N '' -f "$TMP/key/id_ed25519"
-chmod 644 "$TMP/key/id_ed25519" # readable by whatever uid `coder` is in the image
+ssh-keygen -q -t ed25519 -N '' -f "$TMP/key/coder_workspace_ssh"
+chmod 644 "$TMP/key/coder_workspace_ssh" # readable by whatever uid `coder` is in the image
 
 # The "VM" has sshd and nothing else: no curl, no node, no editor.
 docker build -q -t "$ID-vm-image" - > /dev/null <<'DOCKERFILE'
@@ -65,7 +65,7 @@ DOCKERFILE
 
 docker network create "$NET" > /dev/null
 docker run -d --name "$VM" --hostname the-vm --network "$NET" --network-alias vm.test "$ID-vm-image" > /dev/null
-docker cp "$TMP/key/id_ed25519.pub" "$VM:/home/ubuntu/.ssh/authorized_keys"
+docker cp "$TMP/key/coder_workspace_ssh.pub" "$VM:/home/ubuntu/.ssh/authorized_keys"
 docker exec "$VM" sh -c 'chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys && chmod 600 /home/ubuntu/.ssh/authorized_keys'
 vm 'find ~' | LC_ALL=C sort > "$TMP/vm-before.txt"
 

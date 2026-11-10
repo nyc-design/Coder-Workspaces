@@ -53,8 +53,11 @@ VMs; add more in `local.vm_presets` in [`main.tf`](main.tf).
 
 ## SSH key
 
-One key is used for every VM: `/home/ubuntu/secrets/ssh/id_ed25519` on the
-Coder host, mounted read-only into the workspace. Its public half must be in
+This template has its own key, "Coder Workspace SSH", used for every VM:
+`/home/ubuntu/secrets/ssh/coder_workspace_ssh` on the Coder host, mounted into
+the workspace at `~/secrets/ssh/`. It is separate from the general
+`id_ed25519` key, so access granted to this template can be revoked on a VM
+without affecting anything else. Its public half must be in
 `~/.ssh/authorized_keys` for the SSH user on each VM. If the VM rejects the
 key, the startup log prints the public key to add.
 
@@ -63,11 +66,11 @@ volume and rewrites `~/.ssh/config` on every start. The shared key directory
 is mounted beside it at `~/secrets/ssh`, as in every workspace.
 
 To authorise the key on a VM, print the public half from any workspace
-(`cat ~/secrets/ssh/id_ed25519.pub`) and append that line to
+(`cat ~/secrets/ssh/coder_workspace_ssh.pub`) and append that line to
 `~/.ssh/authorized_keys` for the SSH user on the VM. On Oracle Cloud you can
 also paste it into the instance's SSH keys at creation. Check it from a
 normal workspace with
-`ssh -o IdentitiesOnly=yes -i ~/secrets/ssh/id_ed25519 <user>@<ip> true`.
+`ssh -o IdentitiesOnly=yes -i ~/secrets/ssh/coder_workspace_ssh <user>@<ip> true`.
 
 ## Apps
 
