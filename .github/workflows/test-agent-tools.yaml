@@ -35,7 +35,7 @@ jobs:
           NPM_CONFIG_PREFIX: ${{ runner.temp }}/agent-tools
           CODEXBAR_INSTALL_PREFIX: ${{ runner.temp }}/agent-tools
         run: |
-          npm install --global --no-audit --no-fund @qwen-code/qwen-code@0.24.3
+          npm install --global --no-audit --no-fund @qwen-code/qwen-code@0.27.2
           bash workspace-images/base-dev/scripts/install-bailian.sh
           bash workspace-images/base-dev/scripts/install-codexbar.sh
           export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"

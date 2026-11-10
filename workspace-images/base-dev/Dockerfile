@@ -1,4 +1,6 @@
-FROM codercom/enterprise-base:ubuntu-20250929
+# Ubuntu 24.04 (noble). The undated `ubuntu-<date>` tags moved to 26.04, so stay
+# on the noble series explicitly until the images are validated on 26.04.
+FROM codercom/enterprise-base:ubuntu-noble-20260803
 ARG DEBIAN_FRONTEND=noninteractive
 
 USER root
@@ -44,7 +46,7 @@ ENV PATH=/usr/local/share/npm-global/bin:$PATH
 RUN install -d -m 0775 -o coder -g coder /usr/local/share/npm-global
 
 # AI coding CLIs + docs/tooling ecosystem
-RUN npm install -g pnpm @openai/codex @qwen-code/qwen-code@0.24.3 @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli gitnexus @samuelfaj/distill ctx7 \
+RUN npm install -g pnpm @openai/codex @qwen-code/qwen-code@0.27.2 @anthropic-ai/claude-code @google/gemini-cli likec4 skills tree-sitter-cli gitnexus @samuelfaj/distill ctx7 \
  && chown -R coder:coder /usr/local/share/npm-global
 
 # Subscription tooling: no credentials or user state in image layers.

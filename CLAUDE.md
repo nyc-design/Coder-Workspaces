@@ -484,6 +484,8 @@ base-dev → swift-dev
 - **Path-based**: Changes to `workspace-images/{image-name}/**`, `workspace-images/python-shared/**`, or workflow files
 - **Cascade**: Parent image builds trigger child image rebuilds via `workflow_run`
 - **Manual**: `workflow_dispatch` for on-demand builds
+- **Weekly fresh rebuild**: `build-base-dev.yaml` also runs on a weekly schedule (Mondays 05:30 UTC). Scheduled and manual runs build with `no-cache`; push builds reuse the GHA layer cache. A cached build replays the "install latest" layers, so only the uncached runs pick up new code-server, VS Code Web, apt packages and unpinned CLIs. The cascade then rebuilds the child images
+- **Base OS**: `base-dev` is pinned to a dated `codercom/enterprise-base:ubuntu-noble-*` tag (Ubuntu 24.04). The plain `ubuntu-<date>` tags now track 26.04; moving to them is a deliberate migration, not a routine bump
 - **Authentication**: Uses workload identity with `GCP_SA_KEY` secret
 
 ### Image Tagging Strategy

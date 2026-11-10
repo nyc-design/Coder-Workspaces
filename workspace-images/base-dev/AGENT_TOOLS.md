@@ -4,7 +4,7 @@
 
 The base image uses Node 22 (approved upgrade from Node 20) and includes:
 
-- Qwen Code `0.24.3` (`qwen`), via the existing npm-global prefix.
+- Qwen Code `0.27.2` (`qwen`), via the existing npm-global prefix.
 - Bailian CLI `2.0.0` (`bl`, also `bailian`), the official `modelstudioai/cli` npm package. Its tarball is checksum-verified; lifecycle hooks are disabled to avoid downloading mutable wiki/skills content into root's home during image build. Registry dependency ranges remain upstream-managed.
 - CodexBar CLI `0.84.0` (`codexbar`), checksum-verified static-musl Linux amd64/arm64 release. The executable, resource bundle and VERSION stay together under `/usr/local/lib/codexbar`.
 
