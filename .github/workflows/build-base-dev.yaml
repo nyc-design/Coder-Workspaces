@@ -8,6 +8,10 @@ on:
       - "workspace-images/base-dev/**"
       - ".github/workflows/build-base-dev.yaml"
   workflow_dispatch:
+  # Weekly fresh rebuild so the image does not age when nothing is pushed. The
+  # child images follow through their workflow_run triggers on this workflow.
+  schedule:
+    - cron: "30 5 * * 1"
 
 permissions:
   contents: read
@@ -52,8 +56,6 @@ jobs:
         run: |
           echo "IMG=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
           echo "SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
-          # ISO year-week: see ARG CACHE_EPOCH in the Dockerfile.
-          echo "CACHE_EPOCH=$(date -u +%G-W%V)" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,8 +69,12 @@ jobs:
           file: workspace-images/base-dev/Dockerfile
           platforms: ${{ matrix.platform }}
           tags: ${{ env.IMG }}
-          build-args: |
-            CACHE_EPOCH=${{ env.CACHE_EPOCH }}
+          # Push builds reuse the layer cache. Scheduled and manual builds
+          # ignore it, because a cached build
+          # replays the "install latest" layers and never picks up new
+          # code-server, VS Code Web, apt packages or CLIs. They still write
+          # the cache, so later push builds start from the fresh layers.
+          no-cache: ${{ github.event_name != 'push' }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           # GHA cache is scoped separately per image and architecture so the
           # native matrix jobs cannot reserve the same cache entry.

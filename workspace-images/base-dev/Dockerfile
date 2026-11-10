@@ -2,12 +2,6 @@
 # on the noble series explicitly until the images are validated on 26.04.
 FROM codercom/enterprise-base:ubuntu-noble-20260803
 ARG DEBIAN_FRONTEND=noninteractive
-# Changes once per ISO week (set by build-base-dev.yaml). An ARG is part of the
-# cache key of every RUN after it, so the first build of a week re-runs them all
-# and picks up current apt packages, code-server, VS Code Web and the unpinned
-# CLIs; later builds that week reuse the cache. Without it an unchanged
-# Dockerfile is served from cache forever and "latest" never moves.
-ARG CACHE_EPOCH=unset
 
 USER root
 
