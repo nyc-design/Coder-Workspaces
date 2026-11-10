@@ -40,8 +40,11 @@ data "coder_parameter" "vm_host" {
   mutable      = true
   order        = 1
 
+  # The empty alternative is only for template import, which plans with no
+  # parameter values. The parameter has no default, so the create form still
+  # requires one, and vm-gateway.sh refuses to run with an empty host.
   validation {
-    regex = "^[A-Za-z0-9:][A-Za-z0-9.:-]*$"
+    regex = "^$|^[A-Za-z0-9:][A-Za-z0-9.:-]*$"
     error = "Enter an IP address or hostname (letters, digits, '.', ':' and '-' only)."
   }
 }
