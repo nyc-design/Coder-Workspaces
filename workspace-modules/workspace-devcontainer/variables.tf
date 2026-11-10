@@ -27,7 +27,7 @@ variable "agent_env" {
 }
 
 variable "repo" {
-  description = "GitHub repository as owner/name. Cloned into workspace_folder and searched for .devcontainer/devcontainer.json. Empty skips both (template import plans with empty parameters)."
+  description = "GitHub repository as owner/name. Cloned into workspace_folder; its .devcontainer/devcontainer.json names the image. Empty skips both (template import plans with empty parameters)."
   type        = string
 }
 

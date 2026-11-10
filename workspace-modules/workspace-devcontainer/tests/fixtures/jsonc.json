@@ -1,23 +1,26 @@
-// Comments on their own line and trailing commas are what editors leave
-// behind in devcontainer.json, so both have to survive.
+// Comments and trailing commas are what editors leave behind in
+// devcontainer.json, so all of these have to survive.
 {
   "name": "JSONC",
-  // The image comes after a comment.
-  "image": "example/fullstack-dev:latest",
+  /* A block comment,
+     over two lines. */
+  "image": "example/fullstack-dev:latest", // and one at the end of a line
   "customizations": {
     "vscode": {
       "settings": {
         "files.exclude": { "**/*.pyc": true, "**/__pycache__": true, },
         "search.exclude": { "**/node_modules/*": true },
-        "docs.url": "https://example.com/a//b",
       },
     },
   },
-  "onCreateCommand": ["echo", "it's created", "a b"],
-  "updateContentCommand": "git submodule update --init",
-  "postCreateCommand": {
-    "b-frontend": "cd frontend && pnpm install",
-    "a-backend": ["uv", "sync"],
+  "containerEnv": {
+    "DOCS_URL": "https://example.com/a//b /* not a comment */",
   },
-  "postStartCommand": "/usr/local/bin/start-gateway",
+  "onCreateCommand": ["echo", "it's created", "a b"],
+  "updateContentCommand": "pwd > /tmp/lifecycle-pwd",
+  "postCreateCommand": {
+    "b-second": "echo second",
+    "a-first": ["echo", "first"],
+  },
+  "postStartCommand": "cd sub && pwd > /tmp/lifecycle-subdir",
 }

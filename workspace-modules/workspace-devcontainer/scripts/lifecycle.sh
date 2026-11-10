@@ -3,21 +3,23 @@
 # time). A failing command is reported and the remaining ones are skipped, but
 # workspace startup carries on.
 #
-# Head of the agent startup script. The calls are appended by main.tf with
-# base64 arguments, so no command text is ever re-quoted by Terraform. Kept to
-# what dash accepts: the agent runs it with the image user's shell.
+# Head of the agent startup script; main.tf appends the devcontainer_lifecycle
+# call. The commands come from the file devcontainer.sh wrote in the
+# entrypoint. Kept to what dash accepts: the agent runs this with the image
+# user's shell.
 
 devcontainer_lifecycle_failed=""
 
-# Shows what the entrypoint's clone did (its output is otherwise only in the
-# container log), then moves into the project folder.
-devcontainer_enter() {
+# $1: base64 of the project folder.
+devcontainer_lifecycle() {
+  local hook command
+  # What the entrypoint did is otherwise only in the container log.
   [ ! -s /tmp/workspace-clone.log ] || cat /tmp/workspace-clone.log
   cd "$(printf '%s' "$1" | base64 -d)" 2> /dev/null || true
-}
-
-devcontainer_notice() {
-  printf '=== %s\n' "$(printf '%s' "$1" | base64 -d)"
+  [ -f /tmp/workspace-devcontainer.lifecycle ] || return 0
+  while read -r hook command; do
+    run_lifecycle_command "$hook" "$command"
+  done < /tmp/workspace-devcontainer.lifecycle
 }
 
 run_lifecycle_command() {

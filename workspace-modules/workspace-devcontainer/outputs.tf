@@ -9,7 +9,7 @@ output "image_id" {
 }
 
 output "entrypoint" {
-  description = "Container entrypoint: ownership fix, clone, then the agent init script. Set as the entrypoint, not the command, so an image ENTRYPOINT cannot wrap it."
+  description = "Container entrypoint: ownership fix, clone, devcontainer.json environment, then the agent init script. Set as the entrypoint, not the command, so an image ENTRYPOINT cannot wrap it."
   value       = ["sh", "-c", local.entrypoint_script]
 }
 
@@ -19,16 +19,6 @@ output "docker_env" {
 }
 
 output "startup_script" {
-  description = "For coder_agent.startup_script: the devcontainer lifecycle commands, then var.startup_script."
+  description = "For coder_agent.startup_script: the devcontainer lifecycle commands the entrypoint found, then var.startup_script."
   value       = local.startup_script
-}
-
-output "lifecycle_commands" {
-  description = "Devcontainer lifecycle commands in run order, as { hook, command } with command being an sh command line."
-  value       = local.lifecycle_commands
-}
-
-output "notices" {
-  description = "Human-readable notes about how devcontainer.json was interpreted (fallbacks, skipped settings)."
-  value       = local.notices
 }

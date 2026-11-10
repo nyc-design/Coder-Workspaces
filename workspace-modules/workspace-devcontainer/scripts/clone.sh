@@ -1,5 +1,5 @@
-# Container entrypoint, after fix-ownership.sh and before the agent init script
-# that main.tf appends: clone the project if its folder is empty.
+# Container entrypoint, after fix-ownership.sh and before devcontainer.sh:
+# clone the project if its folder is empty.
 #
 # Cloning here, not from the agent, keeps the order envbuilder had: the
 # repository exists before the agent connects, so the agent's startup script,
@@ -9,9 +9,10 @@
 # startup script shows this log, and the next start tries again because the
 # folder is still empty.
 #
-# Settings arrive as WORKSPACE_CLONE_* container env (see main.tf). The token is
-# handed to git by an inline credential helper, so it is not written to
-# ~/.git-credentials or .git/config, and the image's own helper is not used.
+# Settings arrive as WORKSPACE_CLONE_* container env (see main.tf);
+# devcontainer.sh unsets them. The token is handed to git by an inline
+# credential helper, so it is not written to ~/.git-credentials or .git/config,
+# and the image's own helper is not used.
 if [ -n "${WORKSPACE_CLONE_URL:-}" ] && [ -n "${WORKSPACE_CLONE_DIR:-}" ]; then
   {
     mkdir -p "$WORKSPACE_CLONE_DIR"
@@ -33,4 +34,3 @@ if [ -n "${WORKSPACE_CLONE_URL:-}" ] && [ -n "${WORKSPACE_CLONE_DIR:-}" ]; then
     fi
   } 2>&1 | tee /tmp/workspace-clone.log
 fi
-unset WORKSPACE_CLONE_URL WORKSPACE_CLONE_REF WORKSPACE_CLONE_DIR WORKSPACE_CLONE_TOKEN

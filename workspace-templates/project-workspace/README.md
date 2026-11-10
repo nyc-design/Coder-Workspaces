@@ -30,15 +30,17 @@ once per host and reused until its tag moves.
 
 On every start, in this order:
 
-1. **Image.** Terraform reads `.devcontainer/devcontainer.json` from GitHub and
-   uses its `image`. No file, or a file without an `image`, means
+1. **Image.** Terraform reads `.devcontainer/devcontainer.json` from GitHub,
+   for its `image` only. No file, or a file without an `image`, means
    `base-dev`. Any other answer from GitHub fails the build rather than starting
    on the wrong image.
 2. **Container.** Docker runs that image. Its entrypoint fixes ownership of
    `/home/coder` and `/workspaces` as root.
 3. **Clone.** Still in the entrypoint, the repository is cloned into
    `/workspaces/<project>` if that folder is empty, using your linked GitHub
-   account's token (or the shared PAT). The token is not saved to disk.
+   account's token (or the shared PAT). The token is not saved to disk. The
+   checked-out `devcontainer.json` is then read for its environment variables
+   and lifecycle commands.
 4. **Agent.** The Coder agent starts and connects, with the project in place.
 5. **Lifecycle commands.** `onCreateCommand`, `updateContentCommand`,
    `postCreateCommand` and `postStartCommand` run from the project folder. A
@@ -53,26 +55,28 @@ output, which is otherwise only in the container log.
 | Setting | Support |
 |---|---|
 | `image` | Yes. Must be pullable without credentials. |
-| `containerEnv`, `remoteEnv` | Yes, as container environment. `${containerWorkspaceFolder}`, `${localWorkspaceFolder}` and their `Basename` forms are resolved; a value using `${containerEnv:...}` or `${localEnv:...}` is skipped and reported. |
+| `containerEnv`, `remoteEnv` | Yes, exported before the agent starts. `${containerWorkspaceFolder}`, `${localWorkspaceFolder}`, their `Basename` forms, `${containerEnv:NAME}` and `${localEnv:NAME}` are resolved (both from the container). A value using any other variable, or a `CODER_*` name, is skipped and reported. |
 | `onCreateCommand`, `updateContentCommand`, `postCreateCommand`, `postStartCommand` | Yes: string, array and object forms. Object entries run one after another in name order. All four run on every start, because the container is new each time. |
 | `customizations.vscode` | Yes, by the init pipeline, from the checkout. |
 | `build` / `dockerFile`, `features`, `dockerComposeFile` | No. Publish an image and reference it. |
 | `mounts`, `runArgs`, `forwardPorts`, `postAttachCommand`, `initializeCommand` | No. |
 
-Comments on their own line and trailing commas are fine. A file that still does
-not parse keeps its `image` but loses the other settings, with a notice in the
-startup log.
+Comments and trailing commas are fine. Problems with the file are reported at
+the top of the startup log and never stop the workspace.
 
 ### Where the file is read from
 
-The image has to be known before the container exists, so everything in the table
-except `customizations.vscode` comes from GitHub, not from the checkout:
+The image has to be known before the container exists, so `image` alone comes
+from GitHub:
 
-- **Existing repository:** the default branch. A change to `devcontainer.json`
-  takes effect on the next start after it reaches the default branch.
+- **Existing repository:** the default branch. A changed `image` takes effect
+  on the next start after it reaches the default branch.
 - **New project:** the `scaffold/<type>` branch of `nyc-design/Project-Scaffolds`,
   for the life of the workspace. Once the project has its own repository, create
-  a workspace for that repository to have its own `devcontainer.json` apply.
+  a workspace for that repository to have its own `image` apply.
+
+Everything else comes from the checkout in the workspace, so an edit applies on
+the next start without being pushed.
 
 ### If the clone fails
 

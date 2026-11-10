@@ -1,8 +1,9 @@
 # Run from the module directory: terraform init && terraform test
 #
 # Providers are mocked, so nothing is fetched, pulled or created. The GitHub
-# response is injected per run, which is what these tests are about: how a
-# devcontainer.json turns into an image, container env and lifecycle commands.
+# response is injected per run. These tests cover what Terraform decides: which
+# image runs, and what the container and agent are handed. What happens inside
+# the container is covered by test-scripts.sh.
 
 mock_provider "http" {}
 mock_provider "docker" {
@@ -44,59 +45,33 @@ run "strict_json" {
     condition     = output.image == "example/python-dev:latest"
     error_message = "image should come from devcontainer.json, got ${output.image}"
   }
-
   assert {
     condition     = output.image_id == "sha256:2222222222222222222222222222222222222222222222222222222222222222"
     error_message = "the container should run the pulled image id"
   }
   assert {
-    condition     = output.lifecycle_commands == [{ hook = "postCreateCommand", command = "cd services/frontend && npm install" }]
-    error_message = "a string command runs as written, and an empty one is dropped: ${jsonencode(output.lifecycle_commands)}"
+    condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/octo/app/contents/.devcontainer/devcontainer.json"
+    error_message = "default-branch lookups carry no ref: ${data.http.devcontainer[0].url}"
   }
   assert {
-    condition = local.devcontainer_env == {
-      STATE_DIR    = "/home/coder/.local/share/app"
-      PROJECT_ROOT = "/workspaces/app/src"
-      PROJECT_NAME = "app"
-      SHARED       = "from-remote-env"
-    }
-    error_message = "containerEnv/remoteEnv resolution is wrong: ${jsonencode(local.devcontainer_env)}"
-  }
-  assert {
-    condition     = local.devcontainer_env_skipped == tolist(["EDITOR_HOME", "PATH"])
-    error_message = "variables needing containerEnv:/localEnv: must be skipped, never passed through: ${jsonencode(local.devcontainer_env_skipped)}"
-  }
-  assert {
-    condition     = local.container_env["SHARED"] == "from-agent-env" && local.container_env["CODER_AGENT_URL"] == "http://host.docker.internal:3000" && local.container_env["CODER_AGENT_TOKEN"] == "agent-token"
-    error_message = "the template's agent env and the agent credentials must win over the devcontainer's variables"
-  }
-  assert {
-    condition     = length(output.notices) == 1 && strcontains(output.notices[0], "EDITOR_HOME, PATH")
-    error_message = "skipped variables should be reported: ${jsonencode(output.notices)}"
-  }
-  assert {
-    condition     = output.entrypoint[0] == "sh" && output.entrypoint[1] == "-c" && strcontains(output.entrypoint[2], "chown coder:coder") && strcontains(output.entrypoint[2], "WORKSPACE_CLONE_URL") && strcontains(output.entrypoint[2], "curl http://host.docker.internal:3000/bin/coder && exec ./coder agent")
-    error_message = "the entrypoint fixes ownership, clones, then runs the init script with localhost rewritten"
-  }
-  assert {
-    condition     = endswith(output.startup_script, "run_lifecycle_command postCreateCommand ${base64encode("cd services/frontend && npm install")}\necho init-pipeline")
-    error_message = "startup_script must end with the lifecycle commands followed by the init pipeline"
+    condition     = output.entrypoint[0] == "sh" && output.entrypoint[1] == "-c" && strcontains(output.entrypoint[2], "chown coder:coder") && strcontains(output.entrypoint[2], " clone ") && strcontains(output.entrypoint[2], "DEVCONTAINER_PY") && endswith(output.entrypoint[2], "curl http://host.docker.internal:3000/bin/coder && exec ./coder agent")
+    error_message = "the entrypoint fixes ownership, clones, applies devcontainer.json, then runs the init script with localhost rewritten"
   }
   assert {
     condition     = local.clone_env["WORKSPACE_CLONE_URL"] == "https://github.com/octo/app.git" && local.clone_env["WORKSPACE_CLONE_REF"] == "" && local.clone_env["WORKSPACE_CLONE_DIR"] == "/workspaces/app" && nonsensitive(local.clone_env["WORKSPACE_CLONE_TOKEN"]) == "gh-token"
     error_message = "clone settings are wrong"
   }
   assert {
-    condition     = strcontains(output.startup_script, "devcontainer_enter ${base64encode("/workspaces/app")}\n")
-    error_message = "lifecycle commands must run from the project folder"
+    condition     = local.container_env["SHARED"] == "from-agent-env" && local.container_env["CODER_AGENT_URL"] == "http://host.docker.internal:3000" && local.container_env["CODER_AGENT_TOKEN"] == "agent-token"
+    error_message = "the container gets the template's agent env and the agent credentials"
   }
   assert {
-    condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/octo/app/contents/.devcontainer/devcontainer.json"
-    error_message = "default-branch lookups carry no ref: ${data.http.devcontainer[0].url}"
+    condition     = endswith(output.startup_script, "\ndevcontainer_lifecycle ${base64encode("/workspaces/app")}\necho init-pipeline")
+    error_message = "startup_script runs the lifecycle commands from the project folder, then the init pipeline"
   }
 }
 
-run "comments_trailing_commas_and_every_command_form" {
+run "comments_and_trailing_commas" {
   override_data {
     target = data.http.devcontainer
     values = {
@@ -106,49 +81,12 @@ run "comments_trailing_commas_and_every_command_form" {
   }
 
   assert {
-    condition     = output.image == "example/fullstack-dev:latest" && length(output.notices) == 0
-    error_message = "full-line comments and trailing commas must parse cleanly: ${output.image} ${jsonencode(output.notices)}"
-  }
-  assert {
-    condition = output.lifecycle_commands == [
-      { hook = "onCreateCommand", command = "'echo' 'it'\\''s created' 'a b'" },
-      { hook = "updateContentCommand", command = "git submodule update --init" },
-      { hook = "postCreateCommand", command = "'uv' 'sync'" },
-      { hook = "postCreateCommand", command = "cd frontend && pnpm install" },
-      { hook = "postStartCommand", command = "/usr/local/bin/start-gateway" },
-    ]
-    error_message = "hook order, argv quoting or object-form ordering is wrong: ${jsonencode(output.lifecycle_commands)}"
-  }
-  assert {
-    condition     = local.devcontainer.customizations.vscode.settings["docs.url"] == "https://example.com/a//b" && local.devcontainer.customizations.vscode.settings["files.exclude"]["**/*.pyc"] == true
-    error_message = "comment stripping must not touch // or /* inside strings"
+    condition     = output.image == "example/fullstack-dev:latest"
+    error_message = "a file Terraform cannot parse as JSON should still yield its image: ${output.image}"
   }
 }
 
-run "scaffold_branch" {
-  variables {
-    repo     = "nyc-design/Project-Scaffolds"
-    repo_ref = "scaffold/python"
-  }
-  override_data {
-    target = data.http.devcontainer
-    values = {
-      status_code   = 200
-      response_body = "{\"image\": \"example/python-dev:latest\", \"postCreateCommand\": \"uv sync\"}"
-    }
-  }
-
-  assert {
-    condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/nyc-design/Project-Scaffolds/contents/.devcontainer/devcontainer.json?ref=scaffold%2Fpython"
-    error_message = "the ref must be URL-encoded: ${data.http.devcontainer[0].url}"
-  }
-  assert {
-    condition     = local.clone_env["WORKSPACE_CLONE_REF"] == "scaffold/python" && local.clone_env["WORKSPACE_CLONE_URL"] == "https://github.com/nyc-design/Project-Scaffolds.git"
-    error_message = "the scaffold branch must be what gets cloned"
-  }
-}
-
-run "unparsable_file_still_gets_its_image" {
+run "end_of_line_comment" {
   override_data {
     target = data.http.devcontainer
     values = {
@@ -159,11 +97,7 @@ run "unparsable_file_still_gets_its_image" {
 
   assert {
     condition     = output.image == "example/rust-dev:latest"
-    error_message = "an unparsable file should still yield its image: ${output.image}"
-  }
-  assert {
-    condition     = output.lifecycle_commands == [] && length(output.notices) == 1 && strcontains(output.notices[0], "not valid JSON")
-    error_message = "skipped lifecycle commands must be reported: ${jsonencode(output.notices)}"
+    error_message = "a file Terraform cannot parse as JSON should still yield its image: ${output.image}"
   }
 }
 
@@ -180,13 +114,28 @@ run "no_image_falls_back" {
     condition     = output.image == "example/base-dev:latest"
     error_message = "a nested \"image\" key must not be mistaken for the devcontainer image: ${output.image}"
   }
+}
+
+run "scaffold_branch" {
+  variables {
+    repo     = "nyc-design/Project-Scaffolds"
+    repo_ref = "scaffold/python"
+  }
+  override_data {
+    target = data.http.devcontainer
+    values = {
+      status_code   = 200
+      response_body = "{\"image\": \"example/python-dev:latest\"}"
+    }
+  }
+
   assert {
-    condition     = length(output.notices) == 1 && strcontains(output.notices[0], "has no \"image\"")
-    error_message = "the fallback must be reported: ${jsonencode(output.notices)}"
+    condition     = data.http.devcontainer[0].url == "https://api.github.com/repos/nyc-design/Project-Scaffolds/contents/.devcontainer/devcontainer.json?ref=scaffold%2Fpython"
+    error_message = "the ref must be URL-encoded: ${data.http.devcontainer[0].url}"
   }
   assert {
-    condition     = output.lifecycle_commands == [{ hook = "postCreateCommand", command = "make setup" }]
-    error_message = "lifecycle commands still run on the fallback image"
+    condition     = local.clone_env["WORKSPACE_CLONE_REF"] == "scaffold/python" && local.clone_env["WORKSPACE_CLONE_URL"] == "https://github.com/nyc-design/Project-Scaffolds.git"
+    error_message = "the scaffold branch must be what gets cloned"
   }
 }
 
@@ -200,16 +149,8 @@ run "missing_file_falls_back" {
   }
 
   assert {
-    condition     = output.image == "example/base-dev:latest" && output.lifecycle_commands == []
+    condition     = output.image == "example/base-dev:latest"
     error_message = "404 means no devcontainer.json: ${output.image}"
-  }
-  assert {
-    condition     = output.notices == tolist(["No .devcontainer/devcontainer.json in octo/app; using example/base-dev:latest."])
-    error_message = "the fallback must be reported: ${jsonencode(output.notices)}"
-  }
-  assert {
-    condition     = endswith(output.startup_script, "\necho init-pipeline")
-    error_message = "the init pipeline runs whether or not there is a devcontainer.json"
   }
 }
 
@@ -251,10 +192,9 @@ run "template_import_with_empty_parameters" {
   }
 
   assert {
-    condition     = length(data.http.devcontainer) == 0 && output.image == "example/base-dev:latest" && length(output.notices) == 0
+    condition     = length(data.http.devcontainer) == 0 && output.image == "example/base-dev:latest"
     error_message = "an empty repo must not reach GitHub"
   }
-
   assert {
     condition     = length(local.clone_env) == 0 && endswith(output.startup_script, var.startup_script)
     error_message = "with no repo there is nothing to clone, and the init pipeline must still run"

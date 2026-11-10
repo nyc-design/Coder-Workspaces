@@ -35,7 +35,7 @@ workspace-templates/       # Coder workspace template definitions
 
 workspace-modules/         # Reusable Terraform modules for workspace templates
 ├── workspace-apps/        # coder_app metadata
-├── workspace-devcontainer/ # devcontainer.json -> image, clone, lifecycle commands (replaces envbuilder)
+├── workspace-devcontainer/ # devcontainer.json image, clone, env, lifecycle commands (replaces envbuilder)
 ├── workspace-envbuilder/  # legacy; only read by template versions still on envbuilder
 ├── workspace-runtime/     # runtime container/env wiring
 ├── workspace-secrets/     # GCP Secret Manager fetches
@@ -292,15 +292,16 @@ See [MODELING_WORKSPACE.md](MODELING_WORKSPACE.md) for validation limits and int
 ### Workspace container (project-workspace)
 
 `project-workspace` runs the project's devcontainer image directly; envbuilder is
-no longer involved. `workspace-modules/workspace-devcontainer` reads
-`.devcontainer/devcontainer.json` from GitHub at plan time (default branch, or
-the `scaffold/<type>` branch for new projects) to get the image, container env
-and lifecycle commands, and falls back to `base-dev` when there is no file or no
-`image`. The container entrypoint fixes ownership as root, clones the repo if
-the project folder is empty, and only then starts the agent, so the repo exists
-before the agent connects (the order envbuilder had). The agent's
-`startup_script` comes from the module: lifecycle commands, then the init
-pipeline. A failed clone is logged and does not stop the workspace.
+no longer involved. `workspace-modules/workspace-devcontainer` reads only the
+`image` from `.devcontainer/devcontainer.json` on GitHub at plan time (default
+branch, or the `scaffold/<type>` branch for new projects), falling back to
+`base-dev`. The container entrypoint then fixes ownership as root, clones the
+repo if the project folder is empty, exports `containerEnv`/`remoteEnv` from the
+checked-out file (`scripts/devcontainer.sh`, needs `python3` in the image), and
+only then starts the agent, so the repo exists before the agent connects (the
+order envbuilder had). The agent's `startup_script` comes from the module:
+lifecycle commands from the checked-out file, then the init pipeline. A failed
+clone or an unreadable file is logged and does not stop the workspace.
 
 Only prebuilt images are supported (no Dockerfile builds or devcontainer
 features). Details, the supported `devcontainer.json` settings and failure
