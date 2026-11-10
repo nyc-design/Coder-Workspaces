@@ -7,14 +7,33 @@ on:
     paths:
       - "coder-agents-config/**"
       - ".github/workflows/update-coder-agents-config.yaml"
+  pull_request:
+    paths:
+      - "coder-agents-config/**"
+      - ".github/workflows/update-coder-agents-config.yaml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write   # required for GCP Workload Identity Federation
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check syntax and run offline sync tests
+        run: |
+          for tool in curl jq yq envsubst; do command -v "$tool"; done
+          yq --version | grep -E 'version v?4\.'
+          bash -n coder-agents-config/sync.sh
+          python3 -m unittest discover -s coder-agents-config/tests -v
+
   sync:
+    if: github.event_name != 'pull_request'
+    needs: test
+    permissions:
+      contents: read
+      id-token: write   # required for GCP Workload Identity Federation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,5 +73,5 @@ jobs:
             HEADROOM_MCP_SECRET:coder-nt/HEADROOM_MCP_SECRET
             XCODEBUILDMCP_API_KEY:coder-nt/XCODEBUILDMCP_API_KEY
 
-      - name: Sync providers / models / MCP servers / system prompt / template-allowlist
+      - name: Sync providers / models / model overrides / MCP servers / system prompt / template-allowlist
         run: ./coder-agents-config/sync.sh coder-agents-config

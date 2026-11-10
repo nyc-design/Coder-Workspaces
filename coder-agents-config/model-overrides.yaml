@@ -1,0 +1,7 @@
+# Only declared contexts are managed; omitted contexts remain unchanged.
+# Provider/model names resolve to the organization model UUID after model sync.
+overrides:
+  - context: title_generation
+    provider: anthropic
+    model: cliproxy-claude/claude-haiku-5-5
+    reasoning_effort: low

@@ -16,6 +16,7 @@
 #   models          declarative (POST/PATCH desired; DELETE any model not in YAML)
 #                              models reference providers by name; sync.sh
 #                              resolves name → ai_provider_id at push time.
+#   model overrides PUT declared contexts only; unlisted contexts are untouched
 #   mcp servers     additive   (POST if missing, PATCH if exists; never delete)
 #   system prompt   PUT singleton
 #
@@ -32,6 +33,7 @@
 # Stable keys per resource:
 #   ai providers    name field (lowercase-alphanumeric-hyphen)
 #   models          (provider name, model) in YAML; (ai_provider_id, model) in the API
+#   model overrides context; referenced models use the same (provider name, model)
 #   mcp servers     slug field
 
 set -euo pipefail
@@ -76,6 +78,7 @@ _curl() {
 coder_get()    { _curl GET    "$1"; }
 coder_post()   { _curl POST   "$1" "$2"; }
 coder_patch()  { _curl PATCH  "$1" "$2"; }
+coder_put()    { _curl PUT    "$1" "$2"; }
 coder_delete() { _curl DELETE "$1"; }
 
 # Cache of name → id for ai providers, populated by push_providers and used
@@ -261,6 +264,110 @@ push_models() {
   done
 }
 
+# ───────── MODEL OVERRIDES (declared contexts only) ─────────────────────────
+validate_model_overrides() {
+  jq -e '
+    type == "object" and (.overrides | type) == "array" and
+    all(.overrides[];
+      type == "object" and
+      (.context | type) == "string" and
+      (.context | test("^[a-z][a-z0-9_]*\\z")) and
+      (.provider | type) == "string" and (.provider | length) > 0 and
+      (.model | type) == "string" and (.model | length) > 0 and
+      (.reasoning_effort == null or (.reasoning_effort | type) == "string")
+    ) and
+    ((.overrides | map(.context) | unique | length) == (.overrides | length))
+  ' <<< "$1" >/dev/null
+}
+
+validate_model_override_references() {
+  if ! jq -en --argjson models "$1" --argjson providers "$2" '
+    def nonempty_string: type == "string" and length > 0;
+    ($models | type) == "array" and ($providers | type) == "array" and
+    all($models[]; type == "object" and
+      (.id | nonempty_string) and (.ai_provider_id | nonempty_string) and
+      (.model | nonempty_string)) and
+    all($providers[]; type == "object" and
+      (.id | nonempty_string) and (.name | nonempty_string)) and
+    (($providers | map(.name) | unique | length) == ($providers | length))
+  ' >/dev/null; then
+    echo "ERROR: unexpected model/provider API response for model overrides" >&2
+    return 1
+  fi
+}
+
+push_model_overrides() {
+  local file="$CONFIG_DIR/model-overrides.yaml"
+  [ -f "$file" ] || { echo "no model-overrides.yaml, skipping"; return; }
+
+  echo "==> syncing model overrides from $file"
+  local desired models models_url overrides_url requests='[]'
+  desired="$(expand_yaml "$file")"
+  if ! validate_model_overrides "$desired"; then
+    echo "ERROR: invalid model-overrides.yaml; require unique contexts and provider/model names" >&2
+    return 1
+  fi
+  [ "$(jq '.overrides | length' <<< "$desired")" -gt 0 ] || return 0
+
+  models_url="$(resolve_models_url)"
+  overrides_url="${models_url%/models}/model-overrides"
+  models="$(coder_get "$models_url" | jq '.models')"
+  if [ -z "$AI_PROVIDERS_JSON" ]; then
+    AI_PROVIDERS_JSON="$(coder_get '/api/v2/ai/providers')"
+  fi
+  validate_model_override_references "$models" "$AI_PROVIDERS_JSON"
+
+  # Resolve every reference before writing any overrides. Never guess if a
+  # provider/model tuple is missing or ambiguous.
+  local override context provider model ai_provider_id matches body
+  while IFS= read -r override; do
+    context="$(jq -r '.context' <<< "$override")"
+    provider="$(jq -r '.provider' <<< "$override")"
+    model="$(jq -r '.model' <<< "$override")"
+    ai_provider_id="$(resolve_ai_provider_id "$provider")"
+    if [ -z "$ai_provider_id" ] || [ "$ai_provider_id" = "null" ]; then
+      echo "ERROR: could not resolve AI provider '$provider' for override '$context'" >&2
+      return 1
+    fi
+    matches="$(jq --arg pid "$ai_provider_id" --arg model "$model" \
+      '[.[] | select(.ai_provider_id == $pid and .model == $model)]' <<< "$models")"
+    if ! jq -e 'length == 1 and (.[0].id | type) == "string" and
+      (.[0].id | length) > 0 and .[0].enabled == true' <<< "$matches" >/dev/null; then
+      echo "ERROR: override '$context' requires exactly one enabled model '$provider/$model'" >&2
+      return 1
+    fi
+    body="$(jq --arg id "$(jq -r '.[0].id' <<< "$matches")" \
+      '{model_config_id: $id, reasoning_effort} | with_entries(select(.value != null))' \
+      <<< "$override")"
+    requests="$(jq --arg context "$context" --argjson body "$body" \
+      '. + [($body + {context: $context})]' <<< "$requests")"
+  done < <(jq -c '.overrides[]' <<< "$desired")
+
+  while IFS= read -r override; do
+    context="$(jq -r '.context' <<< "$override")"
+    body="$(jq 'del(.context)' <<< "$override")"
+    echo "    PUT $context ($(jq -r '.model_config_id' <<< "$body"))"
+    coder_put "$overrides_url/$context" "$body" >/dev/null
+  done < <(jq -c '.[]' <<< "$requests")
+
+  local saved
+  saved="$(coder_get "$overrides_url")"
+  if ! jq -e --argjson desired "$requests" '
+    . as $saved |
+    (.overrides | type) == "array" and
+    all($desired[]; . as $want |
+      [$saved.overrides[] | select(.context == $want.context)] as $matches |
+      ($matches | length) == 1 and
+      $matches[0].model_config_id == $want.model_config_id and
+      $matches[0].reasoning_effort == $want.reasoning_effort
+    )
+  ' <<< "$saved" >/dev/null; then
+    echo "ERROR: model override verification failed; saved configuration differs from YAML" >&2
+    return 1
+  fi
+  echo "    verified model overrides"
+}
+
 # ───────── MCP SERVERS (additive) ───────────────────────────────────────────
 push_mcp_servers() {
   local file="$CONFIG_DIR/mcp-servers.yaml"
@@ -374,6 +481,7 @@ push_template_allowlist() {
 # - providers.yaml: every ai provider (api_keys come back masked — placeholder
 #   restored to ${LLM_GATEWAY_API_KEY} so the dump round-trips through push)
 # - models.yaml: every model config
+# - model-overrides.yaml: configured contexts with provider/model names, not UUIDs
 # - mcp-servers.yaml: every MCP server
 # - system-prompt.txt: current prompt content
 #
@@ -393,14 +501,53 @@ prettify_yaml() {
   ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
+pull_model_overrides() {
+  echo "  model-overrides.yaml"
+  local models="$1" providers="$2" models_url overrides desired
+  models_url="$(resolve_models_url)"
+  overrides="$(coder_get "${models_url%/models}/model-overrides")"
+  desired="$(jq -e --argjson models "$models" --argjson providers "$providers" '
+    if (.overrides | type) != "array" then
+      error("unexpected model override response")
+    else
+      {overrides: [.overrides[] | . as $override |
+        [$models[] | select(.id == $override.model_config_id)] as $matches |
+        if ($matches | length) != 1 then
+          error("could not resolve model for override " + $override.context)
+        else
+          [$providers[] | select(.id == $matches[0].ai_provider_id)] as $providers |
+          if ($providers | length) != 1 or ($providers[0].name | type) != "string" then
+            error("could not resolve AI provider for override " + $override.context)
+          else
+            {context: $override.context, provider: $providers[0].name,
+             model: $matches[0].model, reasoning_effort: $override.reasoning_effort}
+            | with_entries(select(.value != null))
+          end
+        end
+      ]}
+    end
+  ' <<< "$overrides")"
+  if ! validate_model_overrides "$desired"; then
+    echo "ERROR: invalid model override API response; refusing to export" >&2
+    return 1
+  fi
+  printf '%s\n' "$desired" | yq -o=yaml -P '.' > "$CONFIG_DIR/model-overrides.yaml.new"
+  prettify_yaml "$CONFIG_DIR/model-overrides.yaml.new"
+}
+
 pull_all() {
   echo "==> pulling current admin state into $CONFIG_DIR/"
+  local models_url models providers
+  models_url="$(resolve_models_url)"
+  models="$(coder_get "$models_url" | jq '.models')"
+  providers="$(coder_get '/api/v2/ai/providers')"
+  validate_model_override_references "$models" "$providers"
 
   # AI providers — emit name, type, display_name, base_url, enabled, settings.
   # api_keys come back as masked strings; we replace with ${LLM_GATEWAY_API_KEY}
   # so the dump push-round-trips. Restore real bindings manually if needed.
   echo "  providers.yaml"
-  coder_get '/api/v2/ai/providers' | \
+  printf '%s\n' "$providers" | \
     jq '{providers: [.[] | {name, type, display_name, base_url, enabled,
                             api_keys: (if (.api_keys // []) | length > 0
                                        then ["${LLM_GATEWAY_API_KEY}"] else null end),
@@ -410,14 +557,20 @@ pull_all() {
   prettify_yaml "$CONFIG_DIR/providers.yaml.new"
 
   echo "  models.yaml"
-  local models_url
- models_url="$(resolve_models_url)"
- coder_get "$models_url" | \
-    jq '{models: [.models[] | {provider, model, display_name, enabled, is_default,
-                         context_limit, compression_threshold, model_config}
-                  | with_entries(select(.value != null))]}' | \
+  printf '%s\n' "$models" | \
+    jq --argjson providers "$providers" '{models: [.[] | . as $model |
+      [$providers[] | select(.id == $model.ai_provider_id)] as $matches |
+      if ($matches | length) != 1 then
+        error("could not resolve AI provider for model " + $model.model)
+      else
+        {provider: $matches[0].name, model, display_name, enabled, is_default,
+         context_limit, compression_threshold, model_config}
+        | with_entries(select(.value != null))
+      end]}' | \
     yq -o=yaml -P '.' > "$CONFIG_DIR/models.yaml.new"
   prettify_yaml "$CONFIG_DIR/models.yaml.new"
+
+  pull_model_overrides "$models" "$providers"
 
   echo "  mcp-servers.yaml"
   local mcp_servers_url
@@ -448,6 +601,7 @@ pull_all() {
   echo "Wrote *.new files alongside existing YAML. Diff and rename:"
   echo "  diff $CONFIG_DIR/providers.yaml{,.new}              && mv $CONFIG_DIR/providers.yaml{.new,}"
   echo "  diff $CONFIG_DIR/models.yaml{,.new}                 && mv $CONFIG_DIR/models.yaml{.new,}"
+  echo "  diff $CONFIG_DIR/model-overrides.yaml{,.new}        && mv $CONFIG_DIR/model-overrides.yaml{.new,}"
   echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}            && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
   echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new}     && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
   echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}           && mv $CONFIG_DIR/system-prompt.txt{.new,}"
@@ -459,12 +613,13 @@ pull_all() {
 
 case "$MODE" in
   push)
-    # Order matters: providers → models (with delete pass) → MCPs → prompts.
+    # Order matters: providers → models (with delete pass) → overrides → MCPs → prompts.
     # Coder rejects model creation if its provider isn't already configured,
     # and push_models reads the post-push AI_PROVIDERS_JSON cache to resolve
     # name → ai_provider_id.
     push_providers
     push_models
+    push_model_overrides
     push_mcp_servers
     push_system_prompt
     push_plan_mode_instructions

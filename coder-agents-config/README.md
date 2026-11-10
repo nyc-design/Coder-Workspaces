@@ -11,6 +11,7 @@ GitHub Actions workflow on every commit that touches this directory.
 |---|---|---|
 | `providers.yaml` | `/api/v2/ai/providers` | `name` field |
 | `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` tuple |
+| `model-overrides.yaml` | `/api/v2/organizations/{org}/chats/model-overrides/{context}` | `context` (PUT); model resolved by `(provider, model)` |
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` field |
 | `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
 | `plan-mode-instructions.txt` | `/api/v2/chats/config/plan-mode-instructions` | (singleton, PUT) |
@@ -25,6 +26,7 @@ Per resource type:
 |---|---|---|
 | Providers | **Additive** | POST if missing, PATCH if exists; never delete. Manual UI additions are preserved. |
 | **Models** | **Declarative** | POST/PATCH desired; **DELETE any model in Coder not listed in `models.yaml`**. The YAML is source of truth. |
+| Model overrides | **Declared contexts only** | PUT each declared context, then GET to verify. Missing file, empty list, and unlisted contexts leave existing overrides untouched. |
 | MCP Servers | **Additive** | Same as providers. |
 | System prompt | PUT singleton | Always overwritten. |
 | Plan mode instructions | PUT singleton | Always overwritten. |
@@ -39,8 +41,8 @@ deploy would be far more disruptive than a stale model entry.
 Other notes:
 
 - **Idempotent**: re-running sync produces the same admin state. Safe to spam.
-- **Order**: providers → models (POST/PATCH) → models (delete unmatched) → MCP
-  servers → system prompt. Coder rejects model creation if the provider isn't
+- **Order**: providers → models (POST/PATCH) → models (delete unmatched) → model
+  overrides → MCP servers → system prompt. Coder rejects model creation if the provider isn't
   already configured. Model deletes happen last so a new default is in place
   before the old default gets removed.
 - **Secrets**: YAML values may contain `${VAR}` placeholders, which `envsubst`
@@ -63,6 +65,52 @@ and rename. After pulling, manually restore any `${VAR}` placeholders for
 secrets — the API only returns `has_api_key: true|false`, never the value,
 so secrets come out as opaque placeholders.
 
+
+## Model overrides
+
+`model-overrides.yaml` selects organization-level models for specific chat
+contexts without changing a model's normal-chat defaults:
+
+```yaml
+overrides:
+  - context: title_generation
+    provider: anthropic
+    model: cliproxy-claude/claude-haiku-5-5
+    reasoning_effort: low
+```
+
+The tracked configuration only sets title generation. Haiku's normal-chat
+reasoning default remains `high` in `models.yaml`; compaction and subagent
+settings are untouched. The sync resolves the provider name to its UUID, then
+matches the model by `(ai_provider_id, model)` in the selected organization.
+Missing, ambiguous, or disabled models fail sync before any override PUT.
+Duplicate contexts and malformed entries also fail rather than being ignored.
+A GET after the PUTs must match every declared model and reasoning effort.
+
+`reasoning_effort` is optional; omit it or set it to `null` to inherit the
+selected model's default. Other contexts supported by Coder (such as `general`,
+`explore`, and `compaction`) can be declared using the same schema. Unknown
+contexts are rejected by the server. Omitting a context does **not** clear its
+saved override; clear unwanted overrides in Coder admin.
+
+Pull writes `model-overrides.yaml.new`, resolving stored model/provider UUIDs
+back to readable names and preserving explicit reasoning efforts. It fails if
+a referenced model or provider cannot be resolved. Review the `.new` file
+before replacing the tracked configuration; pull never overwrites it.
+
+The API requires Coder v2.39.0 or a compatible version. As with other resources,
+`CODER_ORGANIZATION` selects the organization (default: `default`).
+
+## Tests
+
+Offline regression tests exercise the actual sync script against a local mock
+Coder API; no deployment credentials are needed. They require Python 3 plus the
+script's normal tools (`bash`, `curl`, `jq`, mikefarah `yq` v4+, `envsubst`):
+
+```bash
+bash -n coder-agents-config/sync.sh
+python3 -m unittest discover -s coder-agents-config/tests -v
+```
 
 ## OmniRoute model aliases
 
