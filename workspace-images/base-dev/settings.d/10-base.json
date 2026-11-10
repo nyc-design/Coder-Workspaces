@@ -28,6 +28,8 @@
   },
   "machine": {
     "git.useIntegratedAskPass": false,
+    "github.copilot.enable": { "*": true },
+    "continue.enableTabAutocomplete": false,
     "likec4.mcp.enabled": true,
     "remote.autoForwardPortsSource": "process"
   }

@@ -47,9 +47,11 @@ if (source.includes(fallback)) {
   process.exit(0);
 }
 
-const originalGetToken = 'async getToken(){try{let r=await this.context.secrets.get(this.serviceId);return r&&r!=="[]"&&this.Logger.trace("Token acquired from secret storage."),r}catch(r){return this.Logger.error(`Getting token failed: ${r}`),Promise.resolve(void 0)}}';
+// Accept minifier-renamed locals, but require the same implementation and a
+// unique match. Fail closed if upstream changes the method's behavior.
+const originalGetToken = /async getToken\(\)\{try\{let ([$\w]+)=await this\.context\.secrets\.get\(this\.serviceId\);return \1&&\1!=="\[\]"&&this\.Logger\.trace\("Token acquired from secret storage\."\),\1\}catch\(([$\w]+)\)\{return this\.Logger\.error\(`Getting token failed: \$\{\2\}`\),Promise\.resolve\(void 0\)\}\}/g;
 
-if (!source.includes(originalGetToken)) {
+if ([...source.matchAll(originalGetToken)].length !== 1) {
   console.error(`Could not find expected GitHub authentication getToken() implementation in ${file}`);
   process.exit(1);
 }
