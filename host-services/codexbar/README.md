@@ -91,7 +91,8 @@ than assigning credits to the wrong account. A genuine empty inventory displays
 ## Deploy
 
 1. Keep `CODEXBAR_DASHBOARD_TOKEN` in the host `.env` and the existing Codex,
-   Claude, Bailian and cache mounts in `docker-compose.snippet.yml`.
+   Claude, Bailian and cache mounts in `docker-compose.snippet.yml`. The Claude
+   mount must be read-write for the token keepalive below.
 2. Pull the published image and recreate: `docker compose pull codexbar` then
    `docker compose up -d codexbar`.
 3. Authenticate `bl` from a workspace if necessary. Its shared `.bailian` session
@@ -116,3 +117,17 @@ CodexBar `/usage` and `/dashboard/v1/snapshot` (75% remaining, reset preserved);
 live workspace Bailian session yields valid monthly fields without logging values.
 Public bearer gating and presentation were tested with the stock binary after
 adding the proxy. Host deployment and a real browser render remain to be checked after rollout.
+
+## Claude token keepalive
+
+CodexBar never refreshes Claude Code-owned OAuth credentials on Linux; it waits
+for a `claude` process to do it. Without help, the Claude row errors once the
+~8h access token lapses, until someone runs `claude` in a workspace.
+`claude-keepalive.mjs` (started by `serve.mjs`) checks the shared
+`.credentials.json` every 2 minutes. Within 4 minutes of expiry it runs one
+minimal headless Claude Code call (`haiku`, no tools/MCP/hooks/session), which
+refreshes the token under Claude Code's own lock — the same coordination used
+by workspace sessions. Logs show only `token fresh|missing|relogin` and
+`refresh ok|failed`, never token values. An expired refresh token
+(`relogin`) still needs `claude` login in a workspace. Disable with
+`CLAUDE_KEEPALIVE=0`.
