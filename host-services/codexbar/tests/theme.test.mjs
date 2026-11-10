@@ -20,7 +20,7 @@ test('local branding retains upstream scripts and functional markup', () => {
 });
 
 test('provider colors are distinct and do not alter quota or ordering metadata', () => {
-  const input = {providers:['codex','claude','llmproxy','other'].map(id => ({id,display:{sortKey:3},windows:[{usedPercent:7.5}]}))};
+  const input = {providers:['codex','claude','alibabatokenplan','other'].map(id => ({id,display:{sortKey:3},windows:[{usedPercent:7.5}]}))};
   const before = structuredClone(input);
   const output = colorProviders(input);
   assert.deepEqual(input,before);

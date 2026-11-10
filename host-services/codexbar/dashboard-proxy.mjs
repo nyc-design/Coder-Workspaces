@@ -3,19 +3,6 @@ import http from 'node:http';
 import {brandDashboard, colorProviders} from './theme.mjs';
 import {timingSafeEqual} from 'node:crypto';
 
-// Change presentation only. Keep the built-in ID for refresh and routing.
-export function presentAlibaba(snapshot) {
-  if (!Array.isArray(snapshot.providers)) throw new Error('Unexpected snapshot');
-  return {...snapshot, providers: snapshot.providers.map(provider => {
-    if (provider.id !== 'llmproxy') return provider;
-    return {...provider, name: 'Alibaba Token Plan',
-      identity: {...provider.identity, plan: 'Personal · Monthly'},
-      windows: (provider.windows ?? []).filter(window =>
-        window.kind === 'session' && window.label === 'Quota'),
-    };
-  })};
-}
-
 export function createDashboardProxy(upstreamPort = 8082, token = process.env.CODEXBAR_DASHBOARD_TOKEN) {
   if (!token) throw new Error('Dashboard token required');
   const readResets = createResetReader(upstreamPort);
@@ -57,7 +44,7 @@ export function createDashboardProxy(upstreamPort = 8082, token = process.env.CO
           const text = Buffer.concat(chunks).toString('utf8');
           let data;
           if (!html) {
-            data = colorProviders(presentAlibaba(JSON.parse(text)));
+            data = colorProviders(JSON.parse(text));
             if (data.providers.some(p => p.id === 'codex')) data = addResetSummary(data, await readResets());
           }
           if (res.destroyed || res.writableEnded) return;

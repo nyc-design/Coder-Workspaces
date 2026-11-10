@@ -6,7 +6,7 @@ The base image uses Node 22 (approved upgrade from Node 20) and includes:
 
 - Qwen Code `0.24.3` (`qwen`), via the existing npm-global prefix.
 - Bailian CLI `2.0.0` (`bl`, also `bailian`), the official `modelstudioai/cli` npm package. Its tarball is checksum-verified; lifecycle hooks are disabled to avoid downloading mutable wiki/skills content into root's home during image build. Registry dependency ranges remain upstream-managed.
-- CodexBar CLI `0.64.0` (`codexbar`), checksum-verified static-musl Linux amd64/arm64 release. The executable, resource bundle and VERSION stay together under `/usr/local/lib/codexbar`.
+- CodexBar CLI `0.84.0` (`codexbar`), checksum-verified static-musl Linux amd64/arm64 release. The executable, resource bundle and VERSION stay together under `/usr/local/lib/codexbar`.
 
 No login, usage polling or inference request runs during build/startup. Secrets are not in the image. Qwen is the coding harness; Bailian is a management/usage companion, not its replacement.
 
@@ -85,7 +85,7 @@ Merge/build base-dev and inherited images; deploy the updated project-workspace 
 
 - https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/
 - https://github.com/modelstudioai/cli
-- https://github.com/steipete/CodexBar/blob/v0.64.0/docs/alibaba-token-plan.md
-- https://github.com/steipete/CodexBar/blob/v0.64.0/docs/configuration.md
+- https://github.com/steipete/CodexBar/blob/v0.84.0/docs/alibaba-token-plan.md
+- https://github.com/steipete/CodexBar/blob/v0.84.0/docs/configuration.md
 - https://github.com/likec4/likec4/tree/main/skills/likec4-dsl
 - https://github.com/tt-a1i/archify/tree/main/archify

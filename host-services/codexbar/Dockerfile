@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
 # codexbar — CodexBar CLI `serve` as a lean host service. Codex/Claude usage is
-# read straight from their mounted credential files (no CLIs); Alibaba Token
-# Plan monthly usage is bridged through the pinned `bl` CLI and stock LLM Proxy
-# provider, using the existing Node runtime. Login stays in the workspaces.
+# read from their mounted credential files; Alibaba Token Plan (Personal,
+# monthly) is read natively by CodexBar through the pinned `bl` CLI. Login
+# stays in the workspaces.
 #
 # Multi-arch: linux/amd64 + linux/arm64. Build context is the repo root so the
 # pinned, checksum-verified installer shared with base-dev is reused.
@@ -41,13 +41,16 @@ COPY --from=fetch /opt/codexbar/lib/codexbar /usr/local/lib/codexbar
 COPY --from=bl /opt/bl /usr/local/share/bl
 RUN ln -s /usr/local/lib/codexbar/codexbar /usr/local/bin/codexbar \
  && ln -s /usr/local/share/bl/bin/bl /usr/local/bin/bl
-COPY host-services/codexbar/*.mjs host-services/codexbar/*.cjs /usr/local/lib/codexbar-bridge/
+COPY host-services/codexbar/*.mjs /usr/local/lib/codexbar-bridge/
 COPY host-services/codexbar/config.json /etc/codexbar/config.template.json
 COPY host-services/codexbar/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 
 USER codexbar
-# The bridge launches `bl` with HOME so it reuses the mounted console session.
+# Create the cache dir as the service user before VOLUME, so new volumes (and
+# empty existing ones) are writable: CodexBar 0.84 keeps its URL cache here.
+RUN mkdir -p /home/codexbar/.cache
+# CodexBar launches `bl` with HOME so it reuses the mounted console session.
 ENV HOME=/home/codexbar \
     CODEXBAR_CONFIG=/home/codexbar/.config/codexbar/config.json \
     CODEX_HOME=/home/codexbar/.codex \
@@ -55,7 +58,7 @@ ENV HOME=/home/codexbar \
 VOLUME ["/home/codexbar/.cache"]
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/health >/dev/null && wget -qO- http://127.0.0.1:8081/health >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

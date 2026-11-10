@@ -2,10 +2,10 @@
 # Build-time installer for the pinned static-musl Linux CLI (root, docker build).
 set -euo pipefail
 
-readonly version="0.64.0"
+readonly version="0.84.0"
 # Verified against both downloaded release archives and upstream .sha256 assets.
-readonly sha256_amd64="5af5fe878ab2f15617acd4db04a84784d63cd96efae9150699aa265910bc4f90"
-readonly sha256_arm64="c7c9814fc275656ed7cc42cafcd0c57571792e9de73c734704ab875119c14f76"
+readonly sha256_amd64="d0ea804c567e3b5855823da2ed3a8c98dd422ab958a9684a3d77d1c9cf25dcd1"
+readonly sha256_arm64="fbacb436af95ce16bea45dd9b393e9df8e47f0abefa5dc236df5b2b01532d079"
 readonly prefix="${CODEXBAR_INSTALL_PREFIX:-/usr/local}"
 
 arch="$(dpkg --print-architecture)"
