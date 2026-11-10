@@ -22,6 +22,11 @@ done
 
 VSCODE_WEB="${INSTALL_PREFIX}/bin/code-server"
 EXTENSIONS_DIR="${EXTENSIONS_DIR}"
+# Images whose 30-extensions-activate.sh curates a per-workspace dir for
+# vscode-web run on that; older images only have the host-shared store.
+if [ -d "${EDITOR_EXTENSIONS_DIR}" ]; then
+  EXTENSIONS_DIR="${EDITOR_EXTENSIONS_DIR}"
+fi
 LOG_PATH="${LOG_PATH}"
 PORT="${PORT}"
 TELEMETRY_LEVEL="${TELEMETRY_LEVEL}"

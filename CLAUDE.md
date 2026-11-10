@@ -321,14 +321,19 @@ workspace is on an envbuilder template version.
 All workspaces on a VM share one extension cache: `~/.vscode-extensions/shared`
 and `~/.vscode-extensions/vscode-web` are host bind mounts
 (`workspace-modules/workspace-runtime/main.tf`). Each editor's own extensions
-dir (`~/.vscode-extensions/code-server`, `~/.vscode-server/extensions`,
-`~/.cursor-server/extensions`) is per-workspace and contains only symlinks into
-the shared cache. Three init scripts manage the lifecycle:
+dir (`~/.vscode-extensions/code-server`, `~/.vscode-extensions/vscode-web-editor`,
+`~/.vscode-server/extensions`, `~/.cursor-server/extensions`) is per-workspace
+and contains only symlinks into the shared cache. VS Code Web's dir also links
+the Marketplace-only extensions from the `vscode-web` store; it used to run on
+that host-shared store directly, where every workspace rewrote the same
+symlinks and `extensions.json`, and `vscode-web-launch.sh` still falls back to
+the store on images without the per-workspace dir. Three init scripts manage
+the lifecycle:
 
 | Script | Role |
 |---|---|
-| `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. |
-| `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir; write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
+| `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. For unpinned OpenVSX ids the wanted version is the newest stable release whose `engines.vscode` code-server satisfies. |
+| `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir (the pin, else the highest version that editor's VS Code version can run per `engines.vscode`, so editors on different VS Code versions can activate different versions of one id); reconcile each per-workspace editor's `extensions.json` / `.obsolete` with those symlinks (the editors trust that registry and do not rescan, so a repointed id otherwise shows as an invalid extension); write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
 | `31-extensions-prune.sh` | Reap versions nobody needs. A versioned dir is deleted only if it is not the newest for its id, not pinned by an image manifest, and not listed in any fresh lease (any workspace's). Leases untouched for `EXTENSIONS_LEASE_STALE_DAYS` (45) are treated as abandoned and removed. |
 
 Leases live *inside* the host-bound cache, so every workspace's pruner sees
