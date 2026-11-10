@@ -12,13 +12,13 @@ cat > "$fixture_root/release/CodexBarCLI" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(dirname "$(readlink -f "$0")")"
-test "$(cat "$root/VERSION")" = 0.64.0
+test "$(cat "$root/VERSION")" = 0.84.0
 test "$(cat "$root/CodexBar_CodexBarCore.bundle/provider.js")" = resource
-printf 'CodexBar 0.64.0\n'
+printf 'CodexBar 0.84.0\n'
 SH
 chmod +x "$fixture_root/release/CodexBarCLI"
 ln -s CodexBarCLI "$fixture_root/release/codexbar"
-printf '0.64.0\n' > "$fixture_root/release/VERSION"
+printf '0.84.0\n' > "$fixture_root/release/VERSION"
 printf 'resource\n' > "$fixture_root/release/CodexBar_CodexBarCore.bundle/provider.js"
 tar -czf "$fixture_root/release.tar.gz" -C "$fixture_root/release" .
 cat > "$fixture_root/mock-bin/dpkg" <<'SH'
@@ -30,7 +30,7 @@ cat > "$fixture_root/mock-bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "$fixture_root/downloads"
-[[ "$*" = *"https://github.com/steipete/CodexBar/releases/download/v0.64.0/CodexBarCLI-v0.64.0-linux-musl-${TEST_PLATFORM}.tar.gz" ]]
+[[ "$*" = *"https://github.com/steipete/CodexBar/releases/download/v0.84.0/CodexBarCLI-v0.84.0-linux-musl-${TEST_PLATFORM}.tar.gz" ]]
 while [[ "$1" != -o ]]; do shift; done
 cp "$fixture_root/release.tar.gz" "$2"
 SH
@@ -50,12 +50,12 @@ export TMPDIR="$fixture_root/tmp"
 for TEST_ARCH in amd64 arm64; do
     export TEST_ARCH
     case "$TEST_ARCH" in
-        amd64) export TEST_PLATFORM=x86_64 TEST_HASH=5af5fe878ab2f15617acd4db04a84784d63cd96efae9150699aa265910bc4f90 ;;
-        arm64) export TEST_PLATFORM=aarch64 TEST_HASH=c7c9814fc275656ed7cc42cafcd0c57571792e9de73c734704ab875119c14f76 ;;
+        amd64) export TEST_PLATFORM=x86_64 TEST_HASH=d0ea804c567e3b5855823da2ed3a8c98dd422ab958a9684a3d77d1c9cf25dcd1 ;;
+        arm64) export TEST_PLATFORM=aarch64 TEST_HASH=fbacb436af95ce16bea45dd9b393e9df8e47f0abefa5dc236df5b2b01532d079 ;;
     esac
     export CODEXBAR_INSTALL_PREFIX="$fixture_root/$TEST_ARCH"
     bash "$installer" > "$fixture_root/output" 2>&1
-    grep -q 'installed: CodexBar 0.64.0' "$fixture_root/output"
+    grep -q 'installed: CodexBar 0.84.0' "$fixture_root/output"
     test -L "$CODEXBAR_INSTALL_PREFIX/bin/codexbar"
     test -L "$CODEXBAR_INSTALL_PREFIX/lib/codexbar/codexbar"
     diff -r "$fixture_root/release" "$CODEXBAR_INSTALL_PREFIX/lib/codexbar"

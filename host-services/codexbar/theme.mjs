@@ -53,7 +53,8 @@ export function brandDashboard(html) {
 }
 
 export function colorProviders(snapshot) {
-  const colors = {codex:'#22bfae', claude:'#e89c65', llmproxy:'#a2cf43'};
+  const colors = {codex:'#22bfae', claude:'#e89c65', alibabatokenplan:'#a2cf43'};
+  if (!Array.isArray(snapshot.providers)) throw new Error('Unexpected snapshot');
   return {...snapshot, providers:snapshot.providers.map(provider => colors[provider.id]
     ? {...provider, display:{...provider.display, accentColor:colors[provider.id]}} : provider)};
 }

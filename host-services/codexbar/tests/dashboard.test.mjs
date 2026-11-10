@@ -3,31 +3,13 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {addResetSummary} from '../reset-credits.mjs';
 import {colorProviders} from '../theme.mjs';
-import {presentAlibaba, createDashboardProxy} from '../dashboard-proxy.mjs';
+import {createDashboardProxy} from '../dashboard-proxy.mjs';
 
 const fixture = {generatedAt: 'unchanged', providers: [
   {id: 'codex', name: 'Codex', windows: [{label: 'Weekly'}]},
-  {id: 'llmproxy', name: 'LLM Proxy', identity: {plan: 'Quota-stats', accountEmail: null},
-    stale: true, error: {message: 'original failure'}, updatedAt: 'unchanged',
-    windows: [{kind: 'session', label: 'Quota', usedPercent: 7.5, resetAt: 'unchanged'},
-      {kind: 'weekly', label: 'Requests'}, {kind: 'tertiary', label: 'Sonnet'}, {kind: 'alibaba', label: 'alibaba'}]},
+  {id: 'alibabatokenplan', name: 'Alibaba Token Plan', stale: true, error: {message: 'original failure'},
+    windows: [{kind: 'session', label: 'Monthly', usedPercent: 7.5, resetAt: 'unchanged'}]},
 ]};
-
-test('only Alibaba presentation changes; quota, errors, staleness and other providers survive', () => {
-  const original = structuredClone(fixture);
-  const result = presentAlibaba(fixture);
-  assert.deepEqual(fixture, original);
-  assert.deepEqual(result.providers[0], fixture.providers[0]);
-  const row = result.providers[1];
-  assert.equal(row.name, 'Alibaba Token Plan');
-  assert.equal(row.identity.plan, 'Personal · Monthly');
-  assert.equal(row.id, 'llmproxy');
-  assert.deepEqual(row.windows, [fixture.providers[1].windows[0]]);
-  assert.deepEqual(row.error, fixture.providers[1].error);
-  assert.equal(row.stale, true);
-  assert.equal(row.updatedAt, 'unchanged');
-  assert.deepEqual(presentAlibaba({providers: [{id: 'llmproxy', error: {message:'offline'}}]}).providers[0].windows, []);
-});
 
 test('proxy preserves bearer gate, assets and raw APIs, transforms only successful snapshots', async t => {
   const upstream = http.createServer((req, res) => {
@@ -56,8 +38,11 @@ test('proxy preserves bearer gate, assets and raw APIs, transforms only successf
   assert.equal(await (await fetch(base+'/asset', {headers: {host: 'usage.tapiavala.com'}})).text(), 'asset');
   const headers = {authorization:'Bearer test', host: 'usage.tapiavala.com'};
   assert.equal(await (await fetch(base+'/usage', {headers})).text(), 'raw usage');
-  const response = await fetch(base+'/dashboard/v1/snapshot?provider=llmproxy', {headers});
+  const response = await fetch(base+'/dashboard/v1/snapshot?provider=alibabatokenplan', {headers});
   assert.equal(response.headers.get('etag'), null);
-  assert.deepEqual(await response.json(), addResetSummary(colorProviders(presentAlibaba(fixture)), {state:'unavailable'}));
+  const snapshot = await response.json();
+  assert.deepEqual(snapshot, addResetSummary(colorProviders(fixture), {state:'unavailable'}));
+  // Native Alibaba rows pass through untouched apart from the accent colour.
+  assert.deepEqual({...snapshot.providers[1], display: undefined}, {...fixture.providers[1], display: undefined});
   assert.equal((await fetch(base+'/dashboard/v1/snapshot?bad', {headers})).status, 502);
 });

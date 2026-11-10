@@ -4,8 +4,8 @@
 # Claude and the Alibaba Token Plan, exposed via Traefik at
 # https://usage.tapiavala.com and linked from every workspace's "AI Usage" app.
 #
-# The image holds the static CodexBar binary plus Node + the pinned `bl` CLI
-# plus a loopback monthly-usage bridge (shown as LLM Proxy / Quota). It reads the same host-shared
+# The image holds the static CodexBar binary plus Node + the pinned `bl` CLI,
+# which CodexBar uses for Alibaba Token Plan usage. It reads the same host-shared
 # credential dirs the workspaces mount; logging in still happens in the
 # workspaces (`codex login`, `claude`, `bl auth login`). A stale token shows
 # as a per-provider error in the dashboard, never a crash.
