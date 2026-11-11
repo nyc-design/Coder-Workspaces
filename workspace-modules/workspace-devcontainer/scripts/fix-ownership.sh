@@ -14,3 +14,9 @@ for path in /home/coder /workspaces; do
     sudo -n find "$path" -xdev -not -user coder -exec chown coder:coder {} + 2> /dev/null || true
   fi
 done
+
+# Docker drops an empty /.dockerenv marker into every container. Tools that
+# look for it change their defaults: likec4 switches its layout engine from the
+# bundled WASM Graphviz to a system `dot`, which the images do not ship, so no
+# view renders. Removing the marker keeps such tools on their normal defaults.
+sudo -n rm -f /.dockerenv 2> /dev/null || true

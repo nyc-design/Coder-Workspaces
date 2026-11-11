@@ -94,6 +94,7 @@ check "/workspaces is writable by coder" ws 'mkdir /workspaces/probe && rmdir /w
 check "parents of nested bind mounts are owned by coder" ws '[ "$(stat -c %U ~/.local/share/code-server ~/.local/share/code-server/User | sort -u)" = coder ]'
 check "the agent can create its code-server Machine dir" ws 'mkdir -p ~/.local/share/code-server/Machine'
 check "nothing under home or /workspaces is left owned by another user" ws '[ -z "$(find /home/coder /workspaces -xdev -not -user coder | head -1)" ]'
+check "the /.dockerenv marker is removed" ws '[ ! -e /.dockerenv ]'
 
 # ── clone.sh ─────────────────────────────────────────────────────────────────
 # A local repository stands in for GitHub; authentication is not exercised here.

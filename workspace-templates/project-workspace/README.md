@@ -41,7 +41,9 @@ On every start, in this order:
    `base-dev`. Any other answer from GitHub fails the build rather than starting
    on the wrong image.
 2. **Container.** Docker runs that image. Its entrypoint fixes ownership of
-   `/home/coder` and `/workspaces` as root.
+   `/home/coder` and `/workspaces` as root, and removes Docker's `/.dockerenv`
+   marker so tools that look for it keep their normal defaults (likec4
+   otherwise expects a system Graphviz that the images do not ship).
 3. **Clone.** Still in the entrypoint, the repository is cloned into
    `/workspaces/<project>` if that folder is empty, using your linked GitHub
    account's token (or the shared PAT). The token is not saved to disk. The
