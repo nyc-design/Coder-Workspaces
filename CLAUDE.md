@@ -399,9 +399,10 @@ the base prompt tells agents never to create a separate `CLAUDE.md`. This repo's
 `CLAUDE.md` predates that rule and is kept as-is.
 
 ### Design Tooling (vite-dev / fullstack-dev)
-- The Pencil VS Code extension + `pencil interactive` CLI + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
-- Prefer Pencil CLI (`pencil interactive`) as the primary interface for `.pen` automation and agent tasks.
-- If Pencil MCP tool calls fail or return no response, switch to Pencil CLI headless mode (`pencil interactive -i input.pen -o output.pen`) and continue there.
+- The pen.dev VS Code extension (`highagency.pencildev`) + `pen interactive` CLI (`@pen.dev/cli`, which replaced the deprecated `@pencil.dev/cli`; it still ships a `pencil` alias) + `stitch-mcp` are bundled into `vite-dev` (and inherited by `fullstack-dev`). They are not installed in `base-dev` — frontend / design work happens on the vite lineage.
+- Prefer the pen.dev CLI (`pen interactive`) as the primary interface for `.pen` automation and agent tasks. Agent-driven CLI use counts toward the pen.dev plan's agent days, the same as MCP.
+- If pen.dev MCP tool calls fail or return no response, switch to CLI headless mode (`pen interactive -i input.pen -o output.pen`) and continue there.
+- OpenPencil ([open-pencil/open-pencil](https://github.com/open-pencil/open-pencil)) is installed alongside as a secondary tool: the `openpencil` CLI (`@open-pencil/cli`) and the `.fig` editor extension (`macacagames.openpencil-vscode`). It reads `.pen` (inspect, lint, export) but can only write `.fig`; writing back to a `.pen` path overwrites it with `.fig` binary, so treat `.pen` as read-only there. This is not ZSeven-W/openpencil (`op`, `.op`), which is not installed.
 - No `pencil-ready` / `pencil-close` pre-step is required.
 - Playwright MCP uses its own `mcp-chromium-*` browser build (separate from standard `chromium-*`). Both are installed during workspace init in fullstack/vite images.
 
@@ -466,7 +467,7 @@ When `CODER_GCP_PROJECT` is set, init scripts automatically:
 - Workspace Docker mode is isolated DinD via `sysbox-runc`; avoid mounting host `/var/run/docker.sock` in workspace containers
 - `01-docker.sh` now handles stale or mounted docker socket paths and starts inner dockerd on `unix:///var/run/docker.sock`
 - npm global install prefix is `/usr/local/share/npm-global` (shared by image-time and runtime installs as user `coder`)
-- `base-dev` globally installs the core AI/dev CLIs (`codex`, `claude-code`, `gemini-cli`, `likec4`, `skills`, `gitnexus`, `distill`, `ctx7`) into `/usr/local/share/npm-global`. Frontend-only CLIs (`pencil`, `stitch-mcp`) live in `vite-dev` instead.
+- `base-dev` globally installs the core AI/dev CLIs (`codex`, `claude-code`, `gemini-cli`, `likec4`, `skills`, `gitnexus`, `distill`, `ctx7`) into `/usr/local/share/npm-global`. Frontend-only CLIs (`pen`, `openpencil`, `stitch-mcp`) live in `vite-dev` instead.
 - `vite-dev` does not force a global `NODE_ENV`; project commands should set their own runtime mode
 - Starship prompt changes won't be visible until new interactive shell starts
 

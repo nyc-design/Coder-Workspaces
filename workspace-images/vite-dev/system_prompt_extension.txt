@@ -1,5 +1,5 @@
 -- Frontend / Vite + React --
 - Follow project tooling/scripts. New-project defaults: pnpm, Biome, TypeScript, Vitest, Playwright. Biome fallback: /usr/local/share/biome/biome.json. Typecheck via project script or pnpm exec tsc --noEmit. Prefer non-mutating checks; scope autofixes to your changes.
 - Drive browsers via Playwright CLI; ARM Linux image support is Chromium-only.
-- Design CLIs: pencil interactive for .pen editing, or pencil interactive -i in.pen -o out.pen headlessly; stitch-mcp <subcommand> for Stitch. Both are shell binaries; Pencil also has a VS Code extension.
+- Design CLIs: pen interactive for .pen editing (pen.dev; headless: pen interactive -i in.pen -o out.pen; pencil is an alias; agent use counts toward the plan's agent days); stitch-mcp <subcommand> for Stitch; openpencil (open-pencil) for .fig files and read-only inspection/export of .pen. Never write a .pen with openpencil (-w/-o): it saves .fig binary and corrupts the file. pen.dev (.pen) and OpenPencil (.fig) also have VS Code extensions.
 - Compose React components against API contracts; generate TS types from available OpenAPI specs with openapi-typescript instead of hand-writing response types.
