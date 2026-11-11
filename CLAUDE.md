@@ -309,6 +309,8 @@ tag is not enough, because the Docker provider only pulls when no local image
 has that name. `scripts/prune-images.sh` (a `local-exec` on the provisioner,
 which shares the host's Docker socket) then removes the other versions of that
 repository; Docker keeps any that a running workspace still uses.
+`vm-ssh-gateway` uses the same module for its `base-dev` image only (empty
+`repo`), so it gets the same pull and prune.
 
 Only prebuilt images are supported (no Dockerfile builds or devcontainer
 features). Details, the supported `devcontainer.json` settings and failure

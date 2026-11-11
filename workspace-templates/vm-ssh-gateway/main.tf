@@ -248,21 +248,28 @@ resource "coder_app" "vm_terminal" {
 
 # ── Workspace container ──────────────────────────────────────────────────────
 # The shared runtime module, running base-dev directly instead of envbuilder.
+#
+# Only the image half of workspace-devcontainer is used: it resolves the tag to
+# its current digest on every start, pulls that digest if the host lacks it, and
+# removes the versions it supersedes. There is no repository to clone here, so
+# `repo` is empty and the module's entrypoint, env and startup-script outputs
+# (and the inputs that only feed them) are unused.
 
-data "docker_registry_image" "workspace" {
-  name = local.workspace_image
-}
-
-resource "docker_image" "workspace" {
-  name          = data.docker_registry_image.workspace.name
-  pull_triggers = [data.docker_registry_image.workspace.sha256_digest]
-  keep_locally  = true
+module "workspace_image" {
+  source           = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-devcontainer?ref=main"
+  start_count      = data.coder_workspace.me.start_count
+  repo             = ""
+  fallback_image   = local.workspace_image
+  agent_token      = ""
+  access_url       = ""
+  init_script      = ""
+  workspace_folder = ""
 }
 
 module "workspace_runtime" {
   source                     = "git::https://github.com/nyc-design/Coder-Workspaces.git//workspace-modules/workspace-runtime?ref=main"
   start_count                = data.coder_workspace.me.start_count
-  devcontainer_builder_image = docker_image.workspace.image_id
+  devcontainer_builder_image = module.workspace_image.image_id
   owner_name                 = data.coder_workspace_owner.me.name
   owner_id                   = data.coder_workspace_owner.me.id
   workspace_id               = data.coder_workspace.me.id

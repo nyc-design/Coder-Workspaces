@@ -208,3 +208,27 @@ run "template_import_with_empty_parameters" {
     error_message = "with no repo there is nothing to clone, and the init pipeline must still run"
   }
 }
+
+# vm-ssh-gateway uses the module for the image only: no repository, and nothing
+# for the entrypoint or startup script.
+run "image_only_caller" {
+  variables {
+    repo             = ""
+    github_token     = ""
+    agent_token      = ""
+    access_url       = ""
+    init_script      = ""
+    agent_env        = {}
+    workspace_folder = ""
+    startup_script   = ""
+  }
+
+  assert {
+    condition     = length(data.http.devcontainer) == 0 && docker_image.workspace[0].name == "example/base-dev@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    error_message = "the fallback image is pulled by digest without asking GitHub: ${docker_image.workspace[0].name}"
+  }
+  assert {
+    condition     = length(terraform_data.prune_images) == 1 && output.image_id == "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    error_message = "superseded versions are pruned and the pulled image ID is returned"
+  }
+}
