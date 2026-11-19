@@ -17,8 +17,8 @@ Skip it for trivial code: single-expression helpers, accessors, pass-through wra
 
 1. Find the steps. If the project has a LikeC4 sequence detail view covering this function, take the steps from it (see the likec4-modeling skill). Otherwise derive them from the requirements and the surrounding code.
 2. Write the outline in place: the signature, the docstring, and the steps as comment lines in the body. Write no implementation yet, beyond whatever placeholder the language needs for the file to parse.
-3. Show the outline to the user and settle it with them. Do not write the implementation until they agree.
-4. Implement each step directly under its comment. Leave the comment where it is.
+3. Show the outline to the user and settle it with them. Do not write the implementation until they agree. Once they agree, set the stage marker to `OUTLINED`.
+4. Implement each step directly under its comment. Leave the comment where it is. When the code is written and its checks pass, set the stage marker to `IMPLEMENTED`.
 5. Report what was implemented against the agreed outline, including any step that changed along the way.
 
 When several functions belong to one task, outline all of them and settle them together rather than one round per function.
@@ -54,6 +54,29 @@ Clear:
     # Remove every track the user already has in their library, comparing by track ID, so the import never creates duplicates
 ```
 
+## Stage marker
+
+Every function that goes through this process carries one stage marker: a single comment line directly above the function, above any decorators, made of the stage, a colon, and the function's name.
+
+```python
+# OUTLINED: delete_files
+@router.delete("")
+async def delete_files(...):
+```
+
+The stages, in order:
+
+- `STUB`: the signature exists, but there is no agreed outline yet. This includes an outline you have written that the user has not agreed.
+- `OUTLINED`: the user has agreed the outline, and the implementation is not finished.
+- `IMPLEMENTED`: the code is written under every step and its checks pass. The user has not reviewed it yet.
+- `REVIEWED`: the user has reviewed the implementation.
+
+Keep exactly one marker per function and move it forward by changing the stage word. Do not stack a line per stage, and do not use checkboxes.
+
+Only the user moves a function to `REVIEWED`. Set it yourself only when they tell you they have reviewed that function. If you later change the code of a `REVIEWED` function, set it back to `IMPLEMENTED` and say so.
+
+Write the stage in capitals exactly as above. The editor's Todo Tree view picks these words up as tags and groups functions by stage, so the tree shows what is left to do.
+
 ## Docstrings
 
 A docstring describes what the function does and nothing else. It holds no step list and no checklist; the steps live in the body.
@@ -71,6 +94,7 @@ If the implementation shows that a step is wrong, missing, or in the wrong order
 The outline, as shown to the user:
 
 ```python
+# STUB: import_playlist
 async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     """Import a playlist from an external service into the user's library, skipping tracks the user already has."""
 
@@ -88,6 +112,7 @@ async def import_playlist(user_id: str, source_url: str) -> ImportResult:
 The same function once the outline is agreed and implemented:
 
 ```python
+# IMPLEMENTED: import_playlist
 async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     """Import a playlist from an external service into the user's library, skipping tracks the user already has."""
 

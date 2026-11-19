@@ -31,6 +31,20 @@
     "github.copilot.enable": { "*": true },
     "continue.enableTabAutocomplete": false,
     "likec4.mcp.enabled": true,
-    "remote.autoForwardPortsSource": "process"
+    "remote.autoForwardPortsSource": "process",
+    "better-todo-tree.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "[ ]", "[x]", "STUB", "OUTLINED", "IMPLEMENTED", "REVIEWED"],
+    "better-todo-tree.highlights.customHighlight": {
+      "BUG": { "icon": "bug" },
+      "HACK": { "icon": "tools" },
+      "FIXME": { "icon": "flame" },
+      "XXX": { "icon": "x" },
+      "[ ]": { "icon": "issue-draft" },
+      "[x]": { "icon": "issue-closed" },
+      "STUB": { "icon": "circle-slash", "iconColour": "#9e9e9e" },
+      "OUTLINED": { "icon": "list-unordered", "iconColour": "#e0a800" },
+      "IMPLEMENTED": { "icon": "tools", "iconColour": "#3b82f6" },
+      "REVIEWED": { "icon": "check", "iconColour": "#22c55e" }
+    },
+    "better-todo-tree.tree.groupedByTag": true
   }
 }
