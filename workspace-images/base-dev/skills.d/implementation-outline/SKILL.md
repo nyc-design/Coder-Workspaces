@@ -29,9 +29,30 @@ If the run is unattended and nobody can answer (for example a task dispatched fr
 
 - One comment per step.
 - Steps are unnumbered.
-- Each step is a single line. Do not wrap it.
+- Each step is a single line, however long it needs to be. Do not wrap it.
 - Leave a blank line between steps.
-- A step says what happens at that point in the function, in plain words. It is not a restatement of the line of code below it.
+
+## Writing a step
+
+The user settles the design by reading the outline, so each step has to be understandable on its own, without reading the code or guessing what a short label stands for.
+
+- Write each step as a full sentence in plain, simple language.
+- Give the detail a reader needs to judge the step: what it acts on, where that comes from, any condition or rule it applies, and what happens when it fails or finds nothing.
+- Do not shorten a step to save space. A terse label such as "Validate input" or "Dedupe" leaves the reader to guess what is checked and what happens next. A long line is fine.
+- Use the names the user knows from the product and the codebase. Avoid abbreviations and labels you made up while working.
+- Describe what happens at that point in the function and why it matters there. Do not restate the line of code below it.
+
+Too terse:
+
+```python
+    # Dedupe tracks
+```
+
+Clear:
+
+```python
+    # Remove every track the user already has in their library, comparing by track ID, so the import never creates duplicates
+```
 
 ## Docstrings
 
@@ -53,15 +74,15 @@ The outline, as shown to the user:
 async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     """Import a playlist from an external service into the user's library, skipping tracks the user already has."""
 
-    # Fetch the playlist metadata and track list from the source service
+    # Fetch the playlist's title and full track list from the external service the URL points to, and stop with a clear error if the playlist is private or no longer exists
 
-    # Drop tracks that are already in the user's library
+    # Remove every track the user already has in their library, comparing by track ID, so the import never creates duplicates
 
-    # Match each remaining track against our catalog
+    # Look up each remaining track in our own catalog, keeping the tracks we could not find in a separate list instead of dropping them
 
-    # Save the matched tracks as a new playlist owned by the user
+    # Save the tracks we found as a new playlist owned by the user, named after the original playlist
 
-    # Return the new playlist with the tracks that could not be matched
+    # Return the new playlist together with the list of tracks we could not find, so the caller can show the user what was left out
 ```
 
 The same function once the outline is agreed and implemented:
@@ -70,19 +91,19 @@ The same function once the outline is agreed and implemented:
 async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     """Import a playlist from an external service into the user's library, skipping tracks the user already has."""
 
-    # Fetch the playlist metadata and track list from the source service
+    # Fetch the playlist's title and full track list from the external service the URL points to, and stop with a clear error if the playlist is private or no longer exists
     source = await source_client.fetch_playlist(source_url)
 
-    # Drop tracks that are already in the user's library
+    # Remove every track the user already has in their library, comparing by track ID, so the import never creates duplicates
     owned = await library.track_ids(user_id)
     candidates = [track for track in source.tracks if track.id not in owned]
 
-    # Match each remaining track against our catalog
+    # Look up each remaining track in our own catalog, keeping the tracks we could not find in a separate list instead of dropping them
     matches = await catalog.match_tracks(candidates)
 
-    # Save the matched tracks as a new playlist owned by the user
+    # Save the tracks we found as a new playlist owned by the user, named after the original playlist
     playlist = await library.create_playlist(user_id, source.title, matches.found)
 
-    # Return the new playlist with the tracks that could not be matched
+    # Return the new playlist together with the list of tracks we could not find, so the caller can show the user what was left out
     return ImportResult(playlist=playlist, unmatched=matches.missing)
 ```
