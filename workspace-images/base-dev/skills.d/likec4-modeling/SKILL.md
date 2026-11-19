@@ -64,14 +64,13 @@ Use category prefixes so the views dropdown stays organized:
   — component drill-downs
 - `Flow:` — dynamic sequence views
 
-## Implementation-checklist coupling
+## Implementation-outline coupling
 
 LikeC4 sequence detail views drive per-component implementation
-checklists. When implementing:
+outlines: the steps a detail view shows for an `fn` element are the
+starting steps for that function's outline. Follow the
+`implementation-outline` skill for how to write the outline, agree it
+with the user, and implement under it.
 
-- Preserve checklists in docstrings.
-- Check items off `[ ] → [x]` — NEVER modify the checklist text.
-- Copy each checklist item as a comment with the implementing code
-  directly below it.
-- Once a checklist is fully complete, you may rename its title to
-  `Procedure`.
+If an agreed outline ends up differing from the detail view, update the
+view so the model and the code stay in sync.
