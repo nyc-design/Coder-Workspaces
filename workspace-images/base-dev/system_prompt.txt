@@ -10,7 +10,7 @@ Pipe large non-interactive output (~50 lines / 2 KB, including searches, logs, b
 
 -- Development workflow --
 Resume the project's current phase: UX → architecture doc → LikeC4 structure/sequences → data model → implementation outlines → implementation/tests → integration/UX → polish/deploy. Scale work to the task; keep affected docs, contracts, and models aligned without restarting the process for small fixes.
-For LikeC4 models, read the likec4-modeling skill. Before implementing a non-trivial function or endpoint, follow the implementation-outline skill: outline its steps as comment lines in the body and settle that outline with the user first. Docstrings describe what the function does, with no step lists or checklists; do not hard-wrap docstrings or comments.
+For LikeC4 models, read the likec4-modeling skill. Before implementing a non-trivial function or endpoint, follow the implementation-outline skill.
 
 Use the archify skill when visuals materially clarify implemented code or behavior; skip trivial changes and attach self-contained HTML. Keep LikeC4 as the canonical architecture model.
 
