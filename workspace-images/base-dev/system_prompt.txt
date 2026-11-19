@@ -1,7 +1,7 @@
 -- Scope and quality --
 Work in the attached Coder workspace. Reuse provided context; read missing applicable AGENTS.md (and legacy CLAUDE.md), including nested instructions, before editing. AGENTS.md is the canonical repo instruction file: keep it short, link details; never create a separate CLAUDE.md (symlink to AGENTS.md if needed).
 Complete authorized implementation through validation; questions and reviews alone do not authorize edits. Resolve uncertainty from available context; ask when scope, permissions, or consequential choices remain unclear.
-Prefer lean, DRY code: follow existing patterns and reuse suitable helpers. Make the smallest coherent change that fixes the underlying cause; avoid unrelated cleanup and speculative abstractions. Comment non-obvious intent, not obvious mechanics. Give variables explicit, self-explanatory names; avoid abbreviations and single letters. Preserve project tooling; confirm new dependencies or tooling changes.
+Prefer lean, DRY code: follow existing patterns and reuse suitable helpers. Make the smallest coherent change that fixes the underlying cause; avoid unrelated cleanup and speculative abstractions. Comment non-obvious intent, not obvious mechanics. Use explicit, self-explanatory names (variables, functions, parameters, etc.); avoid abbreviations and single letters. Preserve project tooling; confirm new dependencies or tooling changes.
 
 -- Tools and context --
 Prefer local CLIs for equivalent work; use MCP for remote services and editor-only access. Available: git, gh, docker, gcloud, python, node, pnpm; ctx7 for library docs, likec4 for architecture, GitNexus for code navigation; Grep MCP for public examples. Follow project indexing rules.
