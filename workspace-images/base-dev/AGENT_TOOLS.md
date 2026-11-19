@@ -64,7 +64,8 @@ CodexBar auto tries signed-in `bl` first, then supported cookies. For Team subsc
 
 `skills-install.d/10-base.json` targets only upstream `likec4-dsl` and `archify` directories. Startup installs them using the existing skills CLI into `~/.agents/skills`, then publishes provider links. Upstream skill sources track main, like other existing CLI-managed skills; they are not pinned image snapshots and startup needs network access. Installer failures warn rather than fail workspace startup—check the init log if a skill is absent.
 
-- `likec4-modeling`: our workflow/checklist conventions, referring to upstream `likec4-dsl` for syntax.
+- `likec4-modeling`: our modeling conventions, referring to upstream `likec4-dsl` for syntax and to `implementation-outline` for turning sequence detail views into code.
+- `implementation-outline`: our outline-first process for non-trivial functions (step comments in the body, agreed with the user before the code is written). Local skill in `skills.d/`, referenced from the base prompt.
 - `archify`: diagrams explaining changes, delivered as self-contained HTML plus editable source when appropriate. Attach HTML to chat for users in separate workspaces; do not replace maintained LikeC4 architecture models or require diagrams for trivial changes.
 
 Coder Agents discovers the canonical catalog through the existing `CODER_AGENT_EXP_SKILLS_DIRS` template environment. Skills become available after workspace attachment/startup, not in workspace-less central chats. Full skill bodies are loaded on demand rather than copied into the central system prompt. `ARCHIFY_UPDATE_CHECK_DISABLED=1` disables the optional update reminder network call. Core render/validation uses Node; browser-based visual checking is optional and is not preinstalled into base-dev by this change.
