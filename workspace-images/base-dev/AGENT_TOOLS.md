@@ -57,7 +57,7 @@ Usage for Codex, Claude and the Alibaba Token Plan is shown by the host's CodexB
 
 ## Review skills and editor commands
 
-Three local skills in `skills.d/` cover reviewing an agent's work. Each is used only when the user asks for it.
+Three local skills in `skills.d/` cover reviewing an agent's work. Each is used only when the user asks for it, with one exception: once a repository has a `.walkthrough/` folder, agents keep the walkthroughs covering code they change up to date without being asked (one line in the base prompt points at the skill for this).
 
 - `walkthrough`: writes a step-by-step record of a change to `.walkthrough/<date>-<slug>.yaml`, played back in the Agent Walkthrough extension, and keeps an index in `.walkthrough/README.md`. The files are committed so they can be searched later for why something was built a certain way. The file format is upstream's (`mepolabs/agent-walkthrough`); the copy is local because upstream writes one after every session and has no naming, summary or index rules.
 - `showme` and `highlight`: the user did not follow an explanation, attaches the workspace they are working in to the chat, and invokes one of the two. The agent then goes through the unclear part one point per turn, marking the exact lines in the user's editor. `showme` uses the ShowMe extension (comment bubbles, files side by side, diagrams, notes); `highlight` uses the Code Walkthrough extension (one highlighted range).
