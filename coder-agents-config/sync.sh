@@ -533,14 +533,14 @@ push_skills() {
 }
 
 # ───────── SYSTEM PROMPT (PUT singleton) ────────────────────────────────────
-# system-prompt.txt may begin with optional YAML frontmatter (between two
+# deployment-system-prompt.txt may begin with optional YAML frontmatter (between two
 # `---` delimiters) carrying toggle fields like include_default_system_prompt.
 # When present, frontmatter is stripped from the body and merged into the
 # PUT JSON. Default include_default_system_prompt=true if absent — without
 # explicitly sending it the Coder admin toggle gets flipped off.
 push_system_prompt() {
-  local file="$CONFIG_DIR/system-prompt.txt"
-  [ -f "$file" ] || { echo "no system-prompt.txt, skipping"; return; }
+  local file="$CONFIG_DIR/deployment-system-prompt.txt"
+  [ -f "$file" ] || { echo "no deployment-system-prompt.txt, skipping"; return; }
 
   echo "==> syncing system prompt from $file"
 
@@ -636,7 +636,7 @@ push_template_allowlist() {
 # - models.yaml: every model config
 # - model-overrides.yaml: configured contexts with provider/model names, not UUIDs
 # - mcp-servers.yaml: every MCP server
-# - system-prompt.txt: current deployment prompt content
+# - deployment-system-prompt.txt: current deployment prompt content
 # - organization-system-prompt.txt: current organization prompt content
 #
 # Secret values (api_keys, mcp custom_headers) are never readable. Pull
@@ -738,9 +738,9 @@ pull_all() {
     yq -o=yaml -P '.' > "$CONFIG_DIR/mcp-servers.yaml.new"
   prettify_yaml "$CONFIG_DIR/mcp-servers.yaml.new"
 
-  echo "  system-prompt.txt"
+  echo "  deployment-system-prompt.txt"
   coder_get '/api/v2/chats/config/system-prompt' | \
-    jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
+    jq -r '.system_prompt' > "$CONFIG_DIR/deployment-system-prompt.txt.new"
 
   echo "  organization-system-prompt.txt"
   coder_get "/api/v2/organizations/$(resolve_organization_id)/chats/config/system-prompt" | \
@@ -762,7 +762,7 @@ pull_all() {
   echo "  diff $CONFIG_DIR/model-overrides.yaml{,.new}        && mv $CONFIG_DIR/model-overrides.yaml{.new,}"
   echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}            && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
   echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new}     && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
-  echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}           && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo "  diff $CONFIG_DIR/deployment-system-prompt.txt{,.new}           && mv $CONFIG_DIR/deployment-system-prompt.txt{.new,}"
   echo "  diff $CONFIG_DIR/organization-system-prompt.txt{,.new} && mv $CONFIG_DIR/organization-system-prompt.txt{.new,}"
   echo "  diff $CONFIG_DIR/plan-mode-instructions.txt{,.new}  && mv $CONFIG_DIR/plan-mode-instructions.txt{.new,}"
   echo

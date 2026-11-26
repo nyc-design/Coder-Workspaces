@@ -577,7 +577,7 @@ class SyncOrganizationSystemPromptTests(SyncTestCase):
 
     def test_repository_prompts_split_by_scope(self):
         # Organization-scoped resources (MCP servers, skills) are described only in the organization prompt.
-        deployment = (SYNC.parent / "system-prompt.txt").read_text()
+        deployment = (SYNC.parent / "deployment-system-prompt.txt").read_text()
         organization = (SYNC.parent / "organization-system-prompt.txt").read_text()
         for reference in ("agentmemory", "headroom__headroom_retrieve", "workspace-creation"):
             self.assertNotIn(reference, deployment)

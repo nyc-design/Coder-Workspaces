@@ -56,7 +56,7 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ├── mcp-servers.yaml       # MCP servers (context7 / grep / github)
 ├── skills/                # organization skills (one SKILL.md per directory)
 ├── skills-install.json    # upstream skills to sync as organization skills
-├── system-prompt.txt      # deployment-wide system prompt
+├── deployment-system-prompt.txt      # deployment-wide system prompt
 ├── organization-system-prompt.txt  # organization system prompt (MCP/skill pointers)
 └── sync.sh                # called by update-coder-agents-config.yaml workflow
 ```
@@ -220,7 +220,7 @@ applies these resources idempotently:
 | `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` |
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` |
 | `skills/`, `skills-install.json` | `/api/experimental/organizations/{org}/skills` | frontmatter `name` |
-| `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton) |
+| `deployment-system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton) |
 | `organization-system-prompt.txt` | `/api/v2/organizations/{org}/chats/config/system-prompt` | (per organization) |
 
 `${VAR}` placeholders in YAML are substituted from the workflow's env at sync
@@ -239,7 +239,7 @@ The agentmemory, `workspace-creation` and `mac-development` skills are central.
 See "Skill levels" in `coder-agents-config/README.md`.
 
 The central prompts are intentionally minimal and split by scope, like the
-resources they refer to: `system-prompt.txt` (deployment) holds only general
+resources they refer to: `deployment-system-prompt.txt` (deployment) holds only general
 behaviour, `organization-system-prompt.txt` holds the pointers to those skills,
 agentmemory scoping and the Headroom retrieval note. They stack on top of (a) Coder's built-in default prompt and (b) the
 per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.

@@ -14,7 +14,7 @@ GitHub Actions workflow on every commit that touches this directory.
 | `model-overrides.yaml` | `/api/v2/organizations/{org}/chats/model-overrides/{context}` | `context` (PUT); model resolved by `(provider, model)` |
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` field |
 | `skills/<name>/SKILL.md`, `skills-install.json` | `/api/experimental/organizations/{org}/skills` | frontmatter `name` (must equal the directory name) |
-| `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
+| `deployment-system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
 | `organization-system-prompt.txt` | `/api/v2/organizations/{org}/chats/config/system-prompt` | (one per organization, PUT) |
 | `plan-mode-instructions.txt` | `/api/v2/chats/config/plan-mode-instructions` | (singleton, PUT) |
 | `template-allowlist.yaml` | `/api/v2/templates/{id}` (`agents_allowed`) | template slug (`name`); every template not listed is set to `false` |
@@ -233,7 +233,7 @@ export GITHUB_PAT=...
 
   | File | Slot in Coder admin | Reaches | Put here |
   |---|---|---|---|
-  | `system-prompt.txt` | Deployment instructions | Every chat in every organization, after Coder's built-in prompt | Rules that hold whatever the organization has configured (communication style) |
+  | `deployment-system-prompt.txt` | Deployment instructions | Every chat in every organization, after Coder's built-in prompt | Rules that hold whatever the organization has configured (communication style) |
   | `organization-system-prompt.txt` | Organization instructions | Chats in `CODER_ORGANIZATION`, as a second system message | Anything that names this organization's MCP servers or skills (agentmemory, Headroom retrieval, workspace creation) |
   | `plan-mode-instructions.txt` | Plan instructions | Any chat, only on plan-mode turns | Plan format rules |
 
