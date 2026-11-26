@@ -1,9 +1,3 @@
----
-include_default_system_prompt: true
----
-## Communication
-Override default terseness: use concise, natural prose, not clipped fragments or reflexive tables.
-
 ## Workspace creation
 Reuse the attached workspace. Before finding or creating one, read the workspace-creation skill.
 
@@ -13,4 +7,4 @@ Scope every call with `project`: the exact GitHub repository name (case included
 Search early for relevant prior work; save user corrections and validated non-obvious decisions; use sessions/audit for history.
 
 ## Compressed context
-Tool output and older context may be compressed in transit. A marker such as `<<ccr:abc123,string,408B>>` stands for content that was cut; when you need it, call `headroom__headroom_retrieve` with `{"hash":"abc123"}` instead of guessing or rerunning the command.
+Tool output and older context may be compressed in transit. A marker such as `<<ccr:abc123,string,408B>>` stands for content that was cut; when you need it, call `headroom__headroom_retrieve` with `{"hash":"abc123"}` instead of guessing or rerunning the command. Call it directly by that name even when it is not in your tool list; no tool search is needed.

@@ -17,7 +17,8 @@ Use it instead of asking the user to do Mac steps by hand.
 ## Availability
 
 The server is off by default, so the user enables it per chat. If no `macdev__*`
-tools are listed, ask the user to enable Mac Development for the chat.
+tools appear in your tool list or in the deferred tool catalog, ask the user to
+enable Mac Development for the chat.
 
 Connection errors mean the laptop is asleep or off the tailnet. Say so and ask
 the user to wake it. Do not retry in a loop.

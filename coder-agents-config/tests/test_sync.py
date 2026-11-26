@@ -26,6 +26,7 @@ MODEL_NAME = "cliproxy-claude/claude-haiku-5-5"
 MODELS = f"/api/v2/organizations/{ORG_ID}/chats/models"
 OVERRIDES = f"/api/v2/organizations/{ORG_ID}/chats/model-overrides"
 PROVIDERS = "/api/v2/ai/providers"
+ORGANIZATION_PROMPT = f"/api/v2/organizations/{ORG_ID}/chats/config/system-prompt"
 SKILLS = f"/api/experimental/organizations/{ORG_ID}/skills"
 SKILL_MAX_BYTES = 65536
 
@@ -65,6 +66,7 @@ class CoderAPI:
             }
         }
         self.skills = {}
+        self.organization_prompt = "set in admin"
         self.raw_files = {}
         self.raw_requests = []
         self.requests = []
@@ -93,10 +95,15 @@ class CoderAPI:
                 return 200, {"overrides": list(self.overrides.values())}
             if path in (f"/api/v2/organizations/{ORG_ID}/mcp-servers", "/api/v2/templates"):
                 return 200, []
+            if path == ORGANIZATION_PROMPT:
+                return 200, {"system_prompt": self.organization_prompt}
             if path == "/api/v2/chats/config/system-prompt":
                 return 200, {"system_prompt": "test"}
             if path == "/api/v2/chats/config/plan-mode-instructions":
                 return 200, {"plan_mode_instructions": "test"}
+        if method == "PUT" and path == ORGANIZATION_PROMPT:
+            self.organization_prompt = body["system_prompt"]
+            return 204, None
         if method == "GET" and path == SKILLS:
             return 200, [{"name": name, "enabled": True} for name in self.skills]
         if method == "POST" and path == SKILLS:
@@ -538,6 +545,43 @@ class SyncModelOverridesTests(SyncTestCase):
                 self.assertFalse(any(method in ("POST", "DELETE")
                                      for method, _path, _body in self.override_writes()))
 
+
+
+class SyncOrganizationSystemPromptTests(SyncTestCase):
+    def prompt_writes(self):
+        return [request for request in self.api.requests if request[0] == "PUT" and request[1] == ORGANIZATION_PROMPT]
+
+    def test_missing_file_leaves_organization_prompt_untouched(self):
+        self.run_sync()
+        self.assertEqual([], self.prompt_writes())
+        self.assertEqual("set in admin", self.api.organization_prompt)
+
+    def test_file_is_put_verbatim_to_the_resolved_organization(self):
+        prompt = "## Persistent memory\nUse `project`.\n"
+        (self.config / "organization-system-prompt.txt").write_text(prompt)
+        self.run_sync(CODER_ORGANIZATION="team-slug")
+        self.assertEqual([("PUT", ORGANIZATION_PROMPT, {"system_prompt": prompt})], self.prompt_writes())
+        self.assertIn(("GET", "/api/v2/organizations/team-slug", None), self.api.requests)
+
+    def test_http_error_is_fatal(self):
+        (self.config / "organization-system-prompt.txt").write_text("prompt\n")
+        self.api.responses = {("PUT", ORGANIZATION_PROMPT): (403, {"message": "forbidden"})}
+        self.run_sync(success=False)
+
+    def test_pull_exports_organization_prompt_without_overwriting(self):
+        tracked = self.config / "organization-system-prompt.txt"
+        tracked.write_text("tracked\n")
+        self.run_sync("pull")
+        self.assertEqual("tracked\n", tracked.read_text())
+        self.assertEqual("set in admin\n", (self.config / "organization-system-prompt.txt.new").read_text())
+
+    def test_repository_prompts_split_by_scope(self):
+        # Organization-scoped resources (MCP servers, skills) are described only in the organization prompt.
+        deployment = (SYNC.parent / "deployment-system-prompt.txt").read_text()
+        organization = (SYNC.parent / "organization-system-prompt.txt").read_text()
+        for reference in ("agentmemory", "headroom__headroom_retrieve", "workspace-creation"):
+            self.assertNotIn(reference, deployment)
+            self.assertIn(reference, organization)
 
 
 class SyncSkillsTests(SyncTestCase):

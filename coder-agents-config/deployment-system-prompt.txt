@@ -1,0 +1,5 @@
+---
+include_default_system_prompt: true
+---
+## Communication
+Override default terseness: use concise, natural prose, not clipped fragments or reflexive tables.
