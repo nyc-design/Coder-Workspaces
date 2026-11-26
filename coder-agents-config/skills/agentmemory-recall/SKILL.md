@@ -3,69 +3,35 @@ name: agentmemory-recall
 description: At the start of a task in a known repo, search persistent memory (agentmemory MCP) for prior observations, lessons, decisions, and session history before doing fresh discovery. Saves rediscovery work; surfaces user-validated approaches and prior failures.
 ---
 
-# Recalling prior memory before a task
+# Recalling prior memory
 
-The **agentmemory** MCP server is attached to the chat (`memory_*` tools).
-It holds per-repo durable memory across workspace recreate: observations
-saved by past agent runs, lessons learned, sessions, embeddings.
+Search agentmemory (the `memory_*` MCP tools) before fresh discovery when:
 
-## When to invoke
+- starting a task or sub-task in a repository that already exists;
+- the user refers to earlier work ("the issue from last week", "what you broke yesterday");
+- about to make a non-trivial architecture, dependency, or config decision that may already have been discussed.
 
-- Starting a new task or sub-task in a repo that already exists (i.e. not
-  a brand-new project you just scaffolded).
-- The user references something they / a prior agent worked on
-  ("the issue from last week", "the rerank changes", "what you broke
-  yesterday").
-- About to make a non-trivial architectural / dependency / config decision
-  in this repo. Check whether the team has already discussed it.
+Skip it for a brand-new repository, for a trivial single-step task, or when the user said to ignore memory.
 
-## How
-
-Always pass `project` so memory stays scoped per-repo and survives
-workspace recreate. Derive once at the start of the session:
-
-```bash
-project="$(basename "$(git remote get-url origin)" .git)"
-# e.g. "Coder-Workspaces"
-```
-
-Then call the agentmemory MCP tools:
+Always pass `project`: the repository name, which is the basename of the origin URL without `.git` (for example `Coder-Workspaces`). Unscoped memory is unreliable to recall.
 
 | Tool | Use for |
 |---|---|
-| `memory_smart_search` | Best default. Hybrid semantic + keyword search with progressive disclosure. Pass `query` + `project`. |
-| `memory_recall` | When you need full raw observations rather than ranked snippets. |
-| `memory_sessions` | Listing recent sessions chronologically; see `agentmemory-session-history` skill for that flow specifically. |
+| `memory_smart_search` | The default. Hybrid semantic and keyword search. Pass `query` and `project`. |
+| `memory_recall` | Full raw observations rather than ranked snippets. |
+| `memory_sessions` | Chronological session list; see the agentmemory-session-history skill. |
 
-### Token discipline
-
-Prefer `format: "compact"` (or `"narrative"`) when calling `memory_recall`
-and apply a `token_budget` if you expect many hits. Memory results can be
-large; budget them like any other tool result.
+Results can be large. Set `limit` on searches, and on `memory_recall` use `format: "compact"` (or `"narrative"`) with a `token_budget`:
 
 ```
-memory_smart_search(query="rerank latency on Oracle VM", limit=8)
-memory_recall(query="rerank latency", format="compact", token_budget=2000, project="<repo>")
+memory_smart_search(query="rerank latency on Oracle VM", project="<repo>", limit=8)
+memory_recall(query="rerank latency", project="<repo>", format="compact", token_budget=2000)
 ```
 
-## What you'll get back
+Results contain:
 
-- **Observations** — raw saved insights with type (`pattern`, `bug`,
-  `architecture`, `preference`, etc.), concepts, importance score.
-- **Lessons** — confidence-weighted rules ("when X, do Y") that strengthen
-  on reuse and decay if unused.
-- **Sentinels / sketches** — passive lifecycle markers; usually safe to
-  skim past unless directly relevant.
+- **Observations**: saved insights with a type (`pattern`, `bug`, `architecture`, `preference`, ...), concepts, and an importance score.
+- **Lessons**: confidence-weighted rules ("when X, do Y") that strengthen on reuse and decay when unused.
+- **Sentinels and sketches**: lifecycle markers; skim past them unless directly relevant.
 
-## When NOT to invoke
-
-- Brand-new repo with no prior sessions (waste of a tool call).
-- Trivial single-step task where rediscovery costs less than the lookup.
-- The user has explicitly told you to ignore memory for this turn.
-
-## Pair with
-
-- `agentmemory-remember` — save the new insights this task produces.
-- `agentmemory-session-history` — when the user asks "what did we do?".
-- `agentmemory-forget` — when prior memory is wrong and needs to be
-  overridden.
+If a result is wrong or out of date, follow the agentmemory-forget skill.

@@ -12,8 +12,7 @@ over Tailscale. It fronts two servers:
   devices, debugging, and UI automation.
 - **Desktop Commander**: terminal, git, filesystem, and process control on the Mac.
 
-Use it for the Apple development loop instead of asking the user to do Mac steps
-by hand. Linux workspaces have no Xcode, Apple SDKs, simulator, or signing.
+Use it instead of asking the user to do Mac steps by hand.
 
 ## Availability
 
