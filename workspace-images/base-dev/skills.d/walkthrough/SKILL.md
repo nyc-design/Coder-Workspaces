@@ -1,6 +1,6 @@
 ---
 name: walkthrough
-description: Write a step-by-step walkthrough of a code change to .walkthrough/, played back in the Agent Walkthrough editor extension and kept in the repository as a record of what was built and why. Use only when the user asks for a walkthrough, or asks to apply walkthrough feedback or review comments from a .feedback.yaml file. Also use when the user asks why something was built a certain way and the repository has a .walkthrough/ folder to search.
+description: Write a step-by-step walkthrough of a code change to .walkthrough/, played back in the Agent Walkthrough editor extension and kept in the repository as a record of what was built and why. Write a new one only when the user asks for a walkthrough. Also use when changing code in a repository that has a .walkthrough/ folder (existing walkthroughs covering that code are kept up to date), when the user asks to apply walkthrough feedback or review comments from a .feedback.yaml file, and when the user asks why something was built a certain way.
 ---
 
 # Walkthrough
@@ -9,9 +9,19 @@ A walkthrough is a YAML file in `.walkthrough/` at the repository root. The user
 
 Walkthroughs are committed. They are the record the user comes back to months later to find out why something was built the way it was, so each one has to be easy to find and has to make sense to someone who has forgotten the conversation that produced it.
 
-Write one only when the user asks. Do not write one at the end of a session on your own initiative.
+Write a new one only when the user asks. Do not write one at the end of a session on your own initiative. Keeping existing walkthroughs up to date is different: do that without being asked.
 
-This skill has three jobs: write a walkthrough, apply the user's feedback on one, and find an old one.
+This skill has four jobs: write a walkthrough, keep existing ones up to date, apply the user's feedback on one, and find an old one.
+
+## Writing style
+
+This applies to every piece of prose in a walkthrough: the title, the summary, each `why`, and the index row.
+
+- Write complete sentences in plain language. Each sentence has a subject and a verb, and says what the thing is, what it does, and why.
+- Do not compress. Clipped notes such as "Dedupes by ID; avoids race" or "Lock per cache → no double install" save a few words and leave the reader to work out what was meant. Write "Tracks are compared by ID, so importing the same playlist twice does not create duplicates."
+- Do not use arrows, symbols, or abbreviations in place of words, and do not drop articles or connecting words such as "because", "so" and "which".
+- Explain a term the first time it appears if the user would not already know it from the product or the codebase.
+- Longer is fine when the extra words carry the explanation. Padding is not: leave out sentences that restate the code or the previous sentence.
 
 ## Write a walkthrough
 
@@ -47,7 +57,7 @@ steps:
     lines: [<start>, <end>]          # 1-based, inclusive, current file contents
     anchor: "<the first line of the range, copied verbatim>"
     why: |
-      <1 to 4 sentences: what this code does and why it was written this way.>
+      <1 to 4 complete sentences: what this code does and why it was written this way.>
 ```
 
 Use only these fields. The extension reads this format; lookup information goes in the title, the summary and the index, not in new fields.
@@ -89,6 +99,24 @@ Step-by-step records of changes, played back with the Agent Walkthrough extensio
 
 Add the new row directly under the header row. "What changed" is one plain sentence. "Areas" lists the main folders or files. Leave "PR" empty if there is none yet, and fill it in when the pull request exists.
 
+## Keep walkthroughs up to date
+
+A walkthrough describes code that keeps changing. When you change code in a repository that has a `.walkthrough/` folder, update the walkthroughs that cover it, as part of the same piece of work and without being asked.
+
+1. Find them. For each file you changed, run `grep -l "file: <path>" .walkthrough/*.yaml`. A walkthrough is affected when one of its steps covers lines you changed, moved, or deleted, or when your change makes a statement in its summary untrue.
+2. Update each affected step so it matches the file on disk: `lines`, `anchor`, and `why` if the code now does something different or for a different reason. The rules for steps above still apply.
+3. Remove a step whose code was deleted. Add a step when your change adds a logical unit that belongs to the feature this walkthrough describes.
+4. Keep the history of decisions. If your change reverses or replaces a decision recorded in the summary, do not delete that decision. Add an "Updates" list at the end of the summary with one dated entry, in complete sentences, saying what changed and why, for example: "2026-11-30: The lock is now taken per extension instead of per cache, because one slow download was blocking every other install."
+5. Set `head_commit` to the commit that contains your code change. Leave `base_commit` and the file name as they are.
+6. Fix the walkthrough's row in `.walkthrough/README.md` if "What changed" or "Areas" is no longer true.
+7. Commit the walkthrough updates with the code change, or in a commit directly after it, and mention them in your report.
+
+Limits:
+
+- If your change only shifts line numbers in a file a walkthrough covers, update `lines` and `anchor` and nothing else.
+- If the change is a new feature or a rewrite, not an adjustment to what the walkthrough describes, update only the steps it broke and tell the user that a new walkthrough may be worth writing. Do not write one unless they ask.
+- Do not touch `.feedback.yaml` files here.
+
 ## Apply feedback
 
 Each walkthrough has a feedback file beside it: `.walkthrough/2026-09-27-order-cancellation.yaml` has `.walkthrough/2026-09-27-order-cancellation.feedback.yaml`. The user's comments from the editor are saved there.
@@ -113,7 +141,7 @@ When the user asks you to apply walkthrough feedback or review comments:
 
 3. For each entry with `status: open`, in order: open `file` around `lines`, make the requested change, or explain why you did not. The lines may have moved; search for the entry's `anchor`, or the step's `anchor` in the walkthrough, to find them again.
 4. Set each handled entry's `status` to `applied`. Change only that field. Do not delete entries, edit other fields or rewrite the file; the user's editor may be adding comments to it at the same time.
-5. If the changes were substantial, ask the user whether they want a new walkthrough for them.
+5. Update the walkthrough for the changes you made (see "Keep walkthroughs up to date"). If the changes were substantial, ask the user whether they want a new walkthrough for them.
 6. Commit the feedback file with the changes it led to, so the record keeps the comment next to its outcome.
 7. Reply with one line per entry: what you changed, or why you left it.
 
@@ -124,7 +152,7 @@ When the user asks why something was built a certain way, or asks for the walkth
 1. Read `.walkthrough/README.md` and pick the rows whose description or areas match.
 2. If the index does not settle it, search the folder for the feature name, file path or symbol: `grep -ril "<term>" .walkthrough/`. Step entries name the files they cover, so a file path finds every walkthrough that touched it.
 3. Read the matching file's summary and the relevant steps, and answer from them. Say which walkthrough you used.
-4. Line numbers in an old walkthrough describe the code as it was at `head_commit` and may no longer match. Use `git show <head_commit>:<file>` to see the code the step describes, and say so if the code has changed since.
+4. A walkthrough describes the code as it was at `head_commit`. If the file has changed since then and the walkthrough was not updated, its line numbers may no longer match. Use `git show <head_commit>:<file>` to see the code the step describes, and say so if the code has changed since.
 
 ## Credit
 
