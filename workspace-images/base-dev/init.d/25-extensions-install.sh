@@ -50,6 +50,41 @@ fi
 
 mkdir -p "$SHARED_DIR" "$VSCODE_WEB_DIR"
 
+# Seconds to wait for another workspace's install before going ahead unlocked.
+INSTALL_LOCK_TIMEOUT="${EXTENSIONS_INSTALL_LOCK_TIMEOUT:-180}"
+
+# with_install_lock <dir> <command...>
+#   Run the command while holding <dir>'s install lock.
+#
+# Both caches are shared by every workspace on the host, and the VS Code CLI
+# does no locking of its own: it extracts into a temp dir inside the cache,
+# renames that into place and rewrites <dir>/extensions.json. Two workspaces
+# installing the same version at once made the second rename fail with
+# ENOTEMPTY, after both had downloaded it.
+#
+# The kernel drops a flock when its holder exits, so a workspace that is killed
+# mid-install leaves no stale lock. The timeout only covers a holder that
+# hangs; the install then goes ahead unlocked, which is the behaviour from
+# before the lock existed.
+with_install_lock() {
+  local dir="$1" lock_fd rc=0
+  shift
+  if ! command -v flock > /dev/null 2>&1; then
+    "$@"
+    return
+  fi
+
+  exec {lock_fd}> "$dir/.install.lock"
+  if ! flock -w "$INSTALL_LOCK_TIMEOUT" "$lock_fd"; then
+    log "install lock on $dir still held after ${INSTALL_LOCK_TIMEOUT}s; installing without it"
+  fi
+  # The descriptor is closed for the command so that nothing the CLI leaves
+  # running can keep the lock; the shell's own copy holds it until released.
+  "$@" {lock_fd}>&- || rc=$?
+  exec {lock_fd}>&-
+  return "$rc"
+}
+
 # Does `<dir>/<id>-<ver>-*/` exist (case-insensitive on id)?
 has_version() {
   local dir="$1" id_lc ver
@@ -182,6 +217,20 @@ install_extension() {
     return 0
   fi
 
+  with_install_lock "$dir" install_resolved_extension "$bin" "$dir" "$id" "$ver" "$label"
+}
+
+# install_resolved_extension <bin> <dir> <id> <ver> <label>
+#   Runs under the install lock. The cache is checked again first: the
+#   workspace that held the lock may have just installed this version.
+install_resolved_extension() {
+  local bin="$1" dir="$2" id="$3" ver="$4" label="$5" rc
+
+  if [ -n "$ver" ] && has_version "$dir" "$id" "$ver"; then
+    log "[$label] ok $id@$ver (installed by another workspace)"
+    return 0
+  fi
+
   local install_spec="$id"
   [ -n "$ver" ] && install_spec="$id@$ver"
 
@@ -204,7 +253,7 @@ install_marketplace_targeted_extension() {
     return 0
   fi
 
-  local id requested_ver resolved version url vsix rc
+  local id requested_ver resolved version url
   if [[ "$spec" == *"@"* ]]; then
     id="${spec%@*}"; requested_ver="${spec#*@}"
   else
@@ -222,6 +271,20 @@ install_marketplace_targeted_extension() {
   fi
   if has_version "$dir" "$id" "$version"; then
     log "[shared-marketplace] ok $id@$version (already in cache)"
+    return 0
+  fi
+
+  with_install_lock "$dir" install_targeted_vsix "$bin" "$dir" "$id" "$version" "$url"
+}
+
+# install_targeted_vsix <bin> <dir> <id> <version> <url>
+#   Runs under the install lock, download included, so a workspace waiting on
+#   the lock finds the version in the cache instead of downloading it again.
+install_targeted_vsix() {
+  local bin="$1" dir="$2" id="$3" version="$4" url="$5" vsix rc
+
+  if has_version "$dir" "$id" "$version"; then
+    log "[shared-marketplace] ok $id@$version (installed by another workspace)"
     return 0
   fi
 
