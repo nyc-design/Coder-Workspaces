@@ -661,6 +661,16 @@ class SyncSkillsTests(SyncTestCase):
             description = re.search(r"^description: (.+)$", content, re.MULTILINE)
             self.assertIsNotNone(description, f"{name} needs a description so the model knows when to load it")
 
+    def test_agentmemory_skills_share_one_project_key_rule(self):
+        # Agents load these skills one at a time; differing rules would split memory across keys.
+        rules = set()
+        for path in sorted((SYNC.parent / "skills").glob("agentmemory-*/SKILL.md")):
+            section = re.search(r"^## Project key\n(.+?)(?=^## |^\| |^\d\. |^\*\*|\Z)", path.read_text(), re.MULTILINE | re.DOTALL)
+            self.assertIsNotNone(section, f"{path.parent.name} must state the project key rule")
+            rules.add(section.group(1).strip())
+        self.assertEqual(1, len(rules), "agentmemory skills must state the same project key rule")
+
+
 
 if __name__ == "__main__":
     unittest.main()

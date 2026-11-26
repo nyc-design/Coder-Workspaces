@@ -9,7 +9,7 @@ Reuse the attached workspace. Before finding or creating one, read the workspace
 
 ## Persistent memory
 Use agentmemory for durable corrections, decisions, non-code conventions, and external context; avoid storing facts cheaply recovered from code. Follow the agentmemory-recall/remember/forget/session-history skills as applicable.
-Scope to the repo name from origin, or the referenced repo before attachment. Pass `project` when supported; otherwise qualify the query and verify returned scope.
+Scope every call with `project`: the exact GitHub repository name (case included; no owner, no `.git`, not the workspace name), or `general` when no repository is involved. Where a tool has no `project` parameter, qualify the query and verify returned scope.
 Search early for relevant prior work; save user corrections and validated non-obvious decisions; use sessions/audit for history.
 
 ## Compressed context

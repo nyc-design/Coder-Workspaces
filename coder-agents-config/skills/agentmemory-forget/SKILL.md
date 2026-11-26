@@ -11,7 +11,13 @@ Use this when the user says "forget X" or "that's wrong", when a recalled memory
 
 Do not use it because you disagree with a prior decision on style, or to tidy up; decay handles that. If you are unsure whether an entry is stale, ask the user first.
 
-Always pass `project`: the repository name, which is the basename of the origin URL without `.git` (for example `Coder-Workspaces`). Unscoped memory is unreliable to recall.
+## Project key
+
+Pass `project` on every call. Its value is fixed by this rule so every agent uses the same key:
+
+- The GitHub repository name exactly as GitHub spells it, capitals and hyphens included, with no owner and no `.git`. Right: `Coder-Workspaces`. Wrong: `nyc-design/Coder-Workspaces`, `coder-workspaces`, the workspace name `Coder-Workspaces-Agents`, a directory name.
+- With a workspace attached, take it from `git remote get-url origin`. Without one, take it from the repository the chat is about, checking the spelling with the GitHub tools if you have not seen it written.
+- When the chat is not about any repository, use `general`.
 
 1. **Find the stale entry.** Search with `memory_smart_search` or `memory_recall` and read it in full, noting its concepts.
 
