@@ -1,0 +1,10 @@
+## Workspace creation
+Reuse the attached workspace. Before finding or creating one, read the workspace-creation skill.
+
+## Persistent memory
+Use agentmemory for durable corrections, decisions, non-code conventions, and external context; avoid storing facts cheaply recovered from code. Follow the agentmemory-recall/remember/forget/session-history skills as applicable.
+Scope every call with `project`: the exact GitHub repository name (case included; no owner, no `.git`, not the workspace name), or `general` when no repository is involved. Where a tool has no `project` parameter, qualify the query and verify returned scope.
+Search early for relevant prior work; save user corrections and validated non-obvious decisions; use sessions/audit for history.
+
+## Compressed context
+Tool output and older context may be compressed in transit. A marker such as `<<ccr:abc123,string,408B>>` stands for content that was cut; when you need it, call `headroom__headroom_retrieve` with `{"hash":"abc123"}` instead of guessing or rerunning the command. Call it directly by that name even when it is not in your tool list; no tool search is needed.

@@ -20,7 +20,9 @@
 #   mcp servers     additive   (POST if missing, PATCH if exists; never delete)
 #   skills          additive   (POST if missing, PATCH content if exists; never
 #                              delete). Push only: pull does not export skills.
-#   system prompt   PUT singleton
+#   system prompt   PUT singleton (deployment-wide)
+#   organization system prompt
+#                   PUT per organization; a missing file leaves it untouched
 #
 # Required env:
 #   CODER_URL              base URL of the Coder deployment
@@ -565,6 +567,21 @@ push_system_prompt() {
   echo "    PUT system prompt ($(printf '%s' "$body" | wc -c) bytes, include_default_system_prompt=$include_default)"
 }
 
+# ───────── ORGANIZATION SYSTEM PROMPT (PUT per organization) ────────────────
+# Sent to chats in $CODER_ORGANIZATION as a second system message, after the
+# deployment prompt. It holds what refers to organization-scoped resources
+# (MCP servers, skills). Plain text, no frontmatter: the endpoint has no toggles.
+push_organization_system_prompt() {
+  local file="$CONFIG_DIR/organization-system-prompt.txt"
+  [ -f "$file" ] || { echo "no organization-system-prompt.txt, skipping"; return; }
+
+  echo "==> syncing organization system prompt from $file"
+  local request_body
+  request_body="$(jq -n --rawfile prompt "$file" '{system_prompt: $prompt}')"
+  coder_put "/api/v2/organizations/$(resolve_organization_id)/chats/config/system-prompt" "$request_body" >/dev/null
+  echo "    PUT organization system prompt ($(wc -c < "$file") bytes)"
+}
+
 # ───────── PLAN MODE INSTRUCTIONS (PUT singleton) ───────────────────────────
 push_plan_mode_instructions() {
   local file="$CONFIG_DIR/plan-mode-instructions.txt"
@@ -619,7 +636,8 @@ push_template_allowlist() {
 # - models.yaml: every model config
 # - model-overrides.yaml: configured contexts with provider/model names, not UUIDs
 # - mcp-servers.yaml: every MCP server
-# - system-prompt.txt: current prompt content
+# - system-prompt.txt: current deployment prompt content
+# - organization-system-prompt.txt: current organization prompt content
 #
 # Secret values (api_keys, mcp custom_headers) are never readable. Pull
 # substitutes ${LLM_GATEWAY_API_KEY} for api_keys and a `${...}` placeholder
@@ -724,6 +742,10 @@ pull_all() {
   coder_get '/api/v2/chats/config/system-prompt' | \
     jq -r '.system_prompt' > "$CONFIG_DIR/system-prompt.txt.new"
 
+  echo "  organization-system-prompt.txt"
+  coder_get "/api/v2/organizations/$(resolve_organization_id)/chats/config/system-prompt" | \
+    jq -r '.system_prompt' > "$CONFIG_DIR/organization-system-prompt.txt.new"
+
   echo "  plan-mode-instructions.txt"
   coder_get '/api/v2/chats/config/plan-mode-instructions' | \
     jq -r '.plan_mode_instructions' > "$CONFIG_DIR/plan-mode-instructions.txt.new"
@@ -741,6 +763,7 @@ pull_all() {
   echo "  diff $CONFIG_DIR/mcp-servers.yaml{,.new}            && mv $CONFIG_DIR/mcp-servers.yaml{.new,}"
   echo "  diff $CONFIG_DIR/template-allowlist.yaml{,.new}     && mv $CONFIG_DIR/template-allowlist.yaml{.new,}"
   echo "  diff $CONFIG_DIR/system-prompt.txt{,.new}           && mv $CONFIG_DIR/system-prompt.txt{.new,}"
+  echo "  diff $CONFIG_DIR/organization-system-prompt.txt{,.new} && mv $CONFIG_DIR/organization-system-prompt.txt{.new,}"
   echo "  diff $CONFIG_DIR/plan-mode-instructions.txt{,.new}  && mv $CONFIG_DIR/plan-mode-instructions.txt{.new,}"
   echo
   echo "Heads up: secret fields come back masked. Restore your \${VAR} references"
@@ -759,6 +782,7 @@ case "$MODE" in
     push_mcp_servers
     push_skills
     push_system_prompt
+    push_organization_system_prompt
     push_plan_mode_instructions
     push_template_allowlist
     echo "==> push done"
