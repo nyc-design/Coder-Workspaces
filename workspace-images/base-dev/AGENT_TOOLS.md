@@ -66,7 +66,7 @@ CodexBar auto tries signed-in `bl` first, then supported cookies. For Team subsc
 
 - `likec4-modeling`: our modeling conventions, referring to upstream `likec4-dsl` for syntax and to `implementation-outline` for turning sequence detail views into code.
 - `implementation-outline`: our outline-first process for non-trivial functions (step comments in the body, agreed with the user before the code is written). Local skill in `skills.d/`, referenced from the base prompt. Its stage markers (`STUB`, `OUTLINED`, `IMPLEMENTED`, `REVIEWED`) are registered as TodoForge tags in the machine block of `settings.d/10-base.json`; keep the two lists the same.
-- `archify`: diagrams explaining changes, delivered as self-contained HTML plus editable source when appropriate. Attach HTML to chat for users in separate workspaces; do not replace maintained LikeC4 architecture models or require diagrams for trivial changes.
+- `archify`: diagrams and one-page explainers as self-contained HTML. Upstream makes explainer pages unasked by default; the base prompt carries upstream's `[archify explainer: on-demand]` rules line, so it is used only when the user invokes it. It does not replace maintained LikeC4 architecture models.
 
 ## Review skills and editor commands
 
@@ -80,7 +80,7 @@ The skills call two commands baked into the image, `showme` and `highlight` (`sc
 - `showme <tool> [JSON]` starts the MCP bridge that ships inside the ShowMe extension, makes one call and exits. ShowMe is off in every new window until the user clicks its status bar item; nothing should script around that.
 - `highlight` posts to the Code Walkthrough extension's server on `127.0.0.1:8771`. That server has no authentication, so do not share the port in Coder. If 8771 is taken, for example by a second editor window on the same workspace, the extension moves to another port and `highlight` does not follow it. Do not run the extension's "Install Claude Code Integration" command; the skill replaces it.
 
-Coder Agents discovers the canonical catalog through the existing `CODER_AGENT_EXP_SKILLS_DIRS` template environment. Skills become available after workspace attachment/startup, not in workspace-less central chats. Full skill bodies are loaded on demand rather than copied into the central system prompt. `ARCHIFY_UPDATE_CHECK_DISABLED=1` disables the optional update reminder network call. Core render/validation uses Node; browser-based visual checking is optional and is not preinstalled into base-dev by this change.
+Coder Agents discovers the canonical catalog through the existing `CODER_AGENT_EXP_SKILLS_DIRS` template environment. Skills become available after workspace attachment/startup, not in workspace-less central chats. Skills that must work without a workspace (agentmemory, workspace creation, Mac development) are organization skills in `coder-agents-config/skills/`; see "Skill levels" in that directory's README. Full skill bodies are loaded on demand rather than copied into the central system prompt. `ARCHIFY_UPDATE_CHECK_DISABLED=1` disables the optional update reminder network call. Core render/validation uses Node; browser-based visual checking is optional and is not preinstalled into base-dev by this change.
 
 ## Checks and rollout
 

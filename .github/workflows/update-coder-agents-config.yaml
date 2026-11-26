@@ -73,5 +73,5 @@ jobs:
             HEADROOM_MCP_SECRET:coder-nt/HEADROOM_MCP_SECRET
             XCODEBUILDMCP_API_KEY:coder-nt/XCODEBUILDMCP_API_KEY
 
-      - name: Sync providers / models / model overrides / MCP servers / system prompt / template-allowlist
+      - name: Sync providers / models / model overrides / MCP servers / skills / system prompt / template-allowlist
         run: ./coder-agents-config/sync.sh coder-agents-config

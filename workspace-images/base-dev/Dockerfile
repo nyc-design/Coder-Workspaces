@@ -157,8 +157,10 @@ RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patc
 # pair. Docker layer inheritance merges them with base-dev's contents at
 # the same shared path.
 #
-# base-dev currently ships the four agentmemory skills (recall, remember,
-# session-history, forget) as SKILL.md dirs; upstream LikeC4 DSL and Archify use the CLI install list.
+# base-dev ships its own skills (likec4-modeling, implementation-outline,
+# walkthrough, showme, highlight) as SKILL.md dirs; upstream LikeC4 DSL and
+# Archify use the CLI install list. Skills that need no workspace live in
+# coder-agents-config/skills/ instead.
 COPY workspace-images/base-dev/skills.d/          /usr/local/share/workspace-skills.d/
 COPY workspace-images/base-dev/skills-install.d/  /usr/local/share/workspace-skills-install.d/
 

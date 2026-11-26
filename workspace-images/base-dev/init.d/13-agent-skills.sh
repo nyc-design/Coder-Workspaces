@@ -17,8 +17,8 @@
 #
 #   /usr/local/share/workspace-skills.d/<name>/SKILL.md
 #     Per-skill subdirectories shipped inside the image. Each must contain
-#     SKILL.md. base-dev contributes the four agentmemory skills (recall,
-#     remember, session-history, forget). Child images can ship their own —
+#     SKILL.md. base-dev contributes its own skills (likec4-modeling,
+#     implementation-outline, walkthrough, showme, highlight). Child images can ship their own —
 #     e.g. workspace-images/python-dev/skills.d/python-lint/SKILL.md COPYs
 #     to /usr/local/share/workspace-skills.d/python-lint/.
 #

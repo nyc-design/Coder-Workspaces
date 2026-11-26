@@ -54,6 +54,8 @@ coder-agents-config/       # git-tracked admin config for Coder Agents (chatd)
 ├── providers.yaml         # chat providers (anthropic / openai / google)
 ├── models.yaml            # chat model configs (provider + model + ctx limit)
 ├── mcp-servers.yaml       # MCP servers (context7 / grep / github)
+├── skills/                # organization skills (one SKILL.md per directory)
+├── skills-install.json    # upstream skills to sync as organization skills
 ├── system-prompt.txt      # central system prompt
 └── sync.sh                # called by update-coder-agents-config.yaml workflow
 ```
@@ -209,13 +211,14 @@ agent's expected read path so Coder Agents (chatd) and in-workspace CLIs
 Git-tracked admin config for Coder Agents (chatd) lives in
 `coder-agents-config/`. The `update-coder-agents-config.yaml` workflow runs
 `coder-agents-config/sync.sh` on every commit that touches that directory and
-applies four resources idempotently:
+applies these resources idempotently:
 
 | File | Synced to | Stable identity |
 |---|---|---|
 | `providers.yaml` | `/api/v2/ai/providers` | `name` |
 | `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` |
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` |
+| `skills/`, `skills-install.json` | `/api/experimental/organizations/{org}/skills` | frontmatter `name` |
 | `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton) |
 
 `${VAR}` placeholders in YAML are substituted from the workflow's env at sync
@@ -227,8 +230,14 @@ Sync is **additive** — items only present in Coder admin (manually added
 in the UI) are not removed. To remove an item, delete it manually. See
 `coder-agents-config/README.md` for full semantics + caveats.
 
-The central system prompt is intentionally minimal (workspace-creation policy
-only) and stacks on top of (a) Coder's built-in default prompt and (b) the
+Skills exist at four levels: Coder Agents central (`coder-agents-config/skills/`,
+available with or without a workspace), base workspace image, runtime-specific
+image (both via `skills.d/` + `skills-install.d/`), and repo (`.agents/skills/`).
+The agentmemory, `workspace-creation` and `mac-development` skills are central.
+See "Skill levels" in `coder-agents-config/README.md`.
+
+The central system prompt is intentionally minimal (pointers to those skills plus
+a note on Headroom retrieval markers) and stacks on top of (a) Coder's built-in default prompt and (b) the
 per-workspace `~/.coder/AGENTS.md` injected by the workspace agent.
 
 **OpenAI sidecar base URL gotcha:** Coder's OpenAI provider path handling comes
@@ -392,7 +401,8 @@ Base-dev now uses Node 22 and includes Qwen Code, Bailian (`bl`), and CodexBar C
 Qwen/Bailian state is host-shared via `.qwen`/`.bailian` runtime mounts; credentials
 are user-provisioned, never baked in. Qwen receives the canonical prompt and skills.
 The base skill manifest adds upstream LikeC4 DSL and Archify (explanatory HTML,
-not a replacement for maintained LikeC4 models). Local `walkthrough`, `showme`
+not a replacement for maintained LikeC4 models; on demand only, via the
+`[archify explainer: on-demand]` line in the base prompt). Local `walkthrough`, `showme`
 and `highlight` skills, with the `showme` and `highlight` commands, cover
 reviewing an agent's work in the editor. See
 `workspace-images/base-dev/AGENT_TOOLS.md` for international Token Plan login,

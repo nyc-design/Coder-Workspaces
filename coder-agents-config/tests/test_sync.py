@@ -26,6 +26,12 @@ MODEL_NAME = "cliproxy-claude/claude-haiku-5-5"
 MODELS = f"/api/v2/organizations/{ORG_ID}/chats/models"
 OVERRIDES = f"/api/v2/organizations/{ORG_ID}/chats/model-overrides"
 PROVIDERS = "/api/v2/ai/providers"
+SKILLS = f"/api/experimental/organizations/{ORG_ID}/skills"
+SKILL_MAX_BYTES = 65536
+
+
+def skill_markdown(name, body="Do the thing."):
+    return f"---\nname: {name}\ndescription: Test skill {name}.\n---\n\n# {name}\n\n{body}\n"
 
 
 def desired_override(context="title_generation", **extra):
@@ -58,9 +64,19 @@ class CoderAPI:
                 "reasoning_effort": "high",
             }
         }
+        self.skills = {}
+        self.raw_files = {}
+        self.raw_requests = []
         self.requests = []
         self.responses = {}
         self.unexpected = []
+
+    def raw_file(self, path, headers):
+        """Stands in for a third-party skill host: no Coder authentication."""
+        self.raw_requests.append((path, "Coder-Session-Token" in headers))
+        if path in self.raw_files:
+            return 200, self.raw_files[path].encode()
+        return 404, b"not found"
 
     def dispatch(self, method, path, body):
         self.requests.append((method, path, copy.deepcopy(body)))
@@ -81,6 +97,17 @@ class CoderAPI:
                 return 200, {"system_prompt": "test"}
             if path == "/api/v2/chats/config/plan-mode-instructions":
                 return 200, {"plan_mode_instructions": "test"}
+        if method == "GET" and path == SKILLS:
+            return 200, [{"name": name, "enabled": True} for name in self.skills]
+        if method == "POST" and path == SKILLS:
+            name = re.search(r"^name: (.+)$", body["content"], re.MULTILINE).group(1)
+            self.skills[name] = body["content"]
+            return 201, {"name": name, **body}
+        if method == "PATCH" and path.startswith(SKILLS + "/"):
+            name = path.removeprefix(SKILLS + "/")
+            if name in self.skills:
+                self.skills[name] = body["content"]
+                return 200, {"name": name, **body}
         if method == "PUT" and path.startswith(OVERRIDES + "/"):
             context = path.removeprefix(OVERRIDES + "/")
             self.overrides[context] = {"context": context, **body}
@@ -103,7 +130,9 @@ class CoderAPI:
         return 404, {"message": f"unexpected fixture request: {method} {path}"}
 
 
-class SyncModelOverridesTests(unittest.TestCase):
+class SyncTestCase(unittest.TestCase):
+    """Runs the real sync.sh against a local HTTP fixture."""
+
     @classmethod
     def setUpClass(cls):
         missing = [tool for tool in ("bash", "curl", "jq", "yq", "envsubst") if not shutil.which(tool)]
@@ -114,7 +143,7 @@ class SyncModelOverridesTests(unittest.TestCase):
             raise unittest.SkipTest("These CLI tests require mikefarah/yq v4")
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="sync-model-overrides-")
+        self.temp = tempfile.TemporaryDirectory(prefix="sync-test-")
         self.addCleanup(self.temp.cleanup)
         self.config = Path(self.temp.name)
         self.api = CoderAPI()
@@ -124,7 +153,9 @@ class SyncModelOverridesTests(unittest.TestCase):
             def handle_request(self):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length)) if length else None
-                if self.headers.get("Coder-Session-Token") != "offline-test-token":
+                if self.path.startswith("/raw/"):
+                    status, response = api.raw_file(self.path, self.headers)
+                elif self.headers.get("Coder-Session-Token") != "offline-test-token":
                     status, response = 401, {"message": "missing test authentication"}
                 else:
                     status, response = api.dispatch(self.command, self.path, body)
@@ -154,10 +185,6 @@ class SyncModelOverridesTests(unittest.TestCase):
     def tearDown(self):
         self.assertEqual([], self.api.unexpected, "Fixture did not recognize an API call")
 
-    def write_overrides(self, document):
-        # JSON is valid YAML; production yq still parses every input file.
-        (self.config / "model-overrides.yaml").write_text(json.dumps(document) + "\n")
-
     def run_sync(self, mode="push", success=True, **extra_env):
         env = os.environ.copy()
         env.pop("CODER_ORGANIZATION", None)
@@ -180,6 +207,12 @@ class SyncModelOverridesTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode, output)
             self.assertTrue(result.stderr.strip(), "Failure must explain itself on stderr\n" + output)
         return result
+
+
+class SyncModelOverridesTests(SyncTestCase):
+    def write_overrides(self, document):
+        # JSON is valid YAML; production yq still parses every input file.
+        (self.config / "model-overrides.yaml").write_text(json.dumps(document) + "\n")
 
     def override_writes(self):
         return [request for request in self.api.requests
@@ -504,6 +537,129 @@ class SyncModelOverridesTests(unittest.TestCase):
                 self.assertEqual(1, len(self.api.models))
                 self.assertFalse(any(method in ("POST", "DELETE")
                                      for method, _path, _body in self.override_writes()))
+
+
+
+class SyncSkillsTests(SyncTestCase):
+    def write_skill(self, directory, content, extra_file=None):
+        skill_dir = self.config / "skills" / directory
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(content)
+        if extra_file:
+            (skill_dir / extra_file).write_text("supporting file\n")
+
+    def write_install_list(self, entries):
+        (self.config / "skills-install.json").write_text(
+            entries if isinstance(entries, str) else json.dumps(entries))
+
+    def raw_url(self, path):
+        return f"http://127.0.0.1:{self.server.server_port}{path}"
+
+    def skill_requests(self):
+        return [request for request in self.api.requests if request[1].startswith(SKILLS)]
+
+    def test_missing_directory_and_empty_inputs_make_no_requests(self):
+        self.run_sync()
+        (self.config / "skills").mkdir()
+        self.write_install_list([])
+        result = self.run_sync()
+        self.assertIn("no skills, skipping", result.stdout)
+        self.assertEqual([], self.skill_requests())
+
+    def test_new_skill_is_posted_and_existing_skill_is_patched_with_content_only(self):
+        self.api.skills = {"existing-skill": "old content", "added-in-admin": "untouched"}
+        self.write_skill("existing-skill", skill_markdown("existing-skill", "New body."))
+        self.write_skill("new-skill", skill_markdown("new-skill"))
+        self.run_sync()
+        self.assertEqual([
+            ("GET", SKILLS, None),
+            ("PATCH", SKILLS + "/existing-skill", {"content": skill_markdown("existing-skill", "New body.")}),
+            ("POST", SKILLS, {"content": skill_markdown("new-skill")}),
+        ], self.skill_requests())
+        self.assertEqual("untouched", self.api.skills["added-in-admin"])
+        self.run_sync()
+        self.assertEqual(["GET", "PATCH", "PATCH"], [request[0] for request in self.skill_requests()[3:]])
+
+    def test_invalid_local_skills_are_rejected_before_any_request(self):
+        cases = {
+            "directory name differs": ("other-name", skill_markdown("some-skill")),
+            "no frontmatter": ("some-skill", "# some-skill\n\nBody.\n"),
+            "invalid name": ("Some_Skill", skill_markdown("Some_Skill")),
+            "too large": ("some-skill", skill_markdown("some-skill", "x" * SKILL_MAX_BYTES)),
+        }
+        for label, (directory, content) in cases.items():
+            with self.subTest(label):
+                shutil.rmtree(self.config / "skills", ignore_errors=True)
+                self.api.requests.clear()
+                self.write_skill(directory, content)
+                self.run_sync(success=False)
+                self.assertEqual([], self.skill_requests())
+
+    def test_directory_without_skill_file_is_rejected(self):
+        (self.config / "skills" / "empty-skill").mkdir(parents=True)
+        result = self.run_sync(success=False)
+        self.assertIn("has no SKILL.md", result.stderr)
+        self.assertEqual([], self.skill_requests())
+
+    def test_supporting_files_warn_but_skill_still_syncs(self):
+        self.write_skill("some-skill", skill_markdown("some-skill"), extra_file="reference.md")
+        result = self.run_sync()
+        self.assertIn("only SKILL.md is uploaded", result.stderr)
+        self.assertEqual({"some-skill": skill_markdown("some-skill")}, self.api.skills)
+
+    def test_install_list_downloads_without_coder_token(self):
+        self.api.raw_files = {
+            "/raw/owner/repo/main/skills/upstream-skill/SKILL.md": skill_markdown("upstream-skill"),
+            "/raw/direct/SKILL.md": skill_markdown("direct-skill"),
+        }
+        self.write_install_list([
+            "https://github.com/owner/repo/tree/main/skills/upstream-skill/",
+            self.raw_url("/raw/direct/SKILL.md"),
+        ])
+        self.run_sync(SKILLS_RAW_BASE_URL=self.raw_url("/raw"))
+        self.assertEqual({
+            "upstream-skill": skill_markdown("upstream-skill"),
+            "direct-skill": skill_markdown("direct-skill"),
+        }, self.api.skills)
+        self.assertEqual([False, False], [sent_token for _path, sent_token in self.api.raw_requests])
+
+    def test_install_list_failures_are_fatal_before_any_request(self):
+        self.api.raw_files = {"/raw/duplicate/SKILL.md": skill_markdown("some-skill")}
+        self.write_skill("some-skill", skill_markdown("some-skill"))
+        cases = {
+            "not an array": '{"skills": []}',
+            "not a URL": ["owner/repo"],
+            "download fails": [self.raw_url("/raw/missing/SKILL.md")],
+            "duplicates a local skill": [self.raw_url("/raw/duplicate/SKILL.md")],
+        }
+        for label, entries in cases.items():
+            with self.subTest(label):
+                self.api.requests.clear()
+                self.write_install_list(entries)
+                self.run_sync(success=False)
+                self.assertEqual([], self.skill_requests())
+
+    def test_http_errors_and_malformed_listing_are_fatal(self):
+        self.write_skill("some-skill", skill_markdown("some-skill"))
+        for request, response in (
+            (("GET", SKILLS), (500, {"message": "boom"})),
+            (("GET", SKILLS), (200, {"skills": []})),
+            (("POST", SKILLS), (400, {"message": "invalid skill"})),
+        ):
+            with self.subTest(request=request, status=response[0]):
+                self.api.responses = {request: response}
+                self.run_sync(success=False)
+        self.assertEqual({}, self.api.skills)
+
+    def test_repository_skills_are_valid(self):
+        repository_config = SYNC.parent
+        shutil.copytree(repository_config / "skills", self.config / "skills")
+        self.run_sync()
+        expected = sorted(path.name for path in (repository_config / "skills").iterdir() if path.is_dir())
+        self.assertEqual(expected, sorted(self.api.skills))
+        for name, content in self.api.skills.items():
+            description = re.search(r"^description: (.+)$", content, re.MULTILINE)
+            self.assertIsNotNone(description, f"{name} needs a description so the model knows when to load it")
 
 
 if __name__ == "__main__":

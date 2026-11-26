@@ -5,7 +5,7 @@ description: At the start of a task in a known repo, search persistent memory (a
 
 # Recalling prior memory before a task
 
-This workspace has the **agentmemory** MCP server attached (`memory_*` tools).
+The **agentmemory** MCP server is attached to the chat (`memory_*` tools).
 It holds per-repo durable memory across workspace recreate: observations
 saved by past agent runs, lessons learned, sessions, embeddings.
 

@@ -13,6 +13,7 @@ GitHub Actions workflow on every commit that touches this directory.
 | `models.yaml` | `/api/v2/organizations/{org}/chats/models` | `(provider, model)` tuple |
 | `model-overrides.yaml` | `/api/v2/organizations/{org}/chats/model-overrides/{context}` | `context` (PUT); model resolved by `(provider, model)` |
 | `mcp-servers.yaml` | `/api/v2/organizations/{org}/mcp-servers` | `slug` field |
+| `skills/<name>/SKILL.md`, `skills-install.json` | `/api/experimental/organizations/{org}/skills` | frontmatter `name` (must equal the directory name) |
 | `system-prompt.txt` | `/api/v2/chats/config/system-prompt` | (singleton, PUT) |
 | `plan-mode-instructions.txt` | `/api/v2/chats/config/plan-mode-instructions` | (singleton, PUT) |
 | `template-allowlist.yaml` | `/api/v2/templates/{id}` (`agents_allowed`) | template slug (`name`); every template not listed is set to `false` |
@@ -28,6 +29,7 @@ Per resource type:
 | **Models** | **Declarative** | POST/PATCH desired; **DELETE any model in Coder not listed in `models.yaml`**. The YAML is source of truth. |
 | Model overrides | **Declared contexts only** | PUT each declared context, then GET to verify. Missing file, empty list, and unlisted contexts leave existing overrides untouched. |
 | MCP Servers | **Additive** | Same as providers. |
+| Skills | **Additive** | POST if missing, PATCH the content if it exists; never delete. Not exported by `pull`. |
 | System prompt | PUT singleton | Always overwritten. |
 | Plan mode instructions | PUT singleton | Always overwritten. |
 | Template allowlist | PUT singleton | Always overwritten. Empty list / missing file = all templates allowed. |
@@ -42,7 +44,7 @@ Other notes:
 
 - **Idempotent**: re-running sync produces the same admin state. Safe to spam.
 - **Order**: providers → models (POST/PATCH) → models (delete unmatched) → model
-  overrides → MCP servers → system prompt. Coder rejects model creation if the provider isn't
+  overrides → MCP servers → skills → system prompt. Coder rejects model creation if the provider isn't
   already configured. Model deletes happen last so a new default is in place
   before the old default gets removed.
 - **Secrets**: YAML values may contain `${VAR}` placeholders, which `envsubst`
@@ -100,6 +102,44 @@ before replacing the tracked configuration; pull never overwrites it.
 
 The API requires Coder v2.39.0 or a compatible version. As with other resources,
 `CODER_ORGANIZATION` selects the organization (default: `default`).
+
+## Skills
+
+Organization skills are available in every chat in the organization, including
+chats with no workspace attached. Like the workspace images, there are two
+inputs:
+
+- `skills/<name>/SKILL.md`: skills maintained here.
+- `skills-install.json`: a JSON array of URLs to upstream skills. A GitHub
+  directory URL (`https://github.com/<owner>/<repo>/tree/<ref>/<path>`) is read
+  as `<path>/SKILL.md`; any other URL must point at a `SKILL.md` directly.
+  Upstream content is fetched again on every sync, so it tracks the ref.
+
+Rules, checked before any request is sent:
+
+- The frontmatter `name` is lowercase kebab-case and, for local skills, equals
+  the directory name. A name may appear only once across both inputs.
+- A skill is one file of at most 64 KB. Coder stores only `SKILL.md`, so files
+  next to it are not uploaded (sync warns), and an upstream skill that relies on
+  supporting files or scripts belongs in a workspace image instead.
+
+Sync sends only the content. A skill disabled in Coder admin stays disabled, and
+whether the model may load a skill on its own follows the frontmatter on
+creation (`disable-model-invocation: true` turns that off). To remove a skill,
+delete it here and in Coder admin. The endpoint is under `/api/experimental` and
+may change between Coder releases; this was written against v2.39.5.
+
+### Skill levels
+
+| Level | Where it lives | Available | Use for |
+|---|---|---|---|
+| Coder Agents central | `coder-agents-config/skills/`, `skills-install.json` | Every chat, with or without a workspace; not the in-workspace CLIs | Skills about central MCP servers or about getting a workspace |
+| Base workspace image | `workspace-images/base-dev/skills.d/`, `skills-install.d/` | Every workspace, for Coder Agents and the CLIs | Process and tooling common to all projects |
+| Runtime-specific image | `workspace-images/<image>/skills.d/`, `skills-install.d/` | Workspaces on that image and its children | Language or framework specifics |
+| Workspace / repo | `.agents/skills/` in the repository | That repository | Project conventions |
+
+A skill with the same name at two levels is not overridden: Coder lists both
+under source-qualified names. Keep each skill at one level.
 
 ## Tests
 

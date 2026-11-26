@@ -25,7 +25,7 @@
   "machine": {
     "git.useIntegratedAskPass": false,
     "github.copilot.enable": { "*": true },
-    "continue.enableTabAutocomplete": false,
+    "continue.enableTabAutocomplete": true,
     "likec4.mcp.enabled": true,
     "remote.autoForwardPortsSource": "process",
     "todoforge.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "STUB", "OUTLINED", "IMPLEMENTED", "REVIEWED"],
