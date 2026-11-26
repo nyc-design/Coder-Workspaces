@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+// Drives the Code Walkthrough extension (fjanuszewski.code-walkthrough-mcp) from a shell,
+// so an agent that is not Claude Code can highlight code in the open editor window.
+//
+//   highlight <file> <start> [end] [--note TEXT] [--status TEXT]   open, scroll to and highlight lines
+//   highlight clear                                                remove the highlight and status
+//   highlight where                                                active file, selection and current highlight
+//   highlight symbols <file>                                       symbol tree with line ranges
+
+const path = require("path");
+
+const port = process.env.WALKTHROUGH_MCP_PORT || "8771";
+const endpoint = `http://127.0.0.1:${port}/mcp`;
+
+
+async function callTool(name, toolArguments = {}) {
+  let response;
+
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: toolArguments } }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    throw new Error(`No Code Walkthrough server on ${endpoint}. An editor window with the extension must be open on this workspace (status bar shows "Walkthrough MCP"). ${error.message}`);
+  }
+
+  // The server answers either plain JSON or a one-event SSE stream.
+  const body = await response.text();
+  const eventData = body.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).pop();
+  const message = JSON.parse(eventData || body);
+
+  if (message.error) throw new Error(message.error.message);
+
+  const text = (message.result.content || []).map((part) => part.text).join("\n");
+
+  if (message.result.isError) throw new Error(text);
+
+  return text;
+}
+
+
+function option(args, name) {
+  const index = args.indexOf(name);
+
+  return index === -1 ? undefined : args.splice(index, 2)[1];
+}
+
+
+async function main() {
+  const args = process.argv.slice(2);
+  const command = args[0];
+
+  if (!command || command === "--help" || command === "-h") {
+    console.log("highlight <file> <start> [end] [--note TEXT] [--status TEXT] | clear | where | symbols <file>");
+    return;
+  }
+
+  if (command === "clear") {
+    await callTool("clear_highlights");
+    await callTool("set_status", { message: "" });
+    console.log("cleared");
+    return;
+  }
+
+  if (command === "where") {
+    for (const tool of ["get_active_file", "get_current_selection", "get_highlight_state"]) {
+      console.log(`${tool}: ${await callTool(tool).catch((error) => error.message)}`);
+    }
+    return;
+  }
+
+  if (command === "symbols") {
+    if (!args[1]) throw new Error("usage: highlight symbols <file>");
+
+    console.log(await callTool("get_document_symbols", { uri: `file://${path.resolve(args[1])}` }));
+    return;
+  }
+
+  const note = option(args, "--note");
+  const status = option(args, "--status");
+  const [file, start, end = start] = args;
+  const startLine = Number(start);
+  const endLine = Number(end);
+
+  if (!file || !Number.isInteger(startLine) || !Number.isInteger(endLine)) throw new Error("usage: highlight <file> <start> [end] [--note TEXT] [--status TEXT]");
+
+  console.log(await callTool("highlight_range", { uri: `file://${path.resolve(file)}`, startLine, endLine, scroll: true, ...(note ? { note } : {}) }));
+
+  if (status !== undefined) await callTool("set_status", { message: status });
+}
+
+
+main().catch((error) => {
+  console.error(`highlight: ${error.message}`);
+  process.exit(1);
+});

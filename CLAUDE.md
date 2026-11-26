@@ -392,7 +392,9 @@ Base-dev now uses Node 22 and includes Qwen Code, Bailian (`bl`), and CodexBar C
 Qwen/Bailian state is host-shared via `.qwen`/`.bailian` runtime mounts; credentials
 are user-provisioned, never baked in. Qwen receives the canonical prompt and skills.
 The base skill manifest adds upstream LikeC4 DSL and Archify (explanatory HTML,
-not a replacement for maintained LikeC4 models). See
+not a replacement for maintained LikeC4 models). Local `walkthrough`, `showme`
+and `highlight` skills, with the `showme` and `highlight` commands, cover
+reviewing an agent's work in the editor. See
 `workspace-images/base-dev/AGENT_TOOLS.md` for international Token Plan login,
 CodexBar usage-auth boundaries, host-directory prerequisites, validation and rollout.
 `host-services/codexbar/` runs `codexbar serve` on the host VM against the same

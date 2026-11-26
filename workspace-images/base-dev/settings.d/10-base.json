@@ -8,10 +8,7 @@
     "claudeCode.preferredLocation": "panel",
     "workbench.activityBar.location": "top",
     "chat.viewSessions.orientation": "stacked",
-    "better-todo-tree.tree.showBadges": true,
-    "better-todo-tree.tree.disableCompactFolders": false,
-    "better-todo-tree.tree.showCountsInTree": true,
-    "better-todo-tree.tree.scanMode": "current file",
+    "todoforge.scanning.mode": "currentFile",
     "mdb.showOverviewPageAfterInstall": false,
     "editor.fontFamily": "Cascadia Mono, Consolas, monospace",
     "editor.fontLigatures": false,
@@ -32,19 +29,18 @@
     "continue.enableTabAutocomplete": false,
     "likec4.mcp.enabled": true,
     "remote.autoForwardPortsSource": "process",
-    "better-todo-tree.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "[ ]", "[x]", "STUB", "OUTLINED", "IMPLEMENTED", "REVIEWED"],
-    "better-todo-tree.highlights.customHighlight": {
+    "todoforge.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "STUB", "OUTLINED", "IMPLEMENTED", "REVIEWED"],
+    "todoforge.general.strictTags": ["BUG", "STUB", "OUTLINED", "IMPLEMENTED", "REVIEWED"],
+    "todoforge.highlighting.tags": {
       "BUG": { "icon": "bug" },
       "HACK": { "icon": "tools" },
       "FIXME": { "icon": "flame" },
       "XXX": { "icon": "x" },
-      "[ ]": { "icon": "issue-draft" },
-      "[x]": { "icon": "issue-closed" },
-      "STUB": { "icon": "circle-slash", "iconColour": "#9e9e9e" },
-      "OUTLINED": { "icon": "list-unordered", "iconColour": "#e0a800" },
-      "IMPLEMENTED": { "icon": "tools", "iconColour": "#3b82f6" },
-      "REVIEWED": { "icon": "check", "iconColour": "#22c55e" }
+      "STUB": { "icon": "circle-slash", "foreground": "#9e9e9e" },
+      "OUTLINED": { "icon": "checklist", "foreground": "#e0a800" },
+      "IMPLEMENTED": { "icon": "tools", "foreground": "#3b82f6" },
+      "REVIEWED": { "icon": "check", "foreground": "#22c55e" }
     },
-    "better-todo-tree.tree.groupedByTag": true
+    "todoforge.tree.groupBy": "tag"
   }
 }

@@ -65,8 +65,20 @@ CodexBar auto tries signed-in `bl` first, then supported cookies. For Team subsc
 `skills-install.d/10-base.json` targets only upstream `likec4-dsl` and `archify` directories. Startup installs them using the existing skills CLI into `~/.agents/skills`, then publishes provider links. Upstream skill sources track main, like other existing CLI-managed skills; they are not pinned image snapshots and startup needs network access. Installer failures warn rather than fail workspace startup—check the init log if a skill is absent.
 
 - `likec4-modeling`: our modeling conventions, referring to upstream `likec4-dsl` for syntax and to `implementation-outline` for turning sequence detail views into code.
-- `implementation-outline`: our outline-first process for non-trivial functions (step comments in the body, agreed with the user before the code is written). Local skill in `skills.d/`, referenced from the base prompt. Its stage markers (`STUB`, `OUTLINED`, `IMPLEMENTED`, `REVIEWED`) are registered as Better Todo Tree tags in the machine block of `settings.d/10-base.json`; keep the two lists the same.
+- `implementation-outline`: our outline-first process for non-trivial functions (step comments in the body, agreed with the user before the code is written). Local skill in `skills.d/`, referenced from the base prompt. Its stage markers (`STUB`, `OUTLINED`, `IMPLEMENTED`, `REVIEWED`) are registered as TodoForge tags in the machine block of `settings.d/10-base.json`; keep the two lists the same.
 - `archify`: diagrams explaining changes, delivered as self-contained HTML plus editable source when appropriate. Attach HTML to chat for users in separate workspaces; do not replace maintained LikeC4 architecture models or require diagrams for trivial changes.
+
+## Review skills and editor commands
+
+Three local skills in `skills.d/` cover reviewing an agent's work. Each is used only when the user asks for it.
+
+- `walkthrough`: writes a step-by-step record of a change to `.walkthrough/<date>-<slug>.yaml`, played back in the Agent Walkthrough extension, and keeps an index in `.walkthrough/README.md`. The files are committed so they can be searched later for why something was built a certain way. The file format is upstream's (`mepolabs/agent-walkthrough`); the copy is local because upstream writes one after every session and has no naming, summary or index rules.
+- `showme` and `highlight`: the user did not follow an explanation, attaches the workspace they are working in to the chat, and invokes one of the two. The agent then goes through the unclear part one point per turn, marking the exact lines in the user's editor. `showme` uses the ShowMe extension (comment bubbles, files side by side, diagrams, notes); `highlight` uses the Code Walkthrough extension (one highlighted range).
+
+The skills call two commands baked into the image, `showme` and `highlight` (`scripts/`, tested by `tests/test-editor-commands.sh`). Both reach an editor window only inside the workspace they run in.
+
+- `showme <tool> [JSON]` starts the MCP bridge that ships inside the ShowMe extension, makes one call and exits. ShowMe is off in every new window until the user clicks its status bar item; nothing should script around that.
+- `highlight` posts to the Code Walkthrough extension's server on `127.0.0.1:8771`. That server has no authentication, so do not share the port in Coder. If 8771 is taken, for example by a second editor window on the same workspace, the extension moves to another port and `highlight` does not follow it. Do not run the extension's "Install Claude Code Integration" command; the skill replaces it.
 
 Coder Agents discovers the canonical catalog through the existing `CODER_AGENT_EXP_SKILLS_DIRS` template environment. Skills become available after workspace attachment/startup, not in workspace-less central chats. Full skill bodies are loaded on demand rather than copied into the central system prompt. `ARCHIFY_UPDATE_CHECK_DISABLED=1` disables the optional update reminder network call. Core render/validation uses Node; browser-based visual checking is optional and is not preinstalled into base-dev by this change.
 

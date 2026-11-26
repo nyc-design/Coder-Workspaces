@@ -75,7 +75,7 @@ Keep exactly one marker per function and move it forward by changing the stage w
 
 Only the user moves a function to `REVIEWED`. Set it yourself only when they tell you they have reviewed that function. If you later change the code of a `REVIEWED` function, set it back to `IMPLEMENTED` and say so.
 
-Write the stage in capitals exactly as above. The editor's Todo Tree view picks these words up as tags and groups functions by stage, so the tree shows what is left to do.
+Write the stage in capitals exactly as above. The editor's TodoForge view picks these words up as tags and groups functions by stage, so the tree shows what is left to do.
 
 ## Docstrings
 
