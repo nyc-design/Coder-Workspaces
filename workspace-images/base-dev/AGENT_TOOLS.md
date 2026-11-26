@@ -6,7 +6,6 @@ The base image uses Node 22 (approved upgrade from Node 20) and includes:
 
 - Qwen Code `0.27.2` (`qwen`), via the existing npm-global prefix.
 - Bailian CLI `2.0.0` (`bl`, also `bailian`), the official `modelstudioai/cli` npm package. Its tarball is checksum-verified; lifecycle hooks are disabled to avoid downloading mutable wiki/skills content into root's home during image build. Registry dependency ranges remain upstream-managed.
-- CodexBar CLI `0.84.0` (`codexbar`), checksum-verified static-musl Linux amd64/arm64 release. The executable, resource bundle and VERSION stay together under `/usr/local/lib/codexbar`.
 
 No login, usage polling or inference request runs during build/startup. Secrets are not in the image. Qwen is the coding harness; Bailian is a management/usage companion, not its replacement.
 
@@ -40,25 +39,13 @@ bl auth status --output json
 bl usage token-plan --console-region ap-southeast-1 --console-site international --output json
 ```
 
-The pinned Bailian 2.0.0 usage command queries Personal/Solo rolling-window usage only; it does not fetch Team credit pools. Team subscriptions need CodexBar's supported console-cookie path (or a separately verified future CLI implementation). Do not treat a successful personal response as Team usage.
+The pinned Bailian 2.0.0 usage command queries Personal/Solo rolling-window usage only; it does not fetch Team credit pools. Team subscriptions need a console-cookie source configured in the host's CodexBar service (or a separately verified future CLI implementation). Do not treat a successful personal response as Team usage.
 
 Run browser login from an interactive session and follow the CLI's instructions. Console login may create an ordinary API key if needed; it does not configure your subscription inference endpoint. We do not run it automatically. Qwen's Token Plan inference key and Bailian's console usage session are separate credentials. Missing auth is reported noninteractively by `bl auth status`; successful status alone does not prove Token Plan usage authorization. Avoid `--verbose` for credential-bearing calls.
 
-### CodexBar usage
+### Usage dashboard
 
-CodexBar reads native Codex/Claude credentials from their existing mounts. Renew Claude login normally; no new Claude credential store is added. Test deliberately after login:
-
-```sh
-codexbar usage --provider codex --source oauth
-codexbar usage --provider claude --source oauth
-codexbar usage --provider alibaba-token-plan
-```
-
-Alibaba usage requires console authentication, not just a model API key. In CodexBar provider configuration select the matching international variant: `intl-personal` (the plan in use is Personal/Solo) or `intl` for Team. Init never writes account-specific config. Use `codexbar config --help` and the upstream configuration reference for provider settings. Configuration normally lives in `~/.config/codexbar/config.json` (per-workspace home persistence, unlike the host-shared native CLI credentials).
-
-The host runs the same providers as a dashboard (`host-services/codexbar/`, linked as the "AI Usage" workspace app); in-workspace `codexbar usage` is for deliberate checks.
-
-CodexBar auto tries signed-in `bl` first, then supported cookies. For Team subscriptions, explicitly configure the cookie usage source rather than relying on an incompatible successful personal CLI response. Live session validity, account tier compatibility, browser-login access and endpoint permissions must be verified after user login. No background poller is installed. Qwen Cloud is a separate provider; do not select it merely because the coding harness is Qwen Code.
+Usage for Codex, Claude and the Alibaba Token Plan is shown by the host's CodexBar service (`host-services/codexbar/`), linked as the "AI Usage" workspace app. Workspaces do not ship the `codexbar` CLI. The host reads the Alibaba plan through the same shared `bl` login, so `bl auth login --console` from any workspace is what keeps it signed in. Qwen Cloud is a separate provider; do not select it merely because the coding harness is Qwen Code.
 
 ## Diagram skills
 
@@ -87,10 +74,9 @@ Coder Agents discovers the canonical catalog through the existing `CODER_AGENT_E
 ```sh
 bash workspace-images/base-dev/tests/test-agent-tools-init.sh
 bash workspace-images/base-dev/tests/test-bailian-install.sh
-bash workspace-images/base-dev/tests/test-codexbar-install.sh
 ```
 
-Installer tests mock downloads/platforms and test checksum rejection, not real cross-architecture execution. Native ARM64 Qwen/Bailian/CodexBar version checks and an Archify showcase delivery passed in scratch environments; full base/child image builds, AMD64 execution and authenticated provider calls were not run locally. The agent-tools CI workflow runs native architecture smoke tests without publishing images or using provider secrets.
+Installer tests mock downloads/platforms and test checksum rejection, not real cross-architecture execution. Native ARM64 Qwen/Bailian version checks and an Archify showcase delivery passed in scratch environments; full base/child image builds, AMD64 execution and authenticated provider calls were not run locally. The agent-tools CI workflow runs native architecture smoke tests without publishing images or using provider secrets.
 
 Merge/build base-dev and inherited images; deploy the updated project-workspace template/runtime module for the new mounts; rebuild/restart workspaces. Restarting an old image alone will not install these CLIs. Existing regular CLI prompt files remain untouched. Node 22 changes the default inherited runtime; project-specific Node pins remain the project's responsibility.
 
@@ -98,7 +84,5 @@ Merge/build base-dev and inherited images; deploy the updated project-workspace 
 
 - https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/
 - https://github.com/modelstudioai/cli
-- https://github.com/steipete/CodexBar/blob/v0.84.0/docs/alibaba-token-plan.md
-- https://github.com/steipete/CodexBar/blob/v0.84.0/docs/configuration.md
 - https://github.com/likec4/likec4/tree/main/skills/likec4-dsl
 - https://github.com/tt-a1i/archify/tree/main/archify

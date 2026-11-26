@@ -401,7 +401,7 @@ image: nothing ties the secrets to the image a workspace resolves to.
 
 ### Base agent tools and diagram skills
 
-Base-dev now uses Node 22 and includes Qwen Code, Bailian (`bl`), and CodexBar CLI.
+Base-dev now uses Node 22 and includes Qwen Code and Bailian (`bl`).
 Qwen/Bailian state is host-shared via `.qwen`/`.bailian` runtime mounts; credentials
 are user-provisioned, never baked in. Qwen receives the canonical prompt and skills.
 The base skill manifest adds upstream LikeC4 DSL and Archify (explanatory HTML,
@@ -410,10 +410,11 @@ not a replacement for maintained LikeC4 models; on demand only, via the
 and `highlight` skills, with the `showme` and `highlight` commands, cover
 reviewing an agent's work in the editor. See
 `workspace-images/base-dev/AGENT_TOOLS.md` for international Token Plan login,
-CodexBar usage-auth boundaries, host-directory prerequisites, validation and rollout.
+host-directory prerequisites, validation and rollout.
 `host-services/codexbar/` runs `codexbar serve` on the host VM against the same
 read-only credential dirs; `usage.tapiavala.com` is the "AI Usage" workspace app
-(`workspace-apps` `ai_usage_url`), replacing the per-vendor usage links.
+(`workspace-apps` `ai_usage_url`), replacing the per-vendor usage links and the
+in-workspace `codexbar` CLI, which base-dev no longer installs.
 
 Repo instruction files: `AGENTS.md` is canonical (short, links to detailed docs);
 the base prompt tells agents never to create a separate `CLAUDE.md`. This repo's

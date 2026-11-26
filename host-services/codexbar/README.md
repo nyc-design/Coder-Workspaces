@@ -101,7 +101,7 @@ on AMD64 and ARM64; the publishing workflow runs them before its build too.
 
 ## Claude usage rate limits
 
-The image pins CodexBar 0.71.1 (base-dev's CLI stays on its own pin). CodexBar
+The image pins CodexBar 0.71.1. CodexBar
 0.72+ reads Claude usage with the reset-credit inventory flag
 (`/api/oauth/usage?cedar_ember=1`), and Anthropic rate limits that variant far
 harder than the plain call: sent seconds apart once a minute, the flagged call
