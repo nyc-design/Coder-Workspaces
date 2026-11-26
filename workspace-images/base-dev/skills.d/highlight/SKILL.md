@@ -30,6 +30,8 @@ The user should have one editor window open on the workspace. With two, the high
 
 - Line numbers are 1-based and the range includes both ends.
 - There is one highlight at a time. A new one replaces the last.
+- A call occasionally times out. Run it once more before telling the user.
+- `highlight symbols` returns an empty list for languages the editor has no language extension for, such as shell scripts. Read the file for line numbers instead.
 - `--note` attaches a short label to the highlight, and `--status` sets a short text in the status bar. Keep both to a few words, such as "2 of 5: the retry loop". They are labels, not the explanation.
 
 ## How to run the explanation

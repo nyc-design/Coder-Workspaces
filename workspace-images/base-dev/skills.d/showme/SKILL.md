@@ -29,7 +29,13 @@ showme show_html - < /tmp/diagram-arguments.json     # "-" reads the JSON argume
 
 Arguments are one JSON object. Read `showme tools <tool>` before the first use of a tool in a chat; it is the authority on arguments and limits, and this skill does not repeat them.
 
-Paths are relative to the repository root. Locate code by `text` (a literal string from the line) or `symbol` in preference to `lines`, so the mark lands in the right place even if the file has shifted.
+Paths are relative to the repository root. Locate code by `text` (a literal string from the line) in preference to `lines`, so the mark lands in the right place even if the file has shifted. `symbol` works only where the editor has a language extension for the file; it finds nothing in shell scripts, for example.
+
+Read the result of every call. A call can succeed while one of its locations was not found: each entry in `resolutions` has a `match` of `one`, `many` or `none`. On `none`, nothing was drawn for that item; try again with `text`. On `many`, pick one with `occurrence`.
+
+Each call is a separate short process, and what it drew stays on screen after it exits. Bubbles keep their `id` between calls, and `get_editor_state` lists them with their line, colour and whether the user resolved them.
+
+ShowMe opens a file in its own read-only tab, marked as the agent's, beside any tab the user already has for that file. That is expected; `arrange_editors` with `close-own` closes those tabs.
 
 ## What each tool is for
 

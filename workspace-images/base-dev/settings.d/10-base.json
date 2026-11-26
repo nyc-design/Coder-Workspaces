@@ -8,7 +8,6 @@
     "claudeCode.preferredLocation": "panel",
     "workbench.activityBar.location": "top",
     "chat.viewSessions.orientation": "stacked",
-    "todoforge.scanning.mode": "currentFile",
     "mdb.showOverviewPageAfterInstall": false,
     "editor.fontFamily": "Cascadia Mono, Consolas, monospace",
     "editor.fontLigatures": false,
@@ -41,6 +40,7 @@
       "IMPLEMENTED": { "icon": "tools", "foreground": "#3b82f6" },
       "REVIEWED": { "icon": "check", "foreground": "#22c55e" }
     },
-    "todoforge.tree.groupBy": "tag"
+    "todoforge.tree.groupBy": "tag",
+    "todoforge.scanning.mode": "currentFile"
   }
 }
