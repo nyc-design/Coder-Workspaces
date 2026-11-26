@@ -341,7 +341,7 @@ the lifecycle:
 
 | Script | Role |
 |---|---|
-| `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. For unpinned OpenVSX ids the wanted version is the newest stable release whose `engines.vscode` code-server satisfies. |
+| `25-extensions-install.sh` | Install manifest ids into the shared cache if the wanted version is absent. Never uninstalls. For unpinned OpenVSX ids the wanted version is the newest stable release whose `engines.vscode` code-server satisfies. Each install runs under a per-cache `flock` (`<cache>/.install.lock`), so workspaces starting together install a new version once instead of racing on it. |
 | `30-extensions-activate.sh` | Promote UI-installed real dirs into the cache; symlink exactly one active version per id into each editor dir (the pin, else the highest version that editor's VS Code version can run per `engines.vscode`, so editors on different VS Code versions can activate different versions of one id); reconcile each per-workspace editor's `extensions.json` / `.obsolete` with those symlinks (the editors trust that registry and do not rescan, so a repointed id otherwise shows as an invalid extension); write this workspace's **lease** at `shared/_leases/<owner>--<workspace>` listing every versioned dir it activated; start a background refresher that re-touches the lease every 6h. |
 | `31-extensions-prune.sh` | Reap versions nobody needs. A versioned dir is deleted only if it is not the newest for its id, not pinned by an image manifest, and not listed in any fresh lease (any workspace's). Leases untouched for `EXTENSIONS_LEASE_STALE_DAYS` (45) are treated as abandoned and removed. |
 
@@ -351,8 +351,11 @@ by its own lease regardless of what image or manifest the pruning workspace
 has. There is no time-based aging of extension versions themselves. A
 workspace whose lease went stale (stopped for >45 days) simply re-downloads
 what it needs on its next start. Knobs: `EXTENSIONS_PRUNE=0` disables the
-pruner, `EXTENSIONS_PRUNE_DRY_RUN=1` logs without deleting. Tests:
-`workspace-images/base-dev/tests/test-extensions-cache.sh`.
+pruner, `EXTENSIONS_PRUNE_DRY_RUN=1` logs without deleting,
+`EXTENSIONS_INSTALL_LOCK_TIMEOUT` (180) is how many seconds an install waits
+for another workspace's before going ahead unlocked. Tests:
+`workspace-images/base-dev/tests/test-extensions-cache.sh` and
+`test-extensions-install-lock.sh`.
 
 ### Xcode Cloud from Linux (swift-dev)
 
@@ -540,7 +543,7 @@ curl -o .github/workflows/coder-issue-automation.yaml \
 - **Update language-image extensions/settings**: Edit the relevant `workspace-images/<image>/extensions.d/*.json` or `settings.d/*.json` (Tier 2 manifest). Extension entries are either bare ids (`"publisher.name"` — track the newest **stable** release, queried from the registry on each workspace start; OpenVSX's `latest` alias can be a nightly pre-release, so `latest_openvsx()` filters on the v2 query API's `preRelease` flag and only falls back to `latest` for extensions that publish no stable builds, e.g. GitLens) or pinned (`"publisher.name@1.2.3"` — exact version). Installs land in host-bound shared caches at `~/.vscode-extensions/shared/` (OpenVSX, used by both editors) and `~/.vscode-extensions/vscode-web/` (Marketplace, vscode-web only), so versions persist across workspaces. `30-extensions-activate.sh` then resolves exactly one active version per manifest id (the pin if present, else the highest version number) and symlinks only that into each editor's own extensions dir, so a workspace only sees the extensions its manifest requested and never has multiple versions of one extension to choose from. UI-installed updates are promoted into the shared cache on next workspace start; manifest pins (if any) re-assert on the start after that. See "Shared extension cache lifecycle" (under Key Architecture Concepts) for how old versions are reaped.
 - **Add language support**: Create new image directory, copy/modify GitHub Actions workflow
 - **Debug build issues**: Check GitHub Actions logs, verify GCP authentication
-- **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output
+- **Debug init issues**: Check `/tmp/workspace-init.log` for script execution output. Each `[init-runner]` line carries the script's start time or duration, and code-server only launches once the whole pipeline has finished
 - **Test shell config**: Use `exec bash` or restart workspace to see prompt changes
 - **Troubleshoot secrets**: Verify `CODER_GCP_PROJECT` is set and GCP authentication works
 - **Monitor builds**: Watch GitHub Actions for build status and multi-arch manifest creation
