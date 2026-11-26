@@ -51,11 +51,10 @@ RUN npm install -g pnpm @openai/codex @qwen-code/qwen-code@0.27.2 @anthropic-ai/
 
 # Subscription tooling: no credentials or user state in image layers.
 COPY workspace-images/base-dev/scripts/install-bailian.sh /tmp/install-bailian.sh
-COPY workspace-images/base-dev/scripts/install-codexbar.sh /tmp/install-codexbar.sh
-RUN bash /tmp/install-bailian.sh && bash /tmp/install-codexbar.sh \
+RUN bash /tmp/install-bailian.sh \
  && qwen --version \
  && chown -R coder:coder /usr/local/share/npm-global \
- && rm /tmp/install-bailian.sh /tmp/install-codexbar.sh
+ && rm /tmp/install-bailian.sh
 ENV ARCHIFY_UPDATE_CHECK_DISABLED=1
 
 # RTK (Reducer ToolKit) — LLM context optimizer via command output reduction

@@ -9,7 +9,7 @@
 # pinned Bailian installer shared with base-dev is reused.
 
 # Stage 1: pinned, checksum-verified CodexBar release.
-# Pinned separately from base-dev (0.84): CodexBar >= 0.72 reads Claude usage
+# Pinned below the latest release on purpose: CodexBar >= 0.72 reads Claude usage
 # with `?cedar_ember=1`, which Anthropic rate limits about half the time even at
 # one request per five minutes; the plain call 0.71.1 makes is not affected.
 # Re-test Claude polling before raising this. Checksums match upstream .sha256.
