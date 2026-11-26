@@ -101,7 +101,7 @@ mcp_servers:
 
   - slug: agentmemory
     display_name: AgentMemory
-    description: 'Per-project persistent memory: save observations, recall via smart search, list/audit sessions, manage lessons + sentinels. Always pass `project` derived from the repo (basename of `git remote get-url origin .git`) so memory scopes per repo and survives workspace recreate.'
+    description: 'Per-project persistent memory: save observations, recall via smart search, list/audit sessions, manage lessons + sentinels. Always pass `project`: the exact GitHub repository name (case included, no owner, no `.git`, not the workspace name), or `general` when no repository is involved, so every agent scopes to the same key.'
     icon_url: /icon/database.svg
     transport: streamable_http
     url: https://memory.tapiavala.com/mcp

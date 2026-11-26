@@ -75,7 +75,7 @@ Keep exactly one marker per function and move it forward by changing the stage w
 
 Only the user moves a function to `REVIEWED`. Set it yourself only when they tell you they have reviewed that function. If you later change the code of a `REVIEWED` function, set it back to `IMPLEMENTED` and say so.
 
-Write the stage in capitals exactly as above. The editor's Todo Tree view picks these words up as tags and groups functions by stage, so the tree shows what is left to do.
+Write the stage in capitals exactly as above. The editor's TodoForge view picks these words up as tags and groups functions by stage, so the tree shows what is left to do.
 
 ## Docstrings
 
@@ -109,7 +109,7 @@ async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     # Return the new playlist together with the list of tracks we could not find, so the caller can show the user what was left out
 ```
 
-The same function once the outline is agreed and implemented:
+Once the outline is agreed and implemented, each comment is unchanged and sits directly above its code:
 
 ```python
 # IMPLEMENTED: import_playlist
@@ -123,12 +123,5 @@ async def import_playlist(user_id: str, source_url: str) -> ImportResult:
     owned = await library.track_ids(user_id)
     candidates = [track for track in source.tracks if track.id not in owned]
 
-    # Look up each remaining track in our own catalog, keeping the tracks we could not find in a separate list instead of dropping them
-    matches = await catalog.match_tracks(candidates)
-
-    # Save the tracks we found as a new playlist owned by the user, named after the original playlist
-    playlist = await library.create_playlist(user_id, source.title, matches.found)
-
-    # Return the new playlist together with the list of tracks we could not find, so the caller can show the user what was left out
-    return ImportResult(playlist=playlist, unmatched=matches.missing)
+    # ...and so on for the remaining steps
 ```

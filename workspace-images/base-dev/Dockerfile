@@ -133,10 +133,15 @@ RUN install -d -m 0755 \
 # symlinks for Claude/Codex/Gemini provider-specific files).
 COPY workspace-images/base-dev/system_prompt.txt /usr/local/share/workspace-prompts/00-base.txt
 COPY workspace-images/base-dev/scripts/continue-patch /usr/local/bin/continue-patch
+# Commands that let an agent point at code in the user's open editor window,
+# through the ShowMe and Code Walkthrough extensions (see the showme and
+# highlight skills).
+COPY workspace-images/base-dev/scripts/showme /usr/local/bin/showme
+COPY workspace-images/base-dev/scripts/highlight /usr/local/bin/highlight
 COPY shared-assets/vscode-themes/ /usr/local/share/shared-assets/vscode-themes/
 
 COPY workspace-images/base-dev/init.d/ /usr/local/share/workspace-init.d/
-RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patch
+RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patch /usr/local/bin/showme /usr/local/bin/highlight
 
 # Image-bundled skills, in two flavors. Both are consumed by
 # 13-agent-skills.sh on every workspace start: it copies the SKILL.md dirs
@@ -152,8 +157,10 @@ RUN chmod +x /usr/local/share/workspace-init.d/*.sh /usr/local/bin/continue-patc
 # pair. Docker layer inheritance merges them with base-dev's contents at
 # the same shared path.
 #
-# base-dev currently ships the four agentmemory skills (recall, remember,
-# session-history, forget) as SKILL.md dirs; upstream LikeC4 DSL and Archify use the CLI install list.
+# base-dev ships its own skills (likec4-modeling, implementation-outline,
+# walkthrough, showme, highlight) as SKILL.md dirs; upstream LikeC4 DSL and
+# Archify use the CLI install list. Skills that need no workspace live in
+# coder-agents-config/skills/ instead.
 COPY workspace-images/base-dev/skills.d/          /usr/local/share/workspace-skills.d/
 COPY workspace-images/base-dev/skills-install.d/  /usr/local/share/workspace-skills-install.d/
 

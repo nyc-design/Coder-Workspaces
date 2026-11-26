@@ -18,6 +18,8 @@
 #                              resolves name → ai_provider_id at push time.
 #   model overrides PUT declared contexts only; unlisted contexts are untouched
 #   mcp servers     additive   (POST if missing, PATCH if exists; never delete)
+#   skills          additive   (POST if missing, PATCH content if exists; never
+#                              delete). Push only: pull does not export skills.
 #   system prompt   PUT singleton
 #
 # Required env:
@@ -35,6 +37,7 @@
 #   models          (provider name, model) in YAML; (ai_provider_id, model) in the API
 #   model overrides context; referenced models use the same (provider name, model)
 #   mcp servers     slug field
+#   skills          frontmatter name (= directory name under skills/)
 
 set -euo pipefail
 
@@ -394,6 +397,139 @@ push_mcp_servers() {
   done
 }
 
+# ───────── SKILLS (additive) ────────────────────────────────────────────────
+# Organization skills are the "Coder Agents central" skill level: every chat in
+# the organization sees them, with or without a workspace. Two inputs, mirroring
+# the workspace images' skills.d/ + skills-install.d/ pair:
+#   skills/<name>/SKILL.md   skills maintained in this repo
+#   skills-install.json      JSON array of URLs to upstream skills, either a
+#                            GitHub directory (…/tree/<ref>/<path>, SKILL.md is
+#                            read from it) or a direct link to a SKILL.md
+#
+# Wire schema (codersdk.CreateSkillRequest / UpdateSkillRequest):
+#   GET    /api/experimental/organizations/{org}/skills          [{name, ...}]
+#   POST   /api/experimental/organizations/{org}/skills          {content}
+#   PATCH  /api/experimental/organizations/{org}/skills/{name}   {content}
+#
+# `content` is the whole SKILL.md; Coder takes the name and description from its
+# frontmatter. An organization skill is that single file, so supporting files
+# next to a SKILL.md are not uploaded. PATCH sends only the content, which
+# leaves a skill disabled in the UI disabled.
+SKILL_NAME_PATTERN='^[a-z0-9]+(-[a-z0-9]+)*$'
+SKILL_MAX_BYTES=65536
+
+# stage_skill <staging dir> <SKILL.md> <source label> [required name]
+# Validates one SKILL.md and copies it to <staging dir>/<name>.md.
+stage_skill() {
+  local staging_dir="$1" skill_file="$2" source_label="$3" required_name="${4-}"
+  local skill_name skill_bytes
+  skill_name="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {exit} fm==1' "$skill_file" \
+    | yq -r '.name // ""' 2>/dev/null || true)"
+  if ! [[ "$skill_name" =~ $SKILL_NAME_PATTERN ]]; then
+    echo "ERROR: $source_label: frontmatter needs a lowercase kebab-case 'name' (got '$skill_name')" >&2
+    return 1
+  fi
+  if [ -n "$required_name" ] && [ "$skill_name" != "$required_name" ]; then
+    echo "ERROR: $source_label: frontmatter name '$skill_name' must match its directory '$required_name'" >&2
+    return 1
+  fi
+  skill_bytes="$(wc -c < "$skill_file")"
+  if [ "$skill_bytes" -gt "$SKILL_MAX_BYTES" ]; then
+    echo "ERROR: $source_label: $skill_bytes bytes exceeds Coder's $SKILL_MAX_BYTES byte skill limit" >&2
+    return 1
+  fi
+  if [ -e "$staging_dir/$skill_name.md" ]; then
+    echo "ERROR: $source_label: skill '$skill_name' is defined more than once" >&2
+    return 1
+  fi
+  cp "$skill_file" "$staging_dir/$skill_name.md"
+}
+
+# GitHub directory URL → raw SKILL.md URL; any other URL is used as given.
+skill_download_url() {
+  local skill_url="${1%/}"
+  if [[ "$skill_url" =~ ^https://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/(.+)$ ]]; then
+    printf '%s/%s/%s/%s/%s/SKILL.md' "${SKILLS_RAW_BASE_URL:-https://raw.githubusercontent.com}" \
+      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"
+  else
+    printf '%s' "$skill_url"
+  fi
+}
+
+push_skills() {
+  local skills_dir="$CONFIG_DIR/skills" install_file="$CONFIG_DIR/skills-install.json"
+  local staging_dir
+  staging_dir="$(mktemp -d)"
+  # Expanded now on purpose: staging_dir is local and gone by the time EXIT fires.
+  # shellcheck disable=SC2064
+  trap "rm -rf '$staging_dir'" EXIT
+
+  local skill_dir skill_name
+  if [ -d "$skills_dir" ]; then
+    for skill_dir in "$skills_dir"/*/; do
+      [ -d "$skill_dir" ] || continue
+      skill_name="$(basename "$skill_dir")"
+      if [ ! -f "$skill_dir/SKILL.md" ]; then
+        echo "ERROR: $skills_dir/$skill_name has no SKILL.md" >&2
+        return 1
+      fi
+      if [ -n "$(find "$skill_dir" -mindepth 1 ! -name SKILL.md -print -quit)" ]; then
+        echo "    WARN  $skill_name: only SKILL.md is uploaded; other files in the directory are ignored" >&2
+      fi
+      stage_skill "$staging_dir" "$skill_dir/SKILL.md" "$skills_dir/$skill_name/SKILL.md" "$skill_name"
+    done
+  fi
+
+  if [ -f "$install_file" ]; then
+    if ! jq -e 'type == "array" and all(.[]; type == "string" and test("^https?://"))' "$install_file" >/dev/null; then
+      echo "ERROR: $install_file must be a JSON array of skill URLs" >&2
+      return 1
+    fi
+    local skill_url download_url
+    while IFS= read -r skill_url; do
+      download_url="$(skill_download_url "$skill_url")"
+      # No Coder auth header here: these are third-party hosts.
+      if ! curl -fsSL --retry 2 -o "$staging_dir/.download" "$download_url"; then
+        echo "ERROR: could not download skill $skill_url ($download_url)" >&2
+        return 1
+      fi
+      stage_skill "$staging_dir" "$staging_dir/.download" "$skill_url"
+    done < <(jq -r '.[]' "$install_file")
+    rm -f "$staging_dir/.download"
+  fi
+
+  local -a staged_files=()
+  local staged_file
+  for staged_file in "$staging_dir"/*.md; do
+    [ -f "$staged_file" ] && staged_files+=("$staged_file")
+  done
+  if [ "${#staged_files[@]}" -eq 0 ]; then
+    echo "no skills, skipping"
+    return
+  fi
+
+  echo "==> syncing ${#staged_files[@]} organization skill(s) from $skills_dir and $install_file"
+  local skills_url current request_body
+  skills_url="/api/experimental/organizations/$(resolve_organization_id)/skills"
+  current="$(coder_get "$skills_url")"
+  if ! jq -e 'type == "array"' <<< "$current" >/dev/null; then
+    echo "ERROR: unexpected organization skills response: $(printf '%s' "$current" | head -c 300)" >&2
+    return 1
+  fi
+
+  for staged_file in "${staged_files[@]}"; do
+    skill_name="$(basename "$staged_file" .md)"
+    request_body="$(jq -n --rawfile content "$staged_file" '{content: $content}')"
+    if jq -e --arg name "$skill_name" 'any(.[]; .name == $name)' <<< "$current" >/dev/null; then
+      echo "    PATCH $skill_name"
+      coder_patch "$skills_url/$skill_name" "$request_body" >/dev/null
+    else
+      echo "    POST  $skill_name (new)"
+      coder_post "$skills_url" "$request_body" >/dev/null
+    fi
+  done
+}
+
 # ───────── SYSTEM PROMPT (PUT singleton) ────────────────────────────────────
 # system-prompt.txt may begin with optional YAML frontmatter (between two
 # `---` delimiters) carrying toggle fields like include_default_system_prompt.
@@ -613,7 +749,7 @@ pull_all() {
 
 case "$MODE" in
   push)
-    # Order matters: providers → models (with delete pass) → overrides → MCPs → prompts.
+    # Order matters: providers → models (with delete pass) → overrides → MCPs → skills → prompts.
     # Coder rejects model creation if its provider isn't already configured,
     # and push_models reads the post-push AI_PROVIDERS_JSON cache to resolve
     # name → ai_provider_id.
@@ -621,6 +757,7 @@ case "$MODE" in
     push_models
     push_model_overrides
     push_mcp_servers
+    push_skills
     push_system_prompt
     push_plan_mode_instructions
     push_template_allowlist

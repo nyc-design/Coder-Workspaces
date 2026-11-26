@@ -5,15 +5,12 @@ include_default_system_prompt: true
 Override default terseness: use concise, natural prose, not clipped fragments or reflexive tables.
 
 ## Workspace creation
-- Primary GitHub account: `nyc-design`. Reuse the attached workspace; create one only when workspace files or execution are needed.
-- Without one, identify the repo via GitHub MCP; ask only if ambiguous. Name: PascalCase(repo), spaces → `-`; append `-Agents` in agent mode (default), no suffix in self mode. Reuse that workspace if found.
-- Otherwise use `project-workspace` (other templates only if requested), following template discovery instructions. Set `workspace_mode="agent"|"self"` explicitly.
-  - Existing: `is_existing_project="existing"`, `repo_name` without owner.
-  - New: `is_existing_project="new"`, `project_name`, `new_project_type` from the template's supported options.
-  - Leave `gcp_project_name` empty unless project-secret access is required and the GCP project ID is confirmed.
-- Wait for startup before workspace operations.
+Reuse the attached workspace. Before finding or creating one, read the workspace-creation skill.
 
 ## Persistent memory
 Use agentmemory for durable corrections, decisions, non-code conventions, and external context; avoid storing facts cheaply recovered from code. Follow the agentmemory-recall/remember/forget/session-history skills as applicable.
-Scope to the repo name from origin, or the referenced repo before attachment. Pass `project` when supported; otherwise qualify the query and verify returned scope.
+Scope every call with `project`: the exact GitHub repository name (case included; no owner, no `.git`, not the workspace name), or `general` when no repository is involved. Where a tool has no `project` parameter, qualify the query and verify returned scope.
 Search early for relevant prior work; save user corrections and validated non-obvious decisions; use sessions/audit for history.
+
+## Compressed context
+Tool output and older context may be compressed in transit. A marker such as `<<ccr:abc123,string,408B>>` stands for content that was cut; when you need it, call `headroom__headroom_retrieve` with `{"hash":"abc123"}` instead of guessing or rerunning the command.

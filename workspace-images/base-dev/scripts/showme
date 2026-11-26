@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+// Calls one tool of the ShowMe extension (zvxbase.vscode-showme) from a shell, so an agent
+// without a stdio MCP client can drive the user's open editor window.
+//
+//   showme tools                    list the tools with a one-line description each
+//   showme tools <tool>             full description and argument schema of one tool
+//   showme <tool> [JSON | -]        call a tool; arguments as a JSON object, or "-" to read them from stdin
+//
+// ShowMe ships its own MCP server (the "bridge") inside the extension. Each run starts that
+// bridge, makes one call and exits; the bridge finds the editor window through ShowMe's
+// runtime folder, so this works from any shell in the same workspace as the window.
+
+const { spawn } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const CALL_TIMEOUT_MILLISECONDS = 30000;
+
+// Each editor has its own extensions folder; the first one that has ShowMe wins.
+const EXTENSION_FOLDERS = [
+  ".vscode-extensions/code-server",
+  ".vscode-extensions/vscode-web-editor",
+  ".vscode-server/extensions",
+  ".cursor-server/extensions",
+  ".vscode-extensions/shared",
+];
+
+
+function findBridge() {
+  if (process.env.SHOWME_BRIDGE) return process.env.SHOWME_BRIDGE;
+
+  for (const folder of EXTENSION_FOLDERS) {
+    const extensionsDirectory = path.join(os.homedir(), folder);
+    if (!fs.existsSync(extensionsDirectory)) continue;
+
+    // The folder name carries the version, so take the newest one present.
+    const bridges = fs.readdirSync(extensionsDirectory)
+      .filter((name) => name.toLowerCase().startsWith("zvxbase.vscode-showme-"))
+      .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
+      .map((name) => path.join(extensionsDirectory, name, "bridge", "index.js"))
+      .filter((bridgePath) => fs.existsSync(bridgePath));
+
+    if (bridges.length > 0) return bridges[0];
+  }
+
+  throw new Error("The ShowMe extension is not installed in this workspace (no zvxbase.vscode-showme-* folder with a bridge was found).");
+}
+
+
+// Start the bridge, complete the MCP handshake, send one request and return its result.
+function request(method, params) {
+  return new Promise((resolve, reject) => {
+    const bridge = spawn(process.execPath, [findBridge()], { stdio: ["pipe", "pipe", "pipe"] });
+    let pendingOutput = "";
+    let errorOutput = "";
+
+    const finish = (settle, value) => {
+      clearTimeout(timer);
+      bridge.kill();
+      settle(value);
+    };
+    const timer = setTimeout(() => finish(reject, new Error(`ShowMe did not answer within ${CALL_TIMEOUT_MILLISECONDS / 1000} seconds. ${errorOutput.trim()}`)), CALL_TIMEOUT_MILLISECONDS);
+    const send = (message) => bridge.stdin.write(`${JSON.stringify(message)}\n`);
+
+    bridge.on("error", (error) => finish(reject, error));
+    bridge.on("exit", (code) => finish(reject, new Error(`The ShowMe bridge exited (code ${code}) before answering. ${errorOutput.trim()}`)));
+    bridge.stderr.on("data", (chunk) => { errorOutput += chunk; });
+    bridge.stdout.on("data", (chunk) => {
+      pendingOutput += chunk;
+
+      let lineEnd;
+      while ((lineEnd = pendingOutput.indexOf("\n")) !== -1) {
+        const line = pendingOutput.slice(0, lineEnd).trim();
+        pendingOutput = pendingOutput.slice(lineEnd + 1);
+        if (!line) continue;
+
+        const message = JSON.parse(line);
+        if (message.error) return finish(reject, new Error(message.error.message));
+
+        if (message.id === 1) {
+          send({ jsonrpc: "2.0", method: "notifications/initialized" });
+          send({ jsonrpc: "2.0", id: 2, method, params });
+        }
+        if (message.id === 2) return finish(resolve, message.result);
+      }
+    });
+
+    send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "showme-cli", version: "1" } } });
+  });
+}
+
+
+async function main() {
+  const [command, argument] = process.argv.slice(2);
+
+  if (!command || command === "--help" || command === "-h") {
+    console.log("showme tools | showme tools <tool> | showme <tool> [JSON | -]");
+    return;
+  }
+
+  if (command === "tools") {
+    const { tools } = await request("tools/list", {});
+
+    if (!argument) {
+      for (const tool of tools) console.log(`${tool.name}: ${(tool.description || "").split(/(?<=\.)\s/)[0]}`);
+      return;
+    }
+
+    const tool = tools.find((candidate) => candidate.name === argument);
+    if (!tool) throw new Error(`No tool named ${argument}. Run "showme tools" for the list.`);
+
+    console.log(`${tool.description}\n\nArguments:\n${JSON.stringify(tool.inputSchema, null, 2)}`);
+    return;
+  }
+
+  const rawArguments = argument === "-" ? fs.readFileSync(0, "utf8") : argument || "{}";
+  let toolArguments;
+  try {
+    toolArguments = JSON.parse(rawArguments);
+  } catch (error) {
+    throw new Error(`The arguments are not valid JSON: ${error.message}`);
+  }
+
+  const result = await request("tools/call", { name: command, arguments: toolArguments });
+  const text = (result.content || []).map((part) => part.text).join("\n");
+
+  if (result.isError) throw new Error(text);
+
+  console.log(text);
+}
+
+
+main().catch((error) => {
+  console.error(`showme: ${error.message}`);
+  process.exit(1);
+});
