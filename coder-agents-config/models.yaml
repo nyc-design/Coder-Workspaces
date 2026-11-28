@@ -180,11 +180,11 @@ models:
   # ── Codex subscription paths (OpenAI Responses API) ───────────────────────
 
   - provider: openai
-    model: cliproxy-codex/gpt-6-astra
-    display_name: GPT-6 Astra — CLIProxyAPI Codex
+    model: cliproxy-codex/gpt-6.2-astra
+    display_name: GPT-6.2 Astra — CLIProxyAPI Codex
     enabled: true
     is_default: false
-    context_limit: 828400
+    context_limit: 400000
     compression_threshold: 80
     model_config:
       openai_config:
@@ -192,11 +192,7 @@ models:
       reasoning_effort:
         default: medium
         max: max
-      cost:
-        input_price_per_million_tokens: "10"
-        output_price_per_million_tokens: "50"
-        cache_read_price_per_million_tokens: "1"
-        cache_write_price_per_million_tokens: "12.5"
+      # Pricing estimates omitted until verified for this model version.
       provider_options:
         openai:
           store: false
@@ -275,8 +271,8 @@ models:
           reasoning_summary: auto
 
   - provider: openai
-    model: cliproxy-codex/gpt-6-sol
-    display_name: GPT-6 Sol — CLIProxyAPI Codex
+    model: cliproxy-codex/gpt-6.2-sol
+    display_name: GPT-6.2 Sol — CLIProxyAPI Codex
     enabled: true
     is_default: false
     context_limit: 400000
@@ -287,11 +283,7 @@ models:
       reasoning_effort:
         default: high
         max: max
-      cost:
-        input_price_per_million_tokens: "2"
-        output_price_per_million_tokens: "10"
-        cache_read_price_per_million_tokens: "0.2"
-        cache_write_price_per_million_tokens: "2.5"
+      # Pricing estimates omitted until verified for this model version.
       provider_options:
         openai:
           store: false
